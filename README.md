@@ -1,4 +1,4 @@
-# agent-session-bridge
+# kage
 
 Export local agent sessions into native `Codex`, `Claude`, and `Qoder` session files.
 
@@ -9,7 +9,7 @@ The name comes from the "shadow clone" idea: a useful coding agent should be abl
 
 ## Why It Exists
 
-`agent-session-bridge` is built around two practical workflows.
+`kage` is built around two practical workflows.
 
 1. Fork a conversation and keep the useful context.
 You can branch an existing session, trim it, append one new user message, and continue without rebuilding context from scratch.
@@ -22,32 +22,32 @@ You can move a session between tools like `Claude -> Codex` or `Codex -> Claude`
 Bridge a Claude session into Codex:
 
 ```bash
-agent-session-bridge c2x
+kage c2x
 ```
 
 Bridge a Codex session into Claude:
 
 ```bash
-agent-session-bridge x2c
+kage x2c
 ```
 
 Fork the current Codex session into a new Codex session:
 
 ```bash
-agent-session-bridge x2x
+kage x2x
 ```
 
 Fork the current Claude session into a new Claude session:
 
 ```bash
-agent-session-bridge c2c
+kage c2c
 ```
 
 Fork or trim before exporting:
 
 ```bash
-agent-session-bridge claude qoder --split-recent 1 --out ./tmp/split.jsonl
-agent-session-bridge claude qoder --fork "另外开一个分支，去做 session split" --out ./tmp/fork.jsonl
+kage claude qoder --split-recent 1 --out ./tmp/split.jsonl
+kage claude qoder --fork "另外开一个分支，去做 session split" --out ./tmp/fork.jsonl
 ```
 
 ## What It Supports
@@ -67,7 +67,7 @@ agent-session-bridge claude qoder --fork "另外开一个分支，去做 session
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/farmcan/agent-session-bridge/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash
 ```
 
 Then use:

@@ -21,8 +21,6 @@ const helpText = `Usage:
   kage <agent>
   kage <source> <target> [options]
   kage <route-alias> [options]
-  agent-session-bridge <source> <target> [options]
-  agent-session-bridge <route-alias> [options]
 
 Route aliases:
   x2x   codex -> codex
@@ -185,7 +183,7 @@ async function resolveForkPrompt(args) {
 }
 
 export async function runUpdateCommand({
-  command = process.env.KAGE_UPDATE_COMMAND ?? "curl -fsSL https://raw.githubusercontent.com/farmcan/agent-session-bridge/main/install.sh | bash",
+  command = process.env.KAGE_UPDATE_COMMAND ?? "curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash",
   stdout = process.stdout,
   stderr = process.stderr,
 } = {}) {

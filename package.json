@@ -1,12 +1,11 @@
 {
-  "name": "agent-session-bridge",
+  "name": "kage",
   "version": "0.1.0",
   "description": "Fork and bridge local agent sessions across Codex, Claude, and Qoder.",
   "type": "module",
   "main": "./src/index.js",
   "bin": {
-    "kage": "./src/cli.js",
-    "agent-session-bridge": "./src/cli.js"
+    "kage": "./src/cli.js"
   },
   "files": [
     "src",
@@ -18,11 +17,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/farmcan/agent-session-bridge.git"
+    "url": "git+https://github.com/farmcan/kage.git"
   },
-  "homepage": "https://github.com/farmcan/agent-session-bridge#readme",
+  "homepage": "https://github.com/farmcan/kage#readme",
   "bugs": {
-    "url": "https://github.com/farmcan/agent-session-bridge/issues"
+    "url": "https://github.com/farmcan/kage/issues"
   },
   "keywords": [
     "codex",

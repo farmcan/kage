@@ -17,7 +17,7 @@ function resolveClaudeInstallPath(projectKey, fileName) {
 }
 
 function resolveDefaultTmpPath(fileName) {
-  return path.join(process.cwd(), "tmp", "agent-session-bridge", fileName);
+  return path.join(process.cwd(), "tmp", "kage", fileName);
 }
 
 function withPath(file, filePath) {

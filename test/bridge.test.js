@@ -569,7 +569,7 @@ test("cli --help only documents native export commands", async () => {
   const result = await spawnCli(["--help"]);
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
-  assert.match(result.stdout, /agent-session-bridge <source> <target> \[options\]/);
+  assert.match(result.stdout, /kage <route-alias> \[options\]/);
   assert.match(result.stdout, /c2v\s+claude -> visualize/);
   assert.match(result.stdout, /x2v\s+codex -> visualize/);
   assert.match(result.stdout, /q2v\s+qoder -> visualize/);
@@ -578,10 +578,10 @@ test("cli --help only documents native export commands", async () => {
   assert.doesNotMatch(result.stdout, /x2r/);
 });
 
-test("package.json exposes kage and legacy agent-session-bridge bins", async () => {
+test("package.json exposes kage bin", async () => {
   const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
+  assert.deepEqual(Object.keys(packageJson.bin), ["kage"]);
   assert.equal(packageJson.bin.kage, "./src/cli.js");
-  assert.equal(packageJson.bin["agent-session-bridge"], "./src/cli.js");
 });
 
 test("cli fails clearly for removed handoff flags and cursor aliases", async () => {
@@ -793,7 +793,7 @@ test("cli runs correctly when invoked through a symlinked entrypoint", async () 
   const sessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
   const realCliPath = path.join(__dirname, "..", "src", "cli.js");
   const tempDir = await makeTempDir("cli-symlink");
-  const symlinkPath = path.join(tempDir, "agent-session-bridge");
+  const symlinkPath = path.join(tempDir, "kage");
   await fs.symlink(realCliPath, symlinkPath);
 
   const result = await new Promise((resolve, reject) => {

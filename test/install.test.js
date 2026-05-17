@@ -13,7 +13,7 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /^#!\/usr\/bin\/env bash/m);
   assert.match(content, /node/i);
   assert.match(content, /npm/i);
-  assert.match(content, /https:\/\/github\.com\/farmcan\/agent-session-bridge\/archive\/refs\/heads\/main\.tar\.gz/);
+  assert.match(content, /https:\/\/github\.com\/farmcan\/kage\/archive\/refs\/heads\/main\.tar\.gz/);
   assert.match(content, /npm install -g/);
   assert.match(content, /kage c2x/);
 });

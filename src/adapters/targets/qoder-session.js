@@ -21,7 +21,7 @@ export function renderQoderSessionExport({
     cwd: session.cwd,
     sessionId: exportedSessionId,
     version,
-    agentId: "agent-session-bridge",
+    agentId: "kage",
     type: message.role === "assistant" ? "assistant" : "user",
     timestamp: exportedTimestamp,
     message: {

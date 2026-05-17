@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO_TARBALL_URL="https://github.com/farmcan/agent-session-bridge/archive/refs/heads/main.tar.gz"
+REPO_TARBALL_URL="https://github.com/farmcan/kage/archive/refs/heads/main.tar.gz"
 
 fail() {
   printf 'Error: %s\n' "$1" >&2
