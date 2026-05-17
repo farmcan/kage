@@ -578,7 +578,7 @@ test("cli --help only documents native export commands", async () => {
   assert.doesNotMatch(result.stdout, /x2r/);
 });
 
-test("package.json exposes kage bin", async () => {
+test("package.json exposes KAGE bin", async () => {
   const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
   assert.deepEqual(Object.keys(packageJson.bin), ["kage"]);
   assert.equal(packageJson.bin.kage, "./src/cli.js");
@@ -606,11 +606,11 @@ test("cli reports supported aliases for unknown route aliases", async () => {
 
 test("cli supports update command", async () => {
   const result = await spawnCli(["update"], {
-    env: { ...process.env, KAGE_UPDATE_COMMAND: "printf 'Updated kage\\n'" },
+    env: { ...process.env, KAGE_UPDATE_COMMAND: "printf 'Updated KAGE\\n'" },
   });
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /Updated kage/);
+  assert.match(result.stdout, /Updated KAGE/);
 });
 
 test("cli shows the selected session card when only one match exists", async () => {

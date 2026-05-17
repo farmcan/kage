@@ -23,7 +23,7 @@ if [ "$node_major" -lt 20 ]; then
   fail "Node.js 20+ is required. Current version: $(node -v)"
 fi
 
-printf 'Installing kage from %s\n' "$REPO_TARBALL_URL"
+printf 'Installing KAGE from %s\n' "$REPO_TARBALL_URL"
 npm install -g "$REPO_TARBALL_URL"
 
 printf '\nInstalled.\n'

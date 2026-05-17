@@ -1,4 +1,4 @@
-# kage
+# KAGE
 
 Export local agent sessions into native `Codex`, `Claude`, and `Qoder` session files.
 
@@ -9,7 +9,7 @@ The name comes from the "shadow clone" idea: a useful coding agent should be abl
 
 ## Why It Exists
 
-`kage` is built around two practical workflows.
+KAGE is built around two practical workflows.
 
 1. Fork a conversation and keep the useful context.
 You can branch an existing session, trim it, append one new user message, and continue without rebuilding context from scratch.
@@ -108,7 +108,7 @@ kage c2q
 
 ## Practical Test
 
-The most convincing way to validate `kage` is to resume a real session in one agent, export it, then resume it in another.
+The most convincing way to validate KAGE is to resume a real session in one agent, export it, then resume it in another.
 
 For example, start from a Claude session:
 
@@ -123,7 +123,7 @@ Then run:
 kage c2x
 ```
 
-If multiple Claude sessions match the current directory, `kage` will ask you to choose:
+If multiple Claude sessions match the current directory, KAGE will ask you to choose:
 
 ```text
 Multiple Claude sessions match the current directory:
@@ -183,7 +183,7 @@ kage qoder codex
 kage claude qoder
 ```
 
-If you mistype a route alias such as `q2q`, `kage` reports the unknown alias and prints the supported alias list.
+If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and prints the supported alias list.
 
 ## Options
 
