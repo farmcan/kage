@@ -96,6 +96,9 @@ npm link
 
 ```bash
 kage c2x
+kage doctor
+kage sessions --json
+kage actions
 kage c2c
 kage c2v
 kage x2c
@@ -214,6 +217,27 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 ```
 
 Useful patterns:
+
+Check the local agent setup:
+
+```bash
+kage doctor
+kage doctor --json
+```
+
+List current-project sessions across agents:
+
+```bash
+kage sessions
+kage sessions --agent claude --json
+```
+
+Generate menu-bar friendly actions and run one:
+
+```bash
+kage actions --json
+kage run-action resume:claude:<session-id>
+```
 
 Upgrade an existing install:
 

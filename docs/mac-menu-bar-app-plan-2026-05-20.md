@@ -74,10 +74,10 @@ KAGE's first app is a small, always-on Mac utility, not a cross-platform IDE she
 
 Before creating the app project, add stable JSON commands:
 
-- `kage doctor --json`
-- `kage sessions --json`
-- `kage actions --json`
-- `kage run-action <id> --json`
+- `kage doctor --json` implemented in phase 1
+- `kage sessions --json` implemented in phase 1
+- `kage actions --json` implemented in phase 1
+- `kage run-action <id> --json` implemented in phase 1
 - `kage replay <session-id> --json`
 
 This keeps the app thin and avoids duplicating adapter logic.

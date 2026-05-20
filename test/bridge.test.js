@@ -30,6 +30,11 @@ async function makeTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
 }
 
+async function writeExecutable(filePath, content) {
+  await fs.writeFile(filePath, content, "utf8");
+  await fs.chmod(filePath, 0o755);
+}
+
 async function canonicalPath(filePath) {
   try {
     return await fs.realpath(filePath);
@@ -707,6 +712,10 @@ test("cli --help only documents native export commands", async () => {
   const result = await spawnCli(["--help"]);
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
+  assert.match(result.stdout, /kage doctor \[--json\]/);
+  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--json\]/);
+  assert.match(result.stdout, /kage actions \[--json\]/);
+  assert.match(result.stdout, /kage run-action <id> \[--json\]/);
   assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
   assert.match(result.stdout, /kage completions bash\|zsh\|fish/);
   assert.match(result.stdout, /kage <route-alias> \[options\]/);
@@ -817,6 +826,106 @@ test("cli supports update command", async () => {
 
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Updated KAGE/);
+});
+
+test("cli doctor emits machine-readable readiness checks", async () => {
+  const fakeHome = await makeTempDir("doctor-home");
+  const binDir = await makeTempDir("doctor-bin");
+  await fs.mkdir(path.join(fakeHome, ".claude", "projects"), { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".codex", "sessions"), { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".qoder", "projects"), { recursive: true });
+  await writeExecutable(path.join(binDir, "claude"), "#!/bin/sh\necho 'claude 2.1.98'\n");
+  await writeExecutable(path.join(binDir, "codex"), "#!/bin/sh\necho 'codex-cli 0.130.0'\n");
+  await writeExecutable(path.join(binDir, "qodercli"), "#!/bin/sh\necho 'Qoder CLI v1.0.0'\n");
+
+  const result = await spawnCli(["doctor", "--json"], {
+    env: { ...process.env, HOME: fakeHome, PATH: binDir },
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.mode, "doctor");
+  assert.equal(payload.ok, true);
+  assert.equal(payload.agents.length, 3);
+  assert.equal(payload.agents.find((agent) => agent.agent === "claude").version, "claude 2.1.98");
+  assert.equal(payload.agents.find((agent) => agent.agent === "codex").resumeCommand, "codex resume <session-id>");
+  assert.equal(payload.agents.find((agent) => agent.agent === "qodercli").sessionRoot.exists, true);
+});
+
+test("cli sessions lists current-project sessions across agents as json", async () => {
+  const fakeHome = await makeTempDir("sessions-home");
+  const currentDir = await makeTempDir("sessions-workspace");
+  const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
+  const qoderProject = path.join(fakeHome, ".qoder", "projects", "-workspace");
+  await fs.mkdir(claudeProject, { recursive: true });
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.mkdir(qoderProject, { recursive: true });
+  await fs.writeFile(
+    path.join(claudeProject, "claude-one.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"claude plan"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-one"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(codexProject, "rollout-codex-one.jsonl"),
+    [
+      `{"timestamp":"2026-05-20T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-one","cwd":"${currentDir}"}}`,
+      '{"timestamp":"2026-05-20T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex plan"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(qoderProject, "qoder-one.jsonl"),
+    `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-one","message":{"role":"user","content":[{"type":"text","text":"qoder plan"}]}}\n`,
+    "utf8",
+  );
+
+  const result = await spawnCli(["sessions", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.mode, "sessions");
+  assert.deepEqual(
+    payload.sessions.map((session) => session.sessionId).sort(),
+    ["claude-one", "codex-one", "qoder-one"].sort(),
+  );
+  assert.equal(payload.sessions.find((session) => session.sessionId === "qoder-one").agent, "qodercli");
+});
+
+test("cli actions and run-action expose menu-bar friendly operations", async () => {
+  const fakeHome = await makeTempDir("actions-home");
+  const currentDir = await makeTempDir("actions-workspace");
+  const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
+  await fs.mkdir(claudeProject, { recursive: true });
+  await fs.writeFile(
+    path.join(claudeProject, "claude-action.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"ship the app contract"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-action"}\n`,
+    "utf8",
+  );
+
+  const actionsResult = await spawnCli(["actions", "--agent", "claude", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(actionsResult.stdout);
+  const resumeAction = payload.actions.find((action) => action.type === "resume");
+
+  assert.equal(actionsResult.code, 0);
+  assert.equal(payload.mode, "actions");
+  assert.equal(resumeAction.id, "resume:claude:claude-action");
+  assert.equal(resumeAction.command, "claude --resume claude-action");
+
+  const runResult = await spawnCli(["run-action", resumeAction.id, "--agent", "claude", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome, KAGE_RUN_COMMAND: "printf 'ACTION_OK\\n'" },
+  });
+
+  assert.equal(runResult.code, 0);
+  assert.match(runResult.stdout, /"mode": "run-action"/);
+  assert.match(runResult.stdout, /ACTION_OK/);
 });
 
 test("cli shows the selected session card when only one match exists", async () => {

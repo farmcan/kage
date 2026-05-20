@@ -35,6 +35,9 @@
 - Refreshed the product positioning, GitHub Pages homepage, original KAGE logo asset, and macOS menu bar app plan.
 - 更新产品定位、GitHub Pages 主页、原创 KAGE logo 资产，以及 macOS 状态栏应用方案。
 
+- Added the first menu-bar app CLI contract with `doctor`, `sessions`, `actions`, and `run-action`.
+- 增加第一版状态栏应用 CLI 合同：`doctor`、`sessions`、`actions` 和 `run-action`。
+
 ## Earlier Work / 早期工作
 
 - Added native Codex, Claude, and QoderCLI session export flows.

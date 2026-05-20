@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +21,10 @@ const removedOptions = new Set(["--handoff", "--copy", "--cursor"]);
 
 const helpText = `Usage:
   kage update
+  kage doctor [--json]
+  kage sessions [--agent claude|codex|qodercli] [--json]
+  kage actions [--json]
+  kage run-action <id> [--json]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
   kage <agent>
@@ -64,7 +69,18 @@ Options:
   --version
   --help`;
 
-const completionCommands = ["update", "clean", "completions", ...supportedAgents, ...shorthandAgents, ...Object.keys(routeAliases)];
+const completionCommands = [
+  "update",
+  "doctor",
+  "sessions",
+  "actions",
+  "run-action",
+  "clean",
+  "completions",
+  ...supportedAgents,
+  ...shorthandAgents,
+  ...Object.keys(routeAliases),
+];
 const completionOptions = [
   "--agent",
   "--target",
@@ -113,6 +129,10 @@ function applyPreset(args, preset) {
 function parseArgs(argv) {
   const args = {
     update: false,
+    doctor: false,
+    sessions: false,
+    actions: false,
+    runActionId: null,
     clean: false,
     cleanConfirm: false,
     cleanOlderThan: null,
@@ -222,6 +242,30 @@ function parseArgs(argv) {
   }
   if (first === "update" && !second) {
     return { ...args, update: true };
+  }
+  if (first === "doctor") {
+    if (second) {
+      return { ...args, error: "Usage: kage doctor [--json]" };
+    }
+    return { ...args, doctor: true };
+  }
+  if (first === "sessions") {
+    if (second) {
+      return { ...args, error: "Usage: kage sessions [--agent claude|codex|qodercli] [--json]" };
+    }
+    return { ...args, sessions: true };
+  }
+  if (first === "actions") {
+    if (second) {
+      return { ...args, error: "Usage: kage actions [--json]" };
+    }
+    return { ...args, actions: true };
+  }
+  if (first === "run-action") {
+    if (!second || positional.length > 2) {
+      return { ...args, error: "Usage: kage run-action <id> [--json]" };
+    }
+    return { ...args, runActionId: second };
   }
   if (first === "clean") {
     if (second) {
@@ -337,10 +381,147 @@ export async function runResumeCommand({
   });
 }
 
+async function runCliCommand(args) {
+  const cliPath = fileURLToPath(import.meta.url);
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [cliPath, ...args], {
+      stdio: "inherit",
+      env: process.env,
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Action failed with exit code ${code}`));
+    });
+  });
+}
+
 async function getCliVersion() {
   const packagePath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
   const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
   return packageJson.version;
+}
+
+function commandForAgent(agent) {
+  if (agent === "claude") {
+    return "claude";
+  }
+  if (agent === "codex") {
+    return "codex";
+  }
+  if (agent === "qodercli") {
+    return "qodercli";
+  }
+  return agent;
+}
+
+function nativeResumeExample(agent) {
+  if (agent === "claude") {
+    return "claude --resume <session-id>";
+  }
+  if (agent === "codex") {
+    return "codex resume <session-id>";
+  }
+  if (agent === "qodercli") {
+    return "qodercli --cwd <working-dir> --resume <session-id>";
+  }
+  return null;
+}
+
+function nativeForkExample(agent) {
+  if (agent === "claude") {
+    return "claude --resume <session-id> --fork-session";
+  }
+  if (agent === "codex") {
+    return "codex fork <session-id>";
+  }
+  return null;
+}
+
+async function captureCommand(command, args = ["--version"], { timeoutMs = 2500 } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      child.kill("SIGTERM");
+      resolve({ ok: false, error: "timed out" });
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve({ exists: false, ok: false, error: error.code === "ENOENT" ? "not found" : error.message });
+    });
+    child.on("exit", (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      const output = `${stdout}\n${stderr}`
+        .split("\n")
+        .map((line) => line.trim())
+        .find(Boolean);
+      resolve({
+        exists: true,
+        ok: code === 0,
+        code,
+        version: output ?? null,
+        ...(code === 0 ? {} : { error: output ?? `exit code ${code}` }),
+      });
+    });
+  });
+}
+
+async function inspectSessionRoot(rootDir) {
+  const result = {
+    path: rootDir,
+    exists: false,
+    readable: false,
+    writable: false,
+  };
+
+  try {
+    await fs.access(rootDir, fsConstants.F_OK);
+    result.exists = true;
+  } catch {
+    return result;
+  }
+
+  try {
+    await fs.access(rootDir, fsConstants.R_OK);
+    result.readable = true;
+  } catch {
+    result.readable = false;
+  }
+
+  try {
+    await fs.access(rootDir, fsConstants.W_OK);
+    result.writable = true;
+  } catch {
+    result.writable = false;
+  }
+
+  return result;
 }
 
 function generateCompletion(shell) {
@@ -555,6 +736,61 @@ function formatCleanResult(result, asJson) {
   return `${lines.join("\n")}\n`;
 }
 
+async function buildDoctorResult(args = {}) {
+  const version = await getCliVersion();
+  const agents = await Promise.all(
+    supportedAgents.map(async (agent) => {
+      const command = commandForAgent(agent);
+      const commandStatus = await captureCommand(command);
+      const sessionRoot = await inspectSessionRoot(getDefaultRoot(agent));
+      const installed = commandStatus.exists ?? commandStatus.ok;
+      return {
+        agent,
+        label: formatSessionLabel(agent),
+        command,
+        installed,
+        version: commandStatus.version ?? null,
+        commandError: installed && commandStatus.ok ? null : commandStatus.error,
+        sessionRoot,
+        resumeCommand: nativeResumeExample(agent),
+        forkCommand: nativeForkExample(agent),
+      };
+    }),
+  );
+
+  return {
+    mode: "doctor",
+    ok: agents.every((agent) => agent.installed && agent.sessionRoot.exists && agent.sessionRoot.readable),
+    cwd: process.cwd(),
+    kageVersion: version,
+    agents,
+  };
+}
+
+function formatDoctorResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const lines = [`KAGE doctor: ${result.ok ? "ready" : "attention needed"}`, `Version: ${result.kageVersion}`, `CWD: ${result.cwd}`];
+  for (const agent of result.agents) {
+    const commandStatus = agent.installed ? agent.version ?? "installed" : `missing (${agent.commandError})`;
+    const rootStatus = agent.sessionRoot.exists
+      ? `${agent.sessionRoot.readable ? "readable" : "not readable"}, ${agent.sessionRoot.writable ? "writable" : "not writable"}`
+      : "missing";
+    lines.push("");
+    lines.push(`${agent.label}`);
+    lines.push(`  Command: ${agent.command} (${commandStatus})`);
+    lines.push(`  Session root: ${agent.sessionRoot.path} (${rootStatus})`);
+    lines.push(`  Resume: ${agent.resumeCommand}`);
+    if (agent.forkCommand) {
+      lines.push(`  Fork: ${agent.forkCommand}`);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function formatBytes(value) {
   const bytes = Number(value ?? 0);
   if (bytes < 1024) {
@@ -700,8 +936,11 @@ async function buildSessionCandidates(args) {
       .map(async (sessionPath) => {
         const session = await parseSession({ sessionPath, agent: resolvedAgent });
         return {
+          agent: resolvedAgent,
+          agentLabel: formatSessionLabel(resolvedAgent),
           sessionPath,
           sessionId: session.sessionId,
+          cwd: session.cwd,
           updatedAt: session.updatedAt,
           title: getSessionTitle(session),
           recentUserMessages: getRealUserMessages(session)
@@ -711,6 +950,250 @@ async function buildSessionCandidates(args) {
         };
       }),
   );
+}
+
+function toSessionPayload(candidate) {
+  return {
+    agent: candidate.agent,
+    agentLabel: candidate.agentLabel,
+    sessionId: candidate.sessionId,
+    title: candidate.title,
+    updatedAt: candidate.updatedAt ?? null,
+    cwd: candidate.cwd,
+    path: candidate.sessionPath,
+    recentUserMessages: candidate.recentUserMessages,
+  };
+}
+
+async function buildSessionInventory(args = {}) {
+  const agents = args.agent ? [formatAgentName(args.agent)] : supportedAgents;
+  if (args.root && agents.length !== 1) {
+    throw new Error("--root requires --agent with kage sessions or kage actions");
+  }
+
+  const groups = [];
+  const errors = [];
+  for (const agent of agents) {
+    try {
+      const root = args.root ?? getDefaultRoot(agent);
+      const candidates = await buildSessionCandidates({ ...args, agent, root });
+      groups.push({
+        agent,
+        agentLabel: formatSessionLabel(agent),
+        root,
+        sessions: candidates.map(toSessionPayload),
+      });
+    } catch (error) {
+      errors.push({
+        agent,
+        agentLabel: formatSessionLabel(agent),
+        root: args.root ?? getDefaultRoot(agent),
+        error: error.message,
+      });
+    }
+  }
+
+  return {
+    mode: "sessions",
+    cwd: process.cwd(),
+    sessions: groups.flatMap((group) => group.sessions),
+    agents: groups,
+    errors,
+  };
+}
+
+function formatSessionsResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const lines = [`Matching sessions for ${result.cwd}:`];
+  for (const group of result.agents) {
+    lines.push("");
+    lines.push(`${group.agentLabel}`);
+    if (group.sessions.length === 0) {
+      lines.push("  No matching sessions.");
+      continue;
+    }
+    for (const [index, session] of group.sessions.entries()) {
+      lines.push(`  [${index + 1}] ${formatSessionTitle(session.title)}`);
+      lines.push(`      Updated: ${session.updatedAt ?? "unknown time"}`);
+      lines.push(`      Session: ${session.sessionId}`);
+      lines.push(`      Path: ${session.path}`);
+      if (session.recentUserMessages.length > 0) {
+        lines.push("      Recent user messages:");
+        for (const message of session.recentUserMessages) {
+          lines.push(`      - ${message}`);
+        }
+      }
+    }
+  }
+
+  for (const error of result.errors) {
+    lines.push("");
+    lines.push(`${error.agentLabel}: ${error.error}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function shellQuote(value) {
+  const text = String(value ?? "");
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) {
+    return text;
+  }
+  return `'${text.replace(/'/gu, "'\\''")}'`;
+}
+
+function routeAliasForAgent(agent, suffix) {
+  const prefix = agent === "claude" ? "c" : agent === "codex" ? "x" : "q";
+  return `${prefix}2${suffix}`;
+}
+
+function buildResumeCommandForSession(session) {
+  if (session.agent === "claude") {
+    return `claude --resume ${shellQuote(session.sessionId)}`;
+  }
+  if (session.agent === "codex") {
+    return `codex resume ${shellQuote(session.sessionId)}`;
+  }
+  if (session.agent === "qodercli") {
+    return `qodercli --cwd ${shellQuote(session.cwd)} --resume ${shellQuote(session.sessionId)}`;
+  }
+  return null;
+}
+
+function latestSessionByAgent(inventory) {
+  const latest = new Map();
+  for (const group of inventory.agents) {
+    const [session] = group.sessions;
+    if (session) {
+      latest.set(group.agent, session);
+    }
+  }
+  return latest;
+}
+
+function buildActionList(inventory) {
+  const latest = latestSessionByAgent(inventory);
+  const actions = [];
+
+  for (const agent of supportedAgents) {
+    const session = latest.get(agent);
+    if (!session) {
+      continue;
+    }
+    const resumeCommand = buildResumeCommandForSession(session);
+    actions.push({
+      id: `resume:${agent}:${session.sessionId}`,
+      type: "resume",
+      label: `Resume latest ${formatSessionLabel(agent)} session`,
+      agent,
+      sessionId: session.sessionId,
+      sessionPath: session.path,
+      command: resumeCommand,
+    });
+
+    const replayAlias = routeAliasForAgent(agent, "v");
+    actions.push({
+      id: `replay:${replayAlias}:${session.sessionId}`,
+      type: "replay",
+      label: `Replay latest ${formatSessionLabel(agent)} session`,
+      agent,
+      sessionId: session.sessionId,
+      sessionPath: session.path,
+      routeAlias: replayAlias,
+      cliArgs: [replayAlias, "--session", session.path],
+    });
+  }
+
+  const latestClaude = latest.get("claude");
+  if (latestClaude) {
+    actions.push({
+      id: `bridge:c2x:${latestClaude.sessionId}`,
+      type: "bridge",
+      label: "Bridge latest Claude Code session to Codex",
+      agent: "claude",
+      targetAgent: "codex",
+      sessionId: latestClaude.sessionId,
+      sessionPath: latestClaude.path,
+      routeAlias: "c2x",
+      cliArgs: ["c2x", "--session", latestClaude.path],
+    });
+  }
+
+  const latestCodex = latest.get("codex");
+  if (latestCodex) {
+    actions.push({
+      id: `bridge:x2c:${latestCodex.sessionId}`,
+      type: "bridge",
+      label: "Bridge latest Codex session to Claude Code",
+      agent: "codex",
+      targetAgent: "claude",
+      sessionId: latestCodex.sessionId,
+      sessionPath: latestCodex.path,
+      routeAlias: "x2c",
+      cliArgs: ["x2c", "--session", latestCodex.path],
+    });
+  }
+
+  return actions;
+}
+
+async function buildActionsResult(args = {}) {
+  const inventory = await buildSessionInventory(args);
+  return {
+    mode: "actions",
+    cwd: inventory.cwd,
+    actions: buildActionList(inventory),
+    errors: inventory.errors,
+  };
+}
+
+function formatActionsResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const lines = [`KAGE actions for ${result.cwd}:`];
+  if (result.actions.length === 0) {
+    lines.push("No actions available for this project.");
+  }
+  for (const action of result.actions) {
+    lines.push(`- ${action.id}`);
+    lines.push(`  ${action.label}`);
+    if (action.command) {
+      lines.push(`  ${action.command}`);
+    }
+  }
+  for (const error of result.errors) {
+    lines.push(`- ${error.agentLabel}: ${error.error}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+async function runAction(args) {
+  const result = await buildActionsResult(args);
+  const action = result.actions.find((candidate) => candidate.id === args.runActionId);
+  if (!action) {
+    throw new Error(`Unknown action id: ${args.runActionId}`);
+  }
+
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify({ mode: "run-action", cwd: result.cwd, action, executed: true }, null, 2)}\n`);
+  }
+
+  if (action.type === "resume") {
+    await runResumeCommand({ command: action.command });
+    return;
+  }
+
+  if (Array.isArray(action.cliArgs)) {
+    await runCliCommand(action.cliArgs);
+    return;
+  }
+
+  throw new Error(`Unsupported action type: ${action.type}`);
 }
 
 async function resolveSessionPath(args) {
@@ -750,6 +1233,25 @@ async function main() {
   }
   if (args.update) {
     await runUpdateCommand();
+    return;
+  }
+  if (args.doctor) {
+    const result = await buildDoctorResult(args);
+    process.stdout.write(formatDoctorResult(result, args.json));
+    return;
+  }
+  if (args.sessions) {
+    const result = await buildSessionInventory(args);
+    process.stdout.write(formatSessionsResult(result, args.json));
+    return;
+  }
+  if (args.actions) {
+    const result = await buildActionsResult(args);
+    process.stdout.write(formatActionsResult(result, args.json));
+    return;
+  }
+  if (args.runActionId) {
+    await runAction(args);
     return;
   }
   if (args.clean) {
