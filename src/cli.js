@@ -346,6 +346,9 @@ export async function chooseClaudeSessionPath(candidates, options = {}) {
 
 function formatSessionLabel(agent) {
   const value = formatAgentName(agent);
+  if (value === "qodercli") {
+    return "QoderCLI";
+  }
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 

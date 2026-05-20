@@ -633,6 +633,22 @@ test("cli rejects the legacy qoder agent name", async () => {
   assert.match(option.stderr, /Unsupported agent: qoder\. Use qodercli instead\./);
 });
 
+test("cli formats the QoderCLI label consistently", async () => {
+  const currentDir = await makeTempDir("qodercli-label-workspace");
+  const otherDir = await makeTempDir("qodercli-label-other");
+  const sessionsRoot = await makeTempDir("qodercli-label-sessions");
+  await fs.writeFile(
+    path.join(sessionsRoot, "session.jsonl"),
+    `{"type":"user","cwd":"${otherDir}","sessionId":"qodercli-other","message":{"role":"user","content":[{"type":"text","text":"not this workspace"}]}}\n`,
+    "utf8",
+  );
+
+  const result = await spawnCli(["q", "--root", sessionsRoot], { cwd: currentDir });
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /No QoderCLI sessions match the current directory/);
+});
+
 test("cli supports update command", async () => {
   const result = await spawnCli(["update"], {
     env: { ...process.env, KAGE_UPDATE_COMMAND: "printf 'Updated KAGE\\n'" },
