@@ -77,7 +77,7 @@ kage c2x
 kage update
 ```
 
-To upgrade a previous install from this script, run the same install command again.
+To upgrade a previous install from this script, run the same install command again. The installer removes the old `agent-session-bridge` global package if it is present, then reinstalls KAGE from the latest `main` tarball.
 
 For local development:
 
@@ -137,7 +137,7 @@ Multiple Claude sessions match the current directory:
    2026-03-20T13:26:27.783Z  33d6decd-7776-4fba-b1d6-50b904c07010
    /Users/you/.claude/projects/-Users-you-wrksp-agentkit/33d6decd-7776-4fba-b1d6-50b904c07010.jsonl
 Select a session [1-3]: 1
-/Users/you/.codex/sessions/2026/03/22/rollout-2026-03-22T14-49-54-695Z-b3b958d7-4ac8-41c4-8660-7b7f654737c6.jsonl
+/Users/you/.codex/sessions/2026/03/22/rollout-b3b958d7-4ac8-41c4-8660-7b7f654737c6.jsonl
 Run:
 codex resume b3b958d7-4ac8-41c4-8660-7b7f654737c6
 ```
@@ -198,8 +198,12 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 --split-recent <n>
 --fork <prompt>
 --fork-file <path>
+--preview
+--run
+--older-than <duration>
 --stdout
 --json
+--version
 --help
 ```
 
@@ -241,6 +245,32 @@ Show the export body instead of writing files:
 kage q2c --stdout
 ```
 
+Preview a transformed export without writing files:
+
+```bash
+kage x2q --preview
+```
+
+Write the export and launch the generated resume command:
+
+```bash
+kage c2x --run
+```
+
+Clean duplicate installed exports. The default is a dry run; deletion requires `--confirm`.
+
+```bash
+kage clean
+kage clean --older-than 7d
+kage clean --confirm
+```
+
+Generate shell completions:
+
+```bash
+kage completions zsh
+```
+
 Generate a local HTML story replay for a session:
 
 ```bash
@@ -272,7 +302,7 @@ Implementation choices:
 
 The CLI does not blindly use the global latest session.
 
-It first tries to find sessions for the current working directory, then falls back to the latest session for that agent if nothing matches.
+It finds sessions for the current working directory. If nothing matches, export commands fail and ask you to provide `--session` or `--session-id`.
 
 If multiple matching sessions exist for the current directory:
 
@@ -298,6 +328,8 @@ Matching rules:
 ```text
 ~/.codex/sessions/YYYY/MM/DD/...
 ```
+
+Default Codex export filenames are stable for the session id, such as `rollout-<session-id>.jsonl`, so repeating the same bridge command overwrites the previous installed export instead of creating duplicates. Fork exports still get a fresh session id.
 
 When the export is installed there, the CLI prints:
 

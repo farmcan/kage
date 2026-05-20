@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 
 import { parseSession } from "./adapters/sources/index.js";
 import { formatAgentName, getDefaultRoot, supportedAgents } from "./core/agents.js";
-import { findMatchingSessions, findSessionById, findLatestSession } from "./core/discovery.js";
+import { cleanDuplicateExports } from "./core/clean.js";
+import { findMatchingSessions, findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
 import { resolveInstallPlan } from "./core/install.js";
 import { inferDefaultExportFormat, routeAliases } from "./core/routing.js";
@@ -19,6 +20,8 @@ const removedOptions = new Set(["--handoff", "--copy", "--cursor"]);
 
 const helpText = `Usage:
   kage update
+  kage clean [--confirm] [--older-than 7d] [--json]
+  kage completions bash|zsh|fish
   kage <agent>
   kage <source> <target> [options]
   kage <route-alias> [options]
@@ -53,9 +56,51 @@ Options:
   --split-recent <n>
   --fork <prompt>
   --fork-file <path>
+  --preview
+  --run
+  --older-than <duration>
   --stdout
   --json
+  --version
   --help`;
+
+const completionCommands = ["update", "clean", "completions", ...supportedAgents, ...shorthandAgents, ...Object.keys(routeAliases)];
+const completionOptions = [
+  "--agent",
+  "--target",
+  "--session",
+  "--session-id",
+  "--out",
+  "--output-dir",
+  "--export",
+  "--split-recent",
+  "--fork",
+  "--fork-file",
+  "--preview",
+  "--run",
+  "--older-than",
+  "--stdout",
+  "--json",
+  "--confirm",
+  "--version",
+  "--help",
+];
+
+function parsePositiveInteger(value, option) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${option} requires a positive integer, got: ${value ?? "(missing)"}`);
+  }
+  return parsed;
+}
+
+function readOptionValue(argv, index, option, { allowOptionValue = false } = {}) {
+  const value = argv[index + 1];
+  if (value === undefined || (!allowOptionValue && value.startsWith("--"))) {
+    throw new Error(`${option} requires a value`);
+  }
+  return value;
+}
 
 function applyPreset(args, preset) {
   return {
@@ -68,6 +113,11 @@ function applyPreset(args, preset) {
 function parseArgs(argv) {
   const args = {
     update: false,
+    clean: false,
+    cleanConfirm: false,
+    cleanOlderThan: null,
+    completions: null,
+    version: false,
     listAgent: null,
     agent: null,
     root: null,
@@ -81,6 +131,8 @@ function parseArgs(argv) {
     splitRecent: null,
     forkPrompt: null,
     forkFile: null,
+    preview: false,
+    run: false,
     json: false,
     stdout: false,
     help: false,
@@ -88,60 +140,100 @@ function parseArgs(argv) {
   };
   const positional = [];
 
+  if (argv.length === 0) {
+    return { ...args, help: true };
+  }
+
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (removedOptions.has(arg)) {
-      args.error = `Unsupported option: ${arg}`;
-    } else if (arg === "--agent") {
-      args.agent = argv[i + 1];
-      i += 1;
-    } else if (arg === "--root") {
-      args.root = argv[i + 1];
-      i += 1;
-    } else if (arg === "--session") {
-      args.session = argv[i + 1];
-      i += 1;
-    } else if (arg === "--session-id") {
-      args.sessionId = argv[i + 1];
-      i += 1;
-    } else if (arg === "--out") {
-      args.out = argv[i + 1];
-      i += 1;
-    } else if (arg === "--output-dir") {
-      args.outputDir = argv[i + 1];
-      i += 1;
-    } else if (arg === "--target") {
-      args.target = argv[i + 1];
-      i += 1;
-    } else if (arg === "--export") {
-      args.exportFormat = argv[i + 1];
-      i += 1;
-    } else if (arg === "--split-recent") {
-      args.splitRecent = Number(argv[i + 1]);
-      i += 1;
-    } else if (arg === "--fork") {
-      args.forkPrompt = argv[i + 1];
-      i += 1;
-    } else if (arg === "--fork-file") {
-      args.forkFile = argv[i + 1];
-      i += 1;
-    } else if (arg === "--stdout") {
-      args.stdout = true;
-    } else if (arg === "--json") {
-      args.json = true;
-    } else if (arg === "--help" || arg === "-h") {
-      args.help = true;
-    } else {
-      positional.push(arg);
+    try {
+      if (removedOptions.has(arg)) {
+        args.error = `Unsupported option: ${arg}`;
+      } else if (arg === "--agent") {
+        args.agent = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--root") {
+        args.root = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--session") {
+        args.session = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--session-id") {
+        args.sessionId = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--out") {
+        args.out = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--output-dir") {
+        args.outputDir = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--target") {
+        args.target = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--export") {
+        args.exportFormat = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--split-recent") {
+        args.splitRecent = parsePositiveInteger(readOptionValue(argv, i, arg), arg);
+        i += 1;
+      } else if (arg === "--fork") {
+        args.forkPrompt = readOptionValue(argv, i, arg, { allowOptionValue: true });
+        i += 1;
+      } else if (arg === "--fork-file") {
+        args.forkFile = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--preview") {
+        args.preview = true;
+      } else if (arg === "--run") {
+        args.run = true;
+      } else if (arg === "--confirm") {
+        args.cleanConfirm = true;
+      } else if (arg === "--older-than") {
+        args.cleanOlderThan = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--stdout") {
+        args.stdout = true;
+      } else if (arg === "--json") {
+        args.json = true;
+      } else if (arg === "--version" || arg === "-V") {
+        args.version = true;
+      } else if (arg === "--help" || arg === "-h") {
+        args.help = true;
+      } else if (arg.startsWith("-")) {
+        args.error = `Unknown option: ${arg}\nRun 'kage --help' for usage information.`;
+      } else {
+        positional.push(arg);
+      }
+    } catch (error) {
+      args.error = error.message;
+    }
+
+    if (args.error) {
+      break;
     }
   }
 
   const [first, second] = positional;
+  if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
+    return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
+  }
   if ([args.agent, args.target].some((value) => removedAgentNames.has(value))) {
     return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
   }
   if (first === "update" && !second) {
     return { ...args, update: true };
+  }
+  if (first === "clean") {
+    if (second) {
+      return { ...args, error: "Usage: kage clean [--confirm] [--older-than 7d] [--json]" };
+    }
+    return { ...args, clean: true };
+  }
+  if (first === "completions") {
+    if (!second || positional.length > 2) {
+      return { ...args, error: "Usage: kage completions bash|zsh|fish" };
+    }
+    return { ...args, completions: second };
   }
   if (positional.some((value) => removedAgentNames.has(value))) {
     return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
@@ -218,6 +310,132 @@ export async function runUpdateCommand({
   });
 }
 
+export async function runResumeCommand({
+  command,
+  commandOverride = process.env.KAGE_RUN_COMMAND,
+} = {}) {
+  const shell = process.env.SHELL || "sh";
+  const commandToRun = commandOverride ?? command;
+  if (!commandToRun) {
+    throw new Error("--run requires a resume command");
+  }
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(shell, ["-lc", commandToRun], {
+      stdio: "inherit",
+      env: process.env,
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Run failed with exit code ${code}`));
+    });
+  });
+}
+
+async function getCliVersion() {
+  const packagePath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+  const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
+  return packageJson.version;
+}
+
+function generateCompletion(shell) {
+  const commands = completionCommands.join(" ");
+  const options = completionOptions.join(" ");
+  const agents = supportedAgents.join(" ");
+  const shells = "bash zsh fish";
+  const exportFormats = "codex-session claude-session qoder-session session-story-html";
+
+  if (shell === "bash") {
+    return `_kage_completions() {
+  local cur prev
+  COMPREPLY=()
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD-1]}"
+
+  case "$prev" in
+    --agent|--target)
+      COMPREPLY=($(compgen -W "${agents}" -- "$cur"))
+      return 0
+      ;;
+    --export)
+      COMPREPLY=($(compgen -W "${exportFormats}" -- "$cur"))
+      return 0
+      ;;
+    completions)
+      COMPREPLY=($(compgen -W "${shells}" -- "$cur"))
+      return 0
+      ;;
+  esac
+
+  COMPREPLY=($(compgen -W "${commands} ${options}" -- "$cur"))
+}
+complete -F _kage_completions kage
+`;
+  }
+
+  if (shell === "zsh") {
+    return `#compdef kage
+
+_kage() {
+  local -a commands options agents exports shells
+  commands=(${commands})
+  options=(${options})
+  agents=(${agents})
+  exports=(${exportFormats})
+  shells=(${shells})
+
+  case "$words[CURRENT-1]" in
+    --agent|--target)
+      _describe 'agent' agents
+      ;;
+    --export)
+      _describe 'export format' exports
+      ;;
+    completions)
+      _describe 'shell' shells
+      ;;
+    *)
+      _describe 'command' commands
+      _describe 'option' options
+      ;;
+  esac
+}
+
+_kage "$@"
+`;
+  }
+
+  if (shell === "fish") {
+    return `complete -c kage -f -a "${commands}"
+complete -c kage -l agent -x -a "${agents}"
+complete -c kage -l target -x -a "${agents}"
+complete -c kage -l export -x -a "${exportFormats}"
+complete -c kage -l session -r
+complete -c kage -l session-id -r
+complete -c kage -l out -r
+complete -c kage -l output-dir -r
+complete -c kage -l split-recent -r
+complete -c kage -l fork -r
+complete -c kage -l fork-file -r
+complete -c kage -l preview
+complete -c kage -l run
+complete -c kage -l older-than -r
+complete -c kage -l stdout
+complete -c kage -l json
+complete -c kage -l confirm
+complete -c kage -l version
+complete -c kage -l help
+`;
+  }
+
+  throw new Error(`Unsupported completion shell: ${shell}. Use bash, zsh, or fish.`);
+}
+
 function emitResult(payload, asJson) {
   if (asJson) {
     process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
@@ -231,6 +449,95 @@ function emitResult(payload, asJson) {
   if (payload.resumeCommand) {
     process.stdout.write(`Run:\n${payload.resumeCommand}\n`);
   }
+}
+
+function compactPreviewText(text, maxLength = 120) {
+  const normalized = String(text ?? "")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 3)}...`;
+}
+
+function formatExportPreview({ exported, installPlan }) {
+  const lines = [
+    "Export preview",
+    `Source: ${exported.sourceAgent}`,
+    `Target: ${exported.targetAgent}`,
+    `Format: ${exported.mode}`,
+    `Session: ${exported.sessionId}`,
+    `Source file: ${exported.sessionPath}`,
+    `Messages: ${exported.session.messages.length}`,
+    "Output files:",
+  ];
+
+  for (const file of installPlan.files) {
+    lines.push(`- ${file.path}`);
+  }
+
+  if (installPlan.resumeCommand) {
+    lines.push("Resume command:");
+    lines.push(installPlan.resumeCommand);
+  }
+
+  lines.push("Message preview:");
+  for (const [index, message] of exported.session.messages.entries()) {
+    lines.push(`${index + 1}. ${message.role}: ${compactPreviewText(message.text)}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatCleanResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const lines = [
+    result.dryRun ? "Dry run. Use --confirm to delete duplicate session exports." : "Deleted duplicate session exports.",
+    `Scanned: ${result.scannedFiles} session files`,
+  ];
+
+  if (result.deleteCandidates.length === 0) {
+    lines.push("No duplicate or stale session exports found.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  lines.push(`Freed: ${formatBytes(result.freedBytes)}`);
+
+  if (result.duplicateGroups.length > 0) {
+    lines.push("Duplicate exports:");
+    for (const group of result.duplicateGroups) {
+      lines.push(`- ${formatSessionLabel(group.agent)} ${group.sessionId}`);
+      lines.push(`  Keep: ${group.keep.path}`);
+      for (const file of group.remove) {
+        lines.push(`  Remove: ${file.path}`);
+      }
+    }
+  }
+
+  if (result.staleCandidates.length > 0) {
+    lines.push("Stale exports:");
+    for (const file of result.staleCandidates) {
+      lines.push(`- ${file.path}`);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatBytes(value) {
+  const bytes = Number(value ?? 0);
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const kib = bytes / 1024;
+  if (kib < 1024) {
+    return `${kib.toFixed(1)} KiB`;
+  }
+  return `${(kib / 1024).toFixed(1)} MiB`;
 }
 
 function formatSessionTitle(title, maxLength = Number.POSITIVE_INFINITY) {
@@ -396,20 +703,35 @@ async function resolveSessionPath(args) {
     return chooseSessionPath(formatSessionLabel(args.agent ?? "codex"), candidates);
   }
 
-  return findLatestSession(rootDir, {
-    cwd: process.cwd(),
-    agent: args.agent ?? "codex",
-  });
+  throw new Error(
+    `No ${formatSessionLabel(args.agent ?? "codex")} sessions match the current directory: ${process.cwd()}\nUse --session or --session-id to specify a session explicitly.`,
+  );
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args.error) {
+    throw new Error(args.error);
+  }
+  if (args.version) {
+    process.stdout.write(`kage ${await getCliVersion()}\n`);
+    return;
+  }
   if (args.help) {
     process.stdout.write(`${helpText}\n`);
     return;
   }
   if (args.update) {
     await runUpdateCommand();
+    return;
+  }
+  if (args.clean) {
+    const result = await cleanDuplicateExports({ confirm: args.cleanConfirm, olderThan: args.cleanOlderThan });
+    process.stdout.write(formatCleanResult(result, args.json));
+    return;
+  }
+  if (args.completions) {
+    process.stdout.write(generateCompletion(args.completions));
     return;
   }
   if (args.listAgent) {
@@ -422,11 +744,14 @@ async function main() {
     process.stdout.write(`${formatSessionCandidates(candidates)}\n`);
     return;
   }
-  if (args.error) {
-    throw new Error(args.error);
-  }
   if (!args.agent || !args.target || !args.exportFormat) {
     throw new Error("Provide a supported source/target pair or route alias");
+  }
+  if (args.preview && args.stdout) {
+    throw new Error("Use either --preview or --stdout, not both");
+  }
+  if (args.run && (args.preview || args.stdout)) {
+    throw new Error("--run requires a written export with a resume command");
   }
 
   args.forkPrompt = await resolveForkPrompt(args);
@@ -466,6 +791,15 @@ async function main() {
     targetAgent: args.target,
   });
 
+  if (args.preview) {
+    process.stdout.write(formatExportPreview({ exported, installPlan }));
+    return;
+  }
+
+  if (args.run && !installPlan.resumeCommand) {
+    throw new Error("--run requires a default install with a resume command");
+  }
+
   for (const file of installPlan.files) {
     await fs.mkdir(path.dirname(file.path), { recursive: true });
     await fs.writeFile(file.path, file.content, "utf8");
@@ -488,6 +822,10 @@ async function main() {
     },
     args.json,
   );
+
+  if (args.run) {
+    await runResumeCommand({ command: installPlan.resumeCommand });
+  }
 }
 
 const invokedCliPath = process.argv[1]

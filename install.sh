@@ -24,7 +24,12 @@ if [ "$node_major" -lt 20 ]; then
 fi
 
 printf 'Installing KAGE from %s\n' "$REPO_TARBALL_URL"
-npm install -g "$REPO_TARBALL_URL"
+if npm list -g agent-session-bridge >/dev/null 2>&1; then
+  printf 'Removing old agent-session-bridge package...\n'
+  npm uninstall -g agent-session-bridge >/dev/null
+fi
+
+npm install -g --force "$REPO_TARBALL_URL"
 
 printf '\nInstalled.\n'
 printf 'Try:\n'

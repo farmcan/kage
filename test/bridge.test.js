@@ -163,6 +163,22 @@ test("parseSession reads Claude sessions", async () => {
   assert.equal(session.messages.length, 3);
 });
 
+test("parseSession reads Claude updatedAt from the latest timestamp", async () => {
+  const tempDir = await makeTempDir("claude-updated-at");
+  const sessionPath = path.join(tempDir, "session.jsonl");
+  await fs.writeFile(
+    sessionPath,
+    [
+      '{"type":"user","message":{"role":"user","content":"hi"},"cwd":"/tmp/demo","sessionId":"aaa"}',
+      '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]},"timestamp":"2026-03-20T11:00:00.000Z","cwd":"/tmp/demo","sessionId":"aaa"}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const session = await parseSession({ sessionPath, agent: "claude" });
+  assert.equal(session.updatedAt, "2026-03-20T11:00:00.000Z");
+});
+
 test("parseSession preserves raw items for story exports", async () => {
   const session = await parseSession({
     sessionPath: path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
@@ -588,13 +604,33 @@ test("cli --help only documents native export commands", async () => {
   const result = await spawnCli(["--help"]);
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
+  assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
+  assert.match(result.stdout, /kage completions bash\|zsh\|fish/);
   assert.match(result.stdout, /kage <route-alias> \[options\]/);
   assert.match(result.stdout, /c2v\s+claude -> visualize/);
   assert.match(result.stdout, /x2v\s+codex -> visualize/);
   assert.match(result.stdout, /q2v\s+qodercli -> visualize/);
+  assert.match(result.stdout, /--preview/);
+  assert.match(result.stdout, /--run/);
+  assert.match(result.stdout, /--version/);
   assert.doesNotMatch(result.stdout, /--handoff/);
   assert.doesNotMatch(result.stdout, /--copy/);
   assert.doesNotMatch(result.stdout, /x2r/);
+});
+
+test("cli shows help with no arguments", async () => {
+  const result = await spawnCli([]);
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Usage:/);
+  assert.doesNotMatch(result.stderr, /Provide a supported source/);
+});
+
+test("cli supports --version", async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
+  const result = await spawnCli(["--version"]);
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout.trim(), `kage ${packageJson.version}`);
 });
 
 test("package.json exposes KAGE bin", async () => {
@@ -613,6 +649,28 @@ test("cli fails clearly for removed handoff flags and cursor aliases", async () 
   const removedAliasResult = await spawnCli(["x2r", "--session", sessionPath]);
   assert.equal(removedAliasResult.code, 1);
   assert.match(removedAliasResult.stderr, /Unsupported route alias: x2r/);
+});
+
+test("cli rejects unknown flags", async () => {
+  const result = await spawnCli(["x2c", "--wat"]);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Unknown option: --wat/);
+  assert.match(result.stderr, /kage --help/);
+});
+
+test("cli validates --split-recent as a positive integer", async () => {
+  const result = await spawnCli([
+    "claude",
+    "qodercli",
+    "--session",
+    path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
+    "--split-recent",
+    "soon",
+  ]);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /--split-recent requires a positive integer, got: soon/);
 });
 
 test("cli reports supported aliases for unknown route aliases", async () => {
@@ -944,6 +1002,29 @@ test("cli fails clearly for ambiguous Codex sessions in non-interactive mode", a
   assert.match(result.stderr, /Multiple Codex sessions match the current directory/);
 });
 
+test("cli does not fall back to an unrelated latest session", async () => {
+  const currentDir = await makeTempDir("codex-no-fallback-current");
+  const otherDir = await makeTempDir("codex-no-fallback-other");
+  const sessionsRoot = await makeTempDir("codex-no-fallback-sessions");
+  const targetDir = path.join(sessionsRoot, "2026", "03", "22");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    path.join(targetDir, "rollout-2026-03-22T11-00-00-other.jsonl"),
+    [
+      `{"timestamp":"2026-03-22T11:00:00.000Z","type":"session_meta","payload":{"id":"other","cwd":"${otherDir}"}}`,
+      '{"timestamp":"2026-03-22T11:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"not this workspace"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["codex", "claude", "--root", sessionsRoot], { cwd: currentDir });
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /No Codex sessions match the current directory:/);
+  assert.match(result.stderr, /Use --session or --session-id to specify a session explicitly\./);
+  assert.doesNotMatch(result.stdout, /claude --resume other/);
+});
+
 test("cli shows the first real user prompt instead of Codex environment context in session choices", async () => {
   const currentDir = await makeTempDir("codex-cli-title-workspace");
   const sessionsRoot = await makeTempDir("codex-cli-title-sessions");
@@ -1029,6 +1110,24 @@ test("cli installs default Codex exports into the real Codex session directory",
     payload.outputPath,
     path.join(fakeHome, ".codex", "sessions", "2026", "03", "20", payload.fileName),
   );
+});
+
+test("cli overwrites default Codex exports for the same source session", async () => {
+  const fakeHome = await makeTempDir("codex-dedupe-home");
+  const sessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
+
+  const first = await spawnCli(["c2x", "--session", sessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const second = await spawnCli(["c2x", "--session", sessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  const firstPayload = JSON.parse(first.stdout);
+  const secondPayload = JSON.parse(second.stdout);
+  assert.equal(firstPayload.outputPath, secondPayload.outputPath);
+  assert.equal(firstPayload.fileName, "rollout-claude-session.jsonl");
+  assert.equal((await fs.readdir(path.dirname(firstPayload.outputPath))).length, 1);
 });
 
 test("cli installs default Claude exports into the real Claude session directory", async () => {
@@ -1213,4 +1312,122 @@ test("cli fails clearly when both --fork and --fork-file are provided", async ()
 
   assert.equal(result.code, 1);
   assert.match(result.stderr, /Use either --fork or --fork-file/);
+});
+
+test("cli previews exports without writing files", async () => {
+  const fakeHome = await makeTempDir("preview-home");
+  const result = await spawnCli([
+    "x2q",
+    "--session",
+    path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl"),
+    "--preview",
+  ], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Export preview/);
+  assert.match(result.stdout, /Target: qodercli/);
+  assert.match(result.stdout, /qodercli --cwd .* --resume sample-session/);
+  await assert.rejects(fs.access(path.join(fakeHome, ".qoder")), /ENOENT/);
+});
+
+test("cli can run the generated resume command after export", async () => {
+  const fakeHome = await makeTempDir("run-home");
+  const result = await spawnCli(
+    ["c2x", "--session", path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"), "--run"],
+    {
+      env: { ...process.env, HOME: fakeHome, KAGE_RUN_COMMAND: "printf 'RUN_OK\\n'" },
+    },
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /codex resume claude-session/);
+  assert.match(result.stdout, /RUN_OK/);
+});
+
+test("cli rejects --run when no resume command is produced", async () => {
+  const outDir = await makeTempDir("run-out");
+  const result = await spawnCli([
+    "c2x",
+    "--session",
+    path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
+    "--out",
+    path.join(outDir, "session.jsonl"),
+    "--run",
+  ]);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /--run requires a default install with a resume command/);
+});
+
+test("cli generates shell completions with QoderCLI aliases", async () => {
+  const result = await spawnCli(["completions", "bash"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /complete -F _kage_completions kage/);
+  assert.match(result.stdout, /qodercli/);
+  assert.match(result.stdout, /q2x/);
+});
+
+test("cli clean previews and confirms duplicate export deletion", async () => {
+  const fakeHome = await makeTempDir("clean-home");
+  const codexDir = path.join(fakeHome, ".codex", "sessions", "2026", "03", "22");
+  const firstPath = path.join(codexDir, "rollout-old-same.jsonl");
+  const secondPath = path.join(codexDir, "rollout-same.jsonl");
+  await fs.mkdir(codexDir, { recursive: true });
+  await fs.writeFile(
+    firstPath,
+    `{"timestamp":"2026-03-22T10:00:00.000Z","type":"session_meta","payload":{"id":"same","cwd":"/tmp/demo"}}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    secondPath,
+    `{"timestamp":"2026-03-22T11:00:00.000Z","type":"session_meta","payload":{"id":"same","cwd":"/tmp/demo"}}\n`,
+    "utf8",
+  );
+  await fs.utimes(firstPath, new Date("2026-03-22T10:00:00.000Z"), new Date("2026-03-22T10:00:00.000Z"));
+  await fs.utimes(secondPath, new Date("2026-03-22T11:00:00.000Z"), new Date("2026-03-22T11:00:00.000Z"));
+
+  const dryRun = await spawnCli(["clean", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const dryRunPayload = JSON.parse(dryRun.stdout);
+  assert.equal(dryRun.code, 0);
+  assert.equal(dryRunPayload.dryRun, true);
+  assert.equal(dryRunPayload.deleteCandidates.length, 1);
+  await fs.access(firstPath);
+
+  const confirmed = await spawnCli(["clean", "--confirm", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const confirmedPayload = JSON.parse(confirmed.stdout);
+  assert.equal(confirmed.code, 0);
+  assert.equal(confirmedPayload.dryRun, false);
+  assert.deepEqual(confirmedPayload.deleted, [firstPath]);
+  await assert.rejects(fs.access(firstPath), /ENOENT/);
+  await fs.access(secondPath);
+});
+
+test("cli clean supports older-than stale cleanup", async () => {
+  const fakeHome = await makeTempDir("clean-stale-home");
+  const codexDir = path.join(fakeHome, ".codex", "sessions", "2026", "03", "01");
+  const stalePath = path.join(codexDir, "rollout-stale.jsonl");
+  await fs.mkdir(codexDir, { recursive: true });
+  await fs.writeFile(
+    stalePath,
+    `{"timestamp":"2026-03-01T10:00:00.000Z","type":"session_meta","payload":{"id":"stale","cwd":"/tmp/demo"}}\n`,
+    "utf8",
+  );
+  await fs.utimes(stalePath, new Date("2020-01-01T00:00:00.000Z"), new Date("2020-01-01T00:00:00.000Z"));
+
+  const result = await spawnCli(["clean", "--older-than", "1d", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.staleCandidates.length, 1);
+  assert.equal(payload.deleteCandidates[0].path, stalePath);
+  await fs.access(stalePath);
 });

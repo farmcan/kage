@@ -2,13 +2,23 @@ import path from "node:path";
 
 import { getDefaultRoot, normalizeAgent } from "./agents.js";
 
-function resolveCodexInstallPath(fileName) {
-  const match = fileName.match(/^rollout-(\d{4})-(\d{2})-(\d{2})T/u);
-  if (!match) {
-    throw new Error(`Unable to derive Codex session install path from file name: ${fileName}`);
+function datePartsFromTimestamp(timestamp) {
+  const date = new Date(timestamp ?? Date.now());
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const year = String(safeDate.getUTCFullYear());
+  const month = String(safeDate.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(safeDate.getUTCDate()).padStart(2, "0");
+  return { year, month, day };
+}
+
+function resolveCodexInstallPath(fileName, timestamp) {
+  const legacyMatch = fileName.match(/^rollout-(\d{4})-(\d{2})-(\d{2})T/u);
+  if (legacyMatch) {
+    const [, year, month, day] = legacyMatch;
+    return path.join(getDefaultRoot("codex"), year, month, day, fileName);
   }
 
-  const [, year, month, day] = match;
+  const { year, month, day } = datePartsFromTimestamp(timestamp);
   return path.join(getDefaultRoot("codex"), year, month, day, fileName);
 }
 
@@ -67,7 +77,7 @@ export function resolveInstallPlan({ args, exported, targetAgent }) {
   }
 
   if (exported.mode === "codex-session" && normalizeAgent(targetAgent) === "codex") {
-    const outputPath = resolveCodexInstallPath(exported.files[0].fileName);
+    const outputPath = resolveCodexInstallPath(exported.files[0].fileName, exported.timestamp);
     return {
       files: [withPath(exported.files[0], outputPath)],
       resumeCommand: `codex resume ${exported.sessionId}`,

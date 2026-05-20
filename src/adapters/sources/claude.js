@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import { extractClaudeText } from "./shared.js";
@@ -8,6 +9,10 @@ export function readSessionCwd(items) {
 
 export function parse(items, sessionPath, agent) {
   const first = items.find((item) => item.sessionId) ?? {};
+  const latestTimestamp = items
+    .map((item) => item.timestamp)
+    .filter(Boolean)
+    .at(-1);
   const messages = items
     .map((item) => {
       if (item.type !== "user" && item.type !== "assistant") {
@@ -30,7 +35,7 @@ export function parse(items, sessionPath, agent) {
     sessionId: first.sessionId ?? path.basename(sessionPath, ".jsonl"),
     cwd: first.cwd ?? "unknown",
     title: null,
-    updatedAt: first.timestamp ?? null,
+    updatedAt: latestTimestamp ?? fs.statSync(sessionPath).mtime.toISOString(),
     rawItems: items,
     messages,
   };
