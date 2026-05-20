@@ -30,7 +30,7 @@ export function joinBlocks(blocks = []) {
     return blocks.trim();
   }
   if (!Array.isArray(blocks)) {
-    return "";
+    return blockText(blocks).trim();
   }
 
   return blocks

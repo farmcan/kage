@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 
 import { chooseClaudeSessionPath, chooseSessionPath } from "../src/cli.js";
+import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import {
@@ -67,6 +68,15 @@ function spawnCli(args, options = {}) {
     });
   });
 }
+
+test("joinBlocks handles native transcript content variants", () => {
+  assert.equal(joinBlocks("plain string"), "plain string");
+  assert.equal(joinBlocks({ text: "single text block" }), "single text block");
+  assert.equal(joinBlocks({ content: "single content block" }), "single content block");
+  assert.equal(joinBlocks(["one", { text: "two" }, { content: "three" }, null]), "one\ntwo\nthree");
+  assert.equal(joinBlocks(undefined), "");
+  assert.equal(joinBlocks({ nested: true }), "");
+});
 
 test("supportedAgents exposes the native-export adapter set", () => {
   assert.deepEqual(supportedAgents.sort(), ["claude", "codex", "qodercli"].sort());
@@ -138,6 +148,30 @@ test("parseSession filters Codex developer, system, and bootstrap messages", asy
   assert.deepEqual(session.messages, [{ role: "user", text: "real user request" }]);
 });
 
+test("parseSession reads Codex string and object message content", async () => {
+  const tempDir = await makeTempDir("codex-content-shapes");
+  const sessionPath = path.join(tempDir, "rollout-content-shapes.jsonl");
+  await fs.writeFile(
+    sessionPath,
+    [
+      '{"timestamp":"2026-03-20T10:00:00.000Z","type":"session_meta","payload":{"id":"content-shapes","cwd":"/tmp/demo"}}',
+      '{"timestamp":"2026-03-20T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":"plain string user"}}',
+      '{"timestamp":"2026-03-20T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":{"text":"object assistant"}}}',
+      '{"timestamp":"2026-03-20T10:00:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":{"content":"object content user"}}}',
+      '{"timestamp":"2026-03-20T10:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":{"unexpected":true}}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const session = await parseSession({ sessionPath, agent: "codex" });
+
+  assert.deepEqual(session.messages, [
+    { role: "user", text: "plain string user" },
+    { role: "assistant", text: "object assistant" },
+    { role: "user", text: "object content user" },
+  ]);
+});
+
 test("parseSession reads QoderCLI sessions and drops meta rows", async () => {
   const session = await parseSession({
     sessionPath: path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl"),
@@ -170,6 +204,29 @@ test("parseSession reads QoderCLI string content and skips missing content", asy
     { role: "user", text: "plain string content" },
     { role: "assistant", text: "array content" },
   ]);
+});
+
+test("cli q lists QoderCLI sessions with string and missing content", async () => {
+  const currentDir = await makeTempDir("qoder-list-string-workspace");
+  const sessionsRoot = await makeTempDir("qoder-list-string-root");
+  const projectDir = path.join(sessionsRoot, "-workspace");
+  await fs.mkdir(projectDir, { recursive: true });
+  await fs.writeFile(
+    path.join(projectDir, "session.jsonl"),
+    [
+      `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-string","message":{"role":"user","content":"plain string list title"}}`,
+      `{"type":"assistant","cwd":"${currentDir}","sessionId":"qoder-string","message":{"role":"assistant","content":[{"type":"text","text":"array reply"}]}}`,
+      `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-string","message":{"role":"user"}}`,
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["q", "--root", sessionsRoot], { cwd: currentDir });
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Matching QoderCLI sessions/);
+  assert.match(result.stdout, /plain string list title/);
+  assert.doesNotMatch(result.stderr, /blocks\.map/);
 });
 
 test("parseSession reads Claude sessions", async () => {
@@ -373,6 +430,31 @@ test("buildStoryPayload groups adjacent events into playback beats", async () =>
   assert.equal(payload.beats[2].roomId, "human-hall");
   assert.equal(payload.beats[3].roomId, "tool-exec-command");
   assert.equal(payload.beats[3].events.length, 2);
+});
+
+test("story html exports QoderCLI string content without crashing", async () => {
+  const tempDir = await makeTempDir("qoder-story-string");
+  const sessionPath = path.join(tempDir, "session.jsonl");
+  await fs.writeFile(
+    sessionPath,
+    [
+      '{"type":"user","cwd":"/tmp/demo","sessionId":"qoder-story","message":{"role":"user","content":"plain story string"}}',
+      '{"type":"assistant","cwd":"/tmp/demo","sessionId":"qoder-story","message":{"role":"assistant","content":{"text":"object story reply"}}}',
+      '{"type":"user","cwd":"/tmp/demo","sessionId":"qoder-story","message":{"role":"user"}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const exported = await exportSession({
+    sessionPath,
+    sourceAgent: "qodercli",
+    targetAgent: "qodercli",
+    format: "session-story-html",
+  });
+
+  assert.equal(exported.mode, "session-story-html");
+  assert.match(exported.files[0].content, /plain story string/);
+  assert.match(exported.files[0].content, /object story reply/);
 });
 
 test("splitSession keeps only the most recent user turn and following messages", async () => {
