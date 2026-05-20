@@ -1,17 +1,18 @@
 import path from "node:path";
 
-import { joinBlocks } from "./shared.js";
+import { joinBlocks, knownCwd } from "./shared.js";
 
 function isCodexBootstrapMessage(role, text) {
   return role === "user" && text.trimStart().startsWith("# AGENTS.md instructions for ");
 }
 
 export function readSessionCwd(items) {
-  return items.find((item) => item.type === "session_meta")?.payload?.cwd ?? null;
+  return knownCwd(items.find((item) => item.type === "session_meta")?.payload?.cwd);
 }
 
 export function parse(items, sessionPath, agent) {
   const meta = items.find((item) => item.type === "session_meta")?.payload ?? {};
+  const cwd = knownCwd(meta.cwd) ?? process.cwd();
   const messages = items
     .map((item) => {
       if (item.type === "event_msg" && item.payload?.type === "agent_message") {
@@ -42,7 +43,7 @@ export function parse(items, sessionPath, agent) {
     agent,
     sessionPath,
     sessionId: meta.id ?? path.basename(sessionPath, ".jsonl"),
-    cwd: meta.cwd ?? "unknown",
+    cwd,
     title: null,
     updatedAt: meta.timestamp ?? null,
     rawItems: items,

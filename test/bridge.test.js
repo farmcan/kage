@@ -888,6 +888,83 @@ test("cli supports explicit qodercli self forks", async () => {
   assert.match(qodercliPayload.resumeCommand, /^qodercli --cwd .* --resume [0-9a-f-]{36}$/u);
 });
 
+test("cli keeps Claude same-agent forks in the source project directory", async () => {
+  const sourceRoot = await makeTempDir("claude-fork-source-root");
+  const sourceProject = path.join(sourceRoot, "-Users-levi-wrksp-kage");
+  const sourcePath = path.join(sourceProject, "source.jsonl");
+  const fakeHome = await makeTempDir("claude-fork-target-home");
+  await fs.mkdir(sourceProject, { recursive: true });
+  await fs.writeFile(
+    sourcePath,
+    [
+      '{"type":"user","message":{"role":"user","content":"fork me"},"sessionId":"source-session"}',
+      '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]},"timestamp":"2026-05-20T10:00:00.000Z","sessionId":"source-session"}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["c2c", "--session", sourcePath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  const payload = JSON.parse(result.stdout);
+  assert.equal(result.code, 0);
+  assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
+  assert.equal(path.dirname(payload.outputPath), path.join(fakeHome, ".claude", "projects", "-Users-levi-wrksp-kage"));
+  assert.doesNotMatch(payload.outputPath, /unknown/);
+});
+
+test("cli keeps QoderCLI same-agent forks in the source project directory", async () => {
+  const sourceRoot = await makeTempDir("qoder-fork-source-root");
+  const sourceProject = path.join(sourceRoot, "-Users-levi-wrksp-kage");
+  const sourcePath = path.join(sourceProject, "source.jsonl");
+  const fakeHome = await makeTempDir("qoder-fork-target-home");
+  await fs.mkdir(sourceProject, { recursive: true });
+  await fs.writeFile(
+    sourcePath,
+    [
+      '{"type":"user","sessionId":"qoder-source","message":{"role":"user","content":[{"type":"text","text":"fork me"}]}}',
+      '{"type":"assistant","sessionId":"qoder-source","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["q2q", "--session", sourcePath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  const payload = JSON.parse(result.stdout);
+  assert.equal(result.code, 0);
+  assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
+  assert.equal(path.dirname(payload.outputPath), path.join(fakeHome, ".qoder", "projects", "-Users-levi-wrksp-kage"));
+  assert.doesNotMatch(payload.outputPath, /unknown/);
+});
+
+test("cli uses the current project cwd for Codex same-agent forks with missing cwd", async () => {
+  const currentDir = await makeTempDir("codex-fork-current");
+  const outDir = await makeTempDir("codex-fork-out");
+  const sourcePath = path.join(outDir, "source.jsonl");
+  const exportPath = path.join(outDir, "fork.jsonl");
+  await fs.writeFile(
+    sourcePath,
+    [
+      '{"timestamp":"2026-05-20T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-source"}}',
+      '{"timestamp":"2026-05-20T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"fork me"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["x2x", "--session", sourcePath, "--out", exportPath, "--json"], {
+    cwd: currentDir,
+  });
+  const content = await fs.readFile(exportPath, "utf8");
+  const expectedCwd = await canonicalPath(currentDir);
+
+  assert.equal(result.code, 0);
+  assert.match(content, new RegExp(`"cwd":"${expectedCwd.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}"`, "u"));
+  assert.doesNotMatch(content, /"cwd":"unknown"/);
+});
+
 test("cli supports x2q and c2q", async () => {
   const codexSessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
   const claudeSessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");

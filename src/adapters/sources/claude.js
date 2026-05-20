@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { extractClaudeText } from "./shared.js";
+import { cwdFromProjectPath, extractClaudeText, knownCwd } from "./shared.js";
 
-export function readSessionCwd(items) {
-  return items.find((item) => item.cwd)?.cwd ?? null;
+export function readSessionCwd(items, sessionPath) {
+  return items.map((item) => knownCwd(item.cwd)).find(Boolean) ?? cwdFromProjectPath(sessionPath);
 }
 
 export function parse(items, sessionPath, agent) {
   const first = items.find((item) => item.sessionId) ?? {};
+  const cwd = knownCwd(first.cwd) ?? readSessionCwd(items, sessionPath) ?? process.cwd();
   const latestTimestamp = items
     .map((item) => item.timestamp)
     .filter(Boolean)
@@ -33,7 +34,7 @@ export function parse(items, sessionPath, agent) {
     agent,
     sessionPath,
     sessionId: first.sessionId ?? path.basename(sessionPath, ".jsonl"),
-    cwd: first.cwd ?? "unknown",
+    cwd,
     title: null,
     updatedAt: latestTimestamp ?? fs.statSync(sessionPath).mtime.toISOString(),
     rawItems: items,

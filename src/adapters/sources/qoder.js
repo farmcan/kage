@@ -1,14 +1,15 @@
 import path from "node:path";
 
-import { joinBlocks, readQoderSidecar } from "./shared.js";
+import { cwdFromProjectPath, joinBlocks, knownCwd, readQoderSidecar } from "./shared.js";
 
-export function readSessionCwd(items) {
-  return items.find((item) => item.cwd)?.cwd ?? null;
+export function readSessionCwd(items, sessionPath) {
+  return items.map((item) => knownCwd(item.cwd)).find(Boolean) ?? cwdFromProjectPath(sessionPath);
 }
 
 export async function parse(items, sessionPath, agent) {
   const sidecar = await readQoderSidecar(sessionPath);
   const first = items.find((item) => !item.isMeta) ?? items[0] ?? {};
+  const cwd = knownCwd(sidecar?.working_dir) ?? knownCwd(first.cwd) ?? readSessionCwd(items, sessionPath) ?? process.cwd();
   const messages = items
     .filter((item) => !item.isMeta)
     .map((item) => {
@@ -28,7 +29,7 @@ export async function parse(items, sessionPath, agent) {
     agent,
     sessionPath,
     sessionId: sidecar?.id ?? first.sessionId ?? path.basename(sessionPath, ".jsonl"),
-    cwd: sidecar?.working_dir ?? first.cwd ?? "unknown",
+    cwd,
     title: sidecar?.title ?? null,
     updatedAt: sidecar?.updated_at ? new Date(sidecar.updated_at).toISOString() : null,
     rawItems: items,

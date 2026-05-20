@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { readJson } from "../../core/files.js";
 
 export function cleanText(text) {
@@ -37,4 +39,22 @@ export async function readQoderSidecar(filePath) {
   } catch {
     return null;
   }
+}
+
+export function knownCwd(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text && text !== "unknown" ? text : null;
+}
+
+export function cwdFromProjectPath(sessionPath) {
+  const projectKey = path.basename(path.dirname(sessionPath));
+  if (!projectKey.startsWith("-") || projectKey.length < 2) {
+    return null;
+  }
+  const decoded = projectKey
+    .slice(1)
+    .split("-")
+    .filter(Boolean)
+    .join(path.sep);
+  return decoded ? `${path.sep}${decoded}` : null;
 }

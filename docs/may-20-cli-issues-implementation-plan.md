@@ -160,3 +160,26 @@ The generated completions must list current QoderCLI-only agents:
 ## Follow-Up
 
 After this batch lands, close or comment on #4 through #15 with the matching commit id and any remaining caveats.
+
+## Update: Issue #16 Fork Project Directory
+
+Discovered after the first batch landed.
+
+- #16 Same-agent fork operations (`c2c`, `x2x`, `q2q`) can write sessions under an `unknown` project directory.
+
+### Root Cause
+
+Some source sessions do not put `cwd` on the first row that contains `sessionId`. The source parsers used that first row directly, so `session.cwd` could become the literal string `unknown`. Target exporters then turned `unknown` into project keys such as:
+
+```text
+-Users-levi-wrksp-kage-unknown
+```
+
+### Fix Plan
+
+- [x] Treat `unknown` as a missing cwd in source parsers.
+- [x] For Claude and QoderCLI, fall back to decoding the project key from the source path when transcript rows or sidecars omit cwd.
+- [x] For explicit Codex sessions with missing cwd, fall back to the current working directory at parse time.
+- [x] Add regression tests for Claude, Codex, and QoderCLI same-agent forks preserving project cwd.
+- [x] Re-run `npm test`.
+- [x] Re-run `git diff --check`.
