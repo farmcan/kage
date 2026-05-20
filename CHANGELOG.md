@@ -32,6 +32,9 @@
 - Document that rerunning the install command upgrades an existing install.
 - 文档中补充说明：重新执行安装命令即可升级已有安装。
 
+- Refreshed the product positioning, GitHub Pages homepage, original KAGE logo asset, and macOS menu bar app plan.
+- 更新产品定位、GitHub Pages 主页、原创 KAGE logo 资产，以及 macOS 状态栏应用方案。
+
 ## Earlier Work / 早期工作
 
 - Added native Codex, Claude, and QoderCLI session export flows.

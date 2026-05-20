@@ -1,7 +1,7 @@
 {
   "name": "kage",
   "version": "0.1.0",
-  "description": "Fork and bridge local agent sessions across Codex, Claude, and QoderCLI.",
+  "description": "Find, fork, replay, and move AI coding sessions across Claude Code, Codex, and QoderCLI.",
   "type": "module",
   "main": "./src/index.js",
   "bin": {
@@ -19,7 +19,7 @@
     "type": "git",
     "url": "git+https://github.com/farmcan/kage.git"
   },
-  "homepage": "https://github.com/farmcan/kage#readme",
+  "homepage": "https://farmcan.github.io/kage/",
   "bugs": {
     "url": "https://github.com/farmcan/kage/issues"
   },

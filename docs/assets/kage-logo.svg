@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">KAGE logo</title>
+  <desc id="desc">An original leaf-shadow mark for KAGE, combining a leaf, a session path, and a command prompt.</desc>
+  <defs>
+    <clipPath id="badgeClip">
+      <circle cx="256" cy="256" r="224"/>
+    </clipPath>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="#101418"/>
+  <circle cx="256" cy="256" r="214" fill="#f7f2e6"/>
+  <g clip-path="url(#badgeClip)">
+    <path d="M92 327c63 73 159 90 236 54 67-31 105-93 103-160-41 35-91 44-147 25-47-16-87-13-121 8-34 21-57 45-71 73z" fill="#1f7a5d"/>
+    <path d="M420 141c-16 66-53 104-111 114-54 9-99-7-135-49 32-43 76-67 132-72 40-4 78-1 114 7z" fill="#63b36d"/>
+    <path d="M121 340c68-25 125-57 172-97 48-40 81-81 99-123" fill="none" stroke="#101418" stroke-width="22" stroke-linecap="round"/>
+    <path d="M177 338c20 23 49 37 85 38 44 0 80-20 103-58 20-34 21-71 3-111" fill="none" stroke="#101418" stroke-width="24" stroke-linecap="round"/>
+    <path d="M231 287c10 26 33 41 68 43 26 1 49-11 69-36" fill="none" stroke="#f2b84b" stroke-width="18" stroke-linecap="round"/>
+    <path d="M151 187l52 45-52 45" fill="none" stroke="#101418" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M224 278h88" fill="none" stroke="#101418" stroke-width="28" stroke-linecap="round"/>
+  </g>
+  <circle cx="256" cy="256" r="214" fill="none" stroke="#101418" stroke-width="18"/>
+</svg>

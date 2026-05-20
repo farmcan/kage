@@ -1,11 +1,15 @@
 # KAGE
 
-Export local agent sessions into native `Codex`, `Claude`, and `QoderCLI` session files.
+Find, fork, replay, and move AI coding sessions across `Claude Code`, `Codex`, and `QoderCLI`.
 
-The CLI reads the latest session for the current working directory, normalizes it into one internal session model, then exports it into the target agent's native format.
+KAGE treats coding-agent sessions as local project assets. It reads sessions for the current working directory, normalizes them into one internal model, and can export, preview, replay, or resume them in another agent's native format.
 
 The CLI command is `kage`.
 The name comes from the "shadow clone" idea: a useful coding agent should be able to fork its current working context into parallel branches instead of forcing every task through one linear loop.
+
+Homepage: <https://farmcan.github.io/kage/>
+
+Product plan: [macOS menu bar app](docs/mac-menu-bar-app-plan-2026-05-20.md)
 
 ## Why It Exists
 

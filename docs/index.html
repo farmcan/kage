@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="KAGE finds, forks, replays, and moves AI coding sessions across Claude Code, Codex, and QoderCLI."
+    >
+    <title>KAGE - AI Coding Session Control</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111418;
+        --muted: #52616b;
+        --paper: #faf8f2;
+        --line: #d8d4ca;
+        --leaf: #1f7a5d;
+        --leaf-soft: #dceee4;
+        --gold: #f2b84b;
+        --red: #c85345;
+        --blue: #315b8d;
+        --white: #fffdf8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--paper);
+        color: var(--ink);
+        line-height: 1.5;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid rgba(17, 20, 24, 0.1);
+        background: rgba(250, 248, 242, 0.92);
+        backdrop-filter: blur(16px);
+      }
+
+      nav {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+        font-size: 18px;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 40px;
+        height: 40px;
+      }
+
+      .links {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .links a {
+        text-decoration: none;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--ink);
+        border-radius: 8px;
+        padding: 0 16px;
+        background: var(--ink);
+        color: var(--white);
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      main {
+        overflow: hidden;
+      }
+
+      .hero {
+        min-height: calc(100svh - 72px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
+        align-items: center;
+        gap: 56px;
+        padding: 76px 0 42px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 18px;
+        color: var(--leaf);
+        font-size: 14px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 24px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--gold);
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 780px;
+        font-size: 112px;
+        line-height: 0.9;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        max-width: 680px;
+        margin: 26px 0 0;
+        color: var(--muted);
+        font-size: 22px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .secondary {
+        background: transparent;
+        color: var(--ink);
+      }
+
+      .terminal {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #171b20;
+        color: #eef4ed;
+        box-shadow: 0 26px 60px rgba(17, 20, 24, 0.18);
+      }
+
+      .terminal-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 42px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 0 16px;
+      }
+
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--red);
+      }
+
+      .dot:nth-child(2) {
+        background: var(--gold);
+      }
+
+      .dot:nth-child(3) {
+        background: #4aa66d;
+      }
+
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        padding: 24px;
+        font: 15px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .comment {
+        color: #9fb2bf;
+      }
+
+      .ok {
+        color: #81d199;
+      }
+
+      .panel-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        padding-bottom: 76px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--white);
+        padding: 22px;
+      }
+
+      .panel h2,
+      .section h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      .panel p,
+      .section p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .section {
+        border-top: 1px solid var(--line);
+        padding: 76px 0;
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1.15fr);
+        gap: 48px;
+        align-items: start;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--white);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      th {
+        background: var(--leaf-soft);
+        font-size: 13px;
+        text-transform: uppercase;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.95em;
+      }
+
+      .roadmap {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .step {
+        border-left: 4px solid var(--blue);
+        border-radius: 8px;
+        background: var(--white);
+        padding: 18px;
+      }
+
+      .step:nth-child(2) {
+        border-color: var(--leaf);
+      }
+
+      .step:nth-child(3) {
+        border-color: var(--gold);
+      }
+
+      .step:nth-child(4) {
+        border-color: var(--red);
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 30px 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      @media (max-width: 840px) {
+        .links {
+          display: none;
+        }
+
+        .hero,
+        .matrix,
+        .panel-row,
+        .roadmap {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          min-height: auto;
+          padding-top: 52px;
+        }
+
+        .terminal {
+          max-width: 100%;
+        }
+
+        h1 {
+          font-size: 64px;
+        }
+
+        .hero-copy {
+          font-size: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav class="shell" aria-label="Primary navigation">
+        <a class="brand" href="#top" aria-label="KAGE home">
+          <img src="./assets/kage-logo.svg" alt="">
+          <span>KAGE</span>
+        </a>
+        <div class="links">
+          <a href="#workflows">Workflows</a>
+          <a href="#matrix">Routes</a>
+          <a href="#roadmap">Roadmap</a>
+          <a href="https://github.com/farmcan/kage">GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="shell hero">
+        <div>
+          <p class="eyebrow">AI coding session control</p>
+          <h1>KAGE</h1>
+          <p class="hero-copy">
+            Find, fork, replay, and move local coding-agent sessions across Claude Code, Codex,
+            and QoderCLI without copy-pasting context by hand.
+          </p>
+          <div class="actions">
+            <a class="button" href="https://github.com/farmcan/kage#install">Install KAGE</a>
+            <a class="button secondary" href="https://github.com/farmcan/kage">View on GitHub</a>
+          </div>
+        </div>
+        <div class="terminal" aria-label="KAGE terminal demo">
+          <div class="terminal-top">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <pre><code>$ kage c2x --preview
+Export preview
+Source: claude
+Target: codex
+Format: codex-session
+Resume command:
+codex resume b3b958d7
+
+$ kage q
+<span class="ok">Matching QoderCLI sessions for ./repo</span>
+
+$ kage x2v
+<span class="comment">Open a local replay of the agent session.</span></code></pre>
+        </div>
+      </section>
+
+      <section id="workflows" class="shell panel-row" aria-label="Core workflows">
+        <article class="panel">
+          <h2>Rescue Context</h2>
+          <p>Locate the coding session where the important decision, bug, or plan actually happened.</p>
+        </article>
+        <article class="panel">
+          <h2>Bridge Agents</h2>
+          <p>Move a useful session from Claude Code to Codex, Codex to QoderCLI, or any supported route.</p>
+        </article>
+        <article class="panel">
+          <h2>Replay Work</h2>
+          <p>Turn a transcript into a local story view so a session can be reviewed instead of guessed.</p>
+        </article>
+      </section>
+
+      <section id="matrix" class="section">
+        <div class="shell matrix">
+          <div>
+            <h2>One tool for local agent memory</h2>
+            <p>
+              Each agent has its own native session store. KAGE keeps the local-first model, then adds
+              discovery, conversion, preview, cleanup, and replay on top.
+            </p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Route</th>
+                <th>Use it when</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>kage c2x</code></td>
+                <td>Continue a Claude Code session in Codex.</td>
+              </tr>
+              <tr>
+                <td><code>kage x2q</code></td>
+                <td>Move Codex context into QoderCLI resume format.</td>
+              </tr>
+              <tr>
+                <td><code>kage c</code></td>
+                <td>List matching Claude sessions for the current project.</td>
+              </tr>
+              <tr>
+                <td><code>kage q2v</code></td>
+                <td>Replay a QoderCLI session as a local HTML story.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="roadmap" class="section">
+        <div class="shell">
+          <h2>Product direction</h2>
+          <p>KAGE is evolving from a bridge command into a lightweight session radar.</p>
+          <div class="roadmap">
+            <article class="step">
+              <strong>Doctor</strong>
+              <p>Check agent installs, versions, session directories, and resume support.</p>
+            </article>
+            <article class="step">
+              <strong>Finder</strong>
+              <p>Search local sessions by project, agent, title, and transcript text.</p>
+            </article>
+            <article class="step">
+              <strong>Menu Bar</strong>
+              <p>Surface live session status from the macOS menu bar.</p>
+            </article>
+            <article class="step">
+              <strong>Manifest</strong>
+              <p>Track exports so KAGE can clean, undo, and explain what it wrote.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="shell">
+        KAGE is open source under the MIT license. Built for local-first coding-agent workflows.
+      </div>
+    </footer>
+  </body>
+</html>
