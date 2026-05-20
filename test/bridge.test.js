@@ -151,6 +151,27 @@ test("parseSession reads QoderCLI sessions and drops meta rows", async () => {
   assert.equal(session.messages[0].text, "你好");
 });
 
+test("parseSession reads QoderCLI string content and skips missing content", async () => {
+  const tempDir = await makeTempDir("qoder-string-content");
+  const sessionPath = path.join(tempDir, "session.jsonl");
+  await fs.writeFile(
+    sessionPath,
+    [
+      '{"type":"user","cwd":"/tmp/demo","sessionId":"qoder-string","message":{"role":"user","content":"plain string content"}}',
+      '{"type":"assistant","cwd":"/tmp/demo","sessionId":"qoder-string","message":{"role":"assistant","content":[{"type":"text","text":"array content"}]}}',
+      '{"type":"user","cwd":"/tmp/demo","sessionId":"qoder-string","message":{"role":"user"}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const session = await parseSession({ sessionPath, agent: "qodercli" });
+
+  assert.deepEqual(session.messages, [
+    { role: "user", text: "plain string content" },
+    { role: "assistant", text: "array content" },
+  ]);
+});
+
 test("parseSession reads Claude sessions", async () => {
   const session = await parseSession({
     sessionPath: path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),

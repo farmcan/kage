@@ -9,9 +9,32 @@ export function cleanText(text) {
     .trim();
 }
 
+function blockText(block) {
+  if (typeof block === "string") {
+    return block;
+  }
+  if (!block || typeof block !== "object") {
+    return "";
+  }
+  if (typeof block.text === "string") {
+    return block.text;
+  }
+  if (typeof block.content === "string") {
+    return block.content;
+  }
+  return "";
+}
+
 export function joinBlocks(blocks = []) {
+  if (typeof blocks === "string") {
+    return blocks.trim();
+  }
+  if (!Array.isArray(blocks)) {
+    return "";
+  }
+
   return blocks
-    .map((block) => block.text)
+    .map(blockText)
     .filter(Boolean)
     .join("\n")
     .trim();
