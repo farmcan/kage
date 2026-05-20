@@ -1,3 +1,23 @@
+import fs from "node:fs";
+import path from "node:path";
+
+function resolveQoderWorkingDir(cwd) {
+  const resolved = path.resolve(cwd);
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+function toQoderProjectKey(cwd) {
+  return `-${path
+    .resolve(cwd)
+    .split(path.sep)
+    .filter(Boolean)
+    .join("-")}`;
+}
+
 function toQoderMessageContent(message) {
   return [{ type: "text", text: message.text }];
 }
@@ -6,10 +26,12 @@ export function renderQoderSessionExport({
   session,
   sessionId,
   timestamp,
-  version = "0.1.29",
+  version = "1.0.0",
 }) {
   const exportedSessionId = sessionId ?? session.sessionId;
   const exportedTimestamp = timestamp ?? session.updatedAt ?? new Date().toISOString();
+  const workingDir = resolveQoderWorkingDir(session.cwd);
+  const projectKey = toQoderProjectKey(workingDir);
   const jsonlFileName = `${exportedSessionId}.jsonl`;
   const sidecarFileName = `${exportedSessionId}-session.json`;
 
@@ -18,7 +40,7 @@ export function renderQoderSessionExport({
     parentUuid: index === 0 ? "" : `m${index}`,
     isSidechain: false,
     userType: "external",
-    cwd: session.cwd,
+    cwd: workingDir,
     sessionId: exportedSessionId,
     version,
     agentId: "kage",
@@ -42,7 +64,7 @@ export function renderQoderSessionExport({
     cost: 0,
     created_at: Date.parse(exportedTimestamp),
     updated_at: Date.parse(exportedTimestamp),
-    working_dir: session.cwd,
+    working_dir: workingDir,
     quest: false,
     total_prompt_tokens: 0,
     total_completed_tokens: 0,
@@ -55,6 +77,8 @@ export function renderQoderSessionExport({
   return {
     mode: "qoder-session",
     sessionId: exportedSessionId,
+    projectKey,
+    workingDir,
     fileName: jsonlFileName,
     files: [
       { key: "main", fileName: jsonlFileName, content: `${rows.map((row) => JSON.stringify(row)).join("\n")}\n` },

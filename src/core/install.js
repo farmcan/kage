@@ -16,6 +16,10 @@ function resolveClaudeInstallPath(projectKey, fileName) {
   return path.join(getDefaultRoot("claude"), projectKey, fileName);
 }
 
+function resolveQoderInstallPath(projectKey, fileName) {
+  return path.join(getDefaultRoot("qoder"), projectKey, fileName);
+}
+
 function resolveDefaultTmpPath(fileName) {
   return path.join(process.cwd(), "tmp", "kage", fileName);
 }
@@ -29,6 +33,14 @@ function replaceExtension(filePath, pattern, replacement, fallbackSuffix) {
     return filePath.replace(pattern, replacement);
   }
   return `${filePath}${fallbackSuffix}`;
+}
+
+function shellQuote(value) {
+  const text = String(value ?? "");
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) {
+    return text;
+  }
+  return `'${text.replace(/'/gu, "'\\''")}'`;
 }
 
 export function resolveInstallPlan({ args, exported, targetAgent }) {
@@ -67,6 +79,13 @@ export function resolveInstallPlan({ args, exported, targetAgent }) {
     return {
       files: [withPath(exported.files[0], outputPath)],
       resumeCommand: `claude --resume ${exported.sessionId}`,
+    };
+  }
+
+  if (exported.mode === "qoder-session" && ["qoder", "qodercli"].includes(normalizeAgent(targetAgent))) {
+    return {
+      files: exported.files.map((file) => withPath(file, resolveQoderInstallPath(exported.projectKey, file.fileName))),
+      resumeCommand: `qodercli --cwd ${shellQuote(exported.workingDir)} --resume ${exported.sessionId}`,
     };
   }
 

@@ -60,9 +60,9 @@ kage claude qoder --fork "另外开一个分支，去做 session split" --out ./
 | `codex` | `codex` | `codex-session` fork | `codex resume ...` |
 | `qoder` / `qodercli` | `codex` | `codex-session` | `codex resume ...` |
 | `qoder` / `qodercli` | `claude` | `claude-session` | `claude --resume ...` |
-| `qoder` / `qodercli` | `qoder` / `qodercli` | `qoder-session` fork | not yet |
-| `codex` | `qoder` / `qodercli` | `qoder-session` | not yet |
-| `claude` | `qoder` / `qodercli` | `qoder-session` | not yet |
+| `qoder` / `qodercli` | `qoder` / `qodercli` | `qoder-session` fork | `qodercli --cwd ... --resume ...` |
+| `codex` | `qoder` / `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
+| `claude` | `qoder` / `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 
 ## Install
 
@@ -319,12 +319,20 @@ Run:
 claude --resume <session-id>
 ```
 
-`qoder-session` currently exports files only:
+`qoder-session` installs directly into:
 
-- `<session-id>.jsonl`
-- `<session-id>-session.json`
+```text
+~/.qoder/projects/<project-key>/...
+```
 
-It does not print a resume command yet.
+When the export is installed there, the CLI prints:
+
+```text
+Run:
+qodercli --cwd <working-dir> --resume <session-id>
+```
+
+QoderCLI resume support requires a recent QoderCLI release. It is verified with `qodercli 1.0.0`.
 
 If you use `--out` or `--output-dir`, missing parent directories are created automatically.
 
@@ -340,4 +348,4 @@ The export pipeline can trim or branch a conversation before writing it:
 
 - exports visible transcript history only
 - does not preserve hidden reasoning, tool runtime state, or UI state
-- `qoder-session` is implemented as a best-effort native export format, pending future resume support on the Qoder side
+- `qoder-session` is implemented as a best-effort native export format, with resume support verified on `qodercli 1.0.0`

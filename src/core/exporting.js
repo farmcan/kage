@@ -16,6 +16,10 @@ function applySessionTransforms(session, options) {
   return nextSession;
 }
 
+function isQoderAgent(agent) {
+  return ["qoder", "qodercli"].includes(normalizeAgent(agent));
+}
+
 export async function exportSession({
   sessionPath,
   sourceAgent,
@@ -39,8 +43,8 @@ export async function exportSession({
     normalizeAgent(targetAgent) === "claude";
   const shouldGenerateQoderForkSessionId =
     format === "qoder-session" &&
-    normalizeAgent(sourceAgent ?? parsedSession.agent) === "qoder" &&
-    normalizeAgent(targetAgent) === "qoder";
+    isQoderAgent(sourceAgent ?? parsedSession.agent) &&
+    isQoderAgent(targetAgent);
   const exportedSessionId =
     sessionId ??
     (shouldGenerateForkSessionId || shouldGenerateClaudeForkSessionId || shouldGenerateQoderForkSessionId

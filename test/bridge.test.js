@@ -29,6 +29,22 @@ async function makeTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
 }
 
+async function canonicalPath(filePath) {
+  try {
+    return await fs.realpath(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+function toProjectKey(cwd) {
+  return `-${path
+    .resolve(cwd)
+    .split(path.sep)
+    .filter(Boolean)
+    .join("-")}`;
+}
+
 function spawnCli(args, options = {}) {
   const cliPath = path.join(__dirname, "..", "src", "cli.js");
   return new Promise((resolve, reject) => {
@@ -82,9 +98,14 @@ test("inferDefaultExportFormat prefers native exports for supported aliases", ()
 test("getExportCapability exposes qoder export pairs", () => {
   assert.equal(getExportCapability("claude", "claude")?.format, "claude-session");
   assert.equal(getExportCapability("qoder", "qoder")?.format, "qoder-session");
+  assert.equal(getExportCapability("qoder", "qoder")?.resumable, true);
+  assert.equal(getExportCapability("qoder", "qodercli")?.format, "qoder-session");
+  assert.equal(getExportCapability("qodercli", "qoder")?.format, "qoder-session");
+  assert.equal(getExportCapability("qodercli", "qodercli")?.fork, true);
   assert.equal(getExportCapability("qodercli", "codex")?.format, "codex-session");
   assert.equal(getExportCapability("qodercli", "claude")?.format, "claude-session");
   assert.equal(getExportCapability("codex", "qodercli")?.format, "qoder-session");
+  assert.equal(getExportCapability("codex", "qodercli")?.resumable, true);
   assert.equal(getExportCapability("claude", "qodercli")?.format, "qoder-session");
 });
 
@@ -754,25 +775,64 @@ test("cli supports q2x and q2c", async () => {
 
 test("cli supports q2q as a qoder fork export", async () => {
   const sessionPath = path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl");
-  const result = await spawnCli(["q2q", "--session", sessionPath, "--json"]);
+  const fakeHome = await makeTempDir("q2q-home");
+  const workingDir = await canonicalPath("/workspace/demo");
+  const projectKey = toProjectKey(workingDir);
+  const result = await spawnCli(["q2q", "--session", sessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
 
   const payload = JSON.parse(result.stdout);
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "qoder-session");
   assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(payload.sessionId, "qoder-session");
-  assert.equal(payload.resumeCommand, undefined);
+  assert.equal(payload.outputPath, path.join(fakeHome, ".qoder", "projects", projectKey, `${payload.sessionId}.jsonl`));
+  assert.equal(payload.sidecarPath, path.join(fakeHome, ".qoder", "projects", projectKey, `${payload.sessionId}-session.json`));
+  assert.equal(payload.resumeCommand, `qodercli --cwd ${workingDir} --resume ${payload.sessionId}`);
+});
+
+test("cli supports explicit qodercli self and qoder target forks", async () => {
+  const sessionPath = path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl");
+  const fakeHome = await makeTempDir("qodercli-fork-home");
+  const qodercliResult = await spawnCli(["qodercli", "qodercli", "--session", sessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const qoderTargetResult = await spawnCli(["qodercli", "qoder", "--session", sessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  const qodercliPayload = JSON.parse(qodercliResult.stdout);
+  const qoderTargetPayload = JSON.parse(qoderTargetResult.stdout);
+  assert.equal(qodercliPayload.mode, "qoder-session");
+  assert.match(qodercliPayload.sessionId, /^[0-9a-f-]{36}$/);
+  assert.notEqual(qodercliPayload.sessionId, "qoder-session");
+  assert.match(qodercliPayload.resumeCommand, /^qodercli --cwd .* --resume [0-9a-f-]{36}$/u);
+  assert.equal(qoderTargetPayload.mode, "qoder-session");
+  assert.match(qoderTargetPayload.sessionId, /^[0-9a-f-]{36}$/);
+  assert.notEqual(qoderTargetPayload.sessionId, "qoder-session");
 });
 
 test("cli supports x2q and c2q", async () => {
   const codexSessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
   const claudeSessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
+  const fakeHome = await makeTempDir("to-qoder-home");
+  const codexWorkingDir = await canonicalPath("/tmp/demo");
+  const claudeWorkingDir = await canonicalPath("/workspace/claude-demo");
 
-  const x2q = await spawnCli(["x2q", "--session", codexSessionPath, "--json"]);
-  const c2q = await spawnCli(["c2q", "--session", claudeSessionPath, "--json"]);
+  const x2q = await spawnCli(["x2q", "--session", codexSessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const c2q = await spawnCli(["c2q", "--session", claudeSessionPath, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
 
-  assert.equal(JSON.parse(x2q.stdout).mode, "qoder-session");
-  assert.equal(JSON.parse(c2q.stdout).mode, "qoder-session");
+  const x2qPayload = JSON.parse(x2q.stdout);
+  const c2qPayload = JSON.parse(c2q.stdout);
+  assert.equal(x2qPayload.mode, "qoder-session");
+  assert.equal(x2qPayload.resumeCommand, `qodercli --cwd ${codexWorkingDir} --resume sample-session`);
+  assert.equal(c2qPayload.mode, "qoder-session");
+  assert.equal(c2qPayload.resumeCommand, `qodercli --cwd ${claudeWorkingDir} --resume claude-session`);
 });
 
 test("cli supports c2v, x2v, and q2v as story exports", async () => {
