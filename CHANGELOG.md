@@ -11,8 +11,11 @@
 - Added `kage update` and shorthand list commands like `kage c`, `kage q`, and `kage x`.
 - 增加了 `kage update`，以及 `kage c`、`kage q`、`kage x` 这类简写的 session 列表命令。
 
-- Added `q2q` so Qoder sessions can also be forked into new native Qoder session files, even before resume support lands.
-- 增加了 `q2q`，支持把 Qoder session fork 成新的原生 Qoder session 文件，即使当前还没有 resume 命令也可以先导出使用。
+- Switched the Qoder integration to QoderCLI-only support and added native `qodercli --resume` install hints.
+- 将 Qoder 集成收敛为只支持 QoderCLI，并补上原生 `qodercli --resume` 安装提示。
+
+- Added `q2q` so QoderCLI sessions can also be forked into new native QoderCLI session files.
+- 增加了 `q2q`，支持把 QoderCLI session fork 成新的原生 QoderCLI session 文件。
 
 - Tolerate corrupted JSONL rows during session discovery so one bad transcript does not break the whole scan.
 - 在 session 发现阶段容忍损坏的 JSONL 行，避免单个坏文件导致整个扫描流程失败。
@@ -31,8 +34,8 @@
 
 ## Earlier Work / 早期工作
 
-- Added native Codex, Claude, and Qoder session export flows.
-- 增加了原生的 Codex、Claude 和 Qoder session 导出流程。
+- Added native Codex, Claude, and QoderCLI session export flows.
+- 增加了原生的 Codex、Claude 和 QoderCLI session 导出流程。
 
 - Added the `kage` CLI alias and the GitHub install script.
 - 增加了 `kage` CLI 别名和 GitHub 安装脚本。

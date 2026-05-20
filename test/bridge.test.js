@@ -69,13 +69,13 @@ function spawnCli(args, options = {}) {
 }
 
 test("supportedAgents exposes the native-export adapter set", () => {
-  assert.deepEqual(supportedAgents.sort(), ["claude", "codex", "qoder", "qodercli"].sort());
+  assert.deepEqual(supportedAgents.sort(), ["claude", "codex", "qodercli"].sort());
 });
 
-test("detectAgent recognizes Codex, Claude, Qoder, and QoderCLI alias paths", () => {
+test("detectAgent recognizes Codex, Claude, and QoderCLI paths", () => {
   assert.equal(detectAgent("/tmp/.codex/sessions/2026/03/demo.jsonl"), "codex");
   assert.equal(detectAgent("/tmp/.claude/projects/foo.jsonl"), "claude");
-  assert.equal(detectAgent("/tmp/.qoder/projects/demo.jsonl"), "qoder");
+  assert.equal(detectAgent("/tmp/.qoder/projects/demo.jsonl"), "qodercli");
   assert.equal(detectAgent("/tmp/.qoder/bin/qodercli/demo.jsonl"), "qodercli");
   assert.equal(detectAgent("/tmp/.cursor/projects/foo/agent-transcripts/id/session.jsonl"), null);
 });
@@ -95,12 +95,10 @@ test("inferDefaultExportFormat prefers native exports for supported aliases", ()
   assert.equal(inferDefaultExportFormat({ routeAlias: "q2v", exportFormat: null }).exportFormat, "session-story-html");
 });
 
-test("getExportCapability exposes qoder export pairs", () => {
+test("getExportCapability exposes qodercli export pairs", () => {
   assert.equal(getExportCapability("claude", "claude")?.format, "claude-session");
-  assert.equal(getExportCapability("qoder", "qoder")?.format, "qoder-session");
-  assert.equal(getExportCapability("qoder", "qoder")?.resumable, true);
-  assert.equal(getExportCapability("qoder", "qodercli")?.format, "qoder-session");
-  assert.equal(getExportCapability("qodercli", "qoder")?.format, "qoder-session");
+  assert.equal(getExportCapability("qoder", "qodercli"), null);
+  assert.equal(getExportCapability("qodercli", "qoder"), null);
   assert.equal(getExportCapability("qodercli", "qodercli")?.fork, true);
   assert.equal(getExportCapability("qodercli", "codex")?.format, "codex-session");
   assert.equal(getExportCapability("qodercli", "claude")?.format, "claude-session");
@@ -140,13 +138,13 @@ test("parseSession filters Codex developer, system, and bootstrap messages", asy
   assert.deepEqual(session.messages, [{ role: "user", text: "real user request" }]);
 });
 
-test("parseSession reads Qoder sessions and drops meta rows", async () => {
+test("parseSession reads QoderCLI sessions and drops meta rows", async () => {
   const session = await parseSession({
     sessionPath: path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl"),
-    agent: "qoder",
+    agent: "qodercli",
   });
 
-  assert.equal(session.agent, "qoder");
+  assert.equal(session.agent, "qodercli");
   assert.equal(session.sessionId, "qoder-session");
   assert.equal(session.title, "Demo Qoder Session");
   assert.equal(session.messages.length, 2);
@@ -593,7 +591,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /kage <route-alias> \[options\]/);
   assert.match(result.stdout, /c2v\s+claude -> visualize/);
   assert.match(result.stdout, /x2v\s+codex -> visualize/);
-  assert.match(result.stdout, /q2v\s+qoder -> visualize/);
+  assert.match(result.stdout, /q2v\s+qodercli -> visualize/);
   assert.doesNotMatch(result.stdout, /--handoff/);
   assert.doesNotMatch(result.stdout, /--copy/);
   assert.doesNotMatch(result.stdout, /x2r/);
@@ -625,6 +623,16 @@ test("cli reports supported aliases for unknown route aliases", async () => {
   assert.match(result.stderr, /Run: kage update/);
 });
 
+test("cli rejects the legacy qoder agent name", async () => {
+  const positional = await spawnCli(["qoder", "codex"]);
+  const option = await spawnCli(["--agent", "qoder", "--target", "codex"]);
+
+  assert.equal(positional.code, 1);
+  assert.match(positional.stderr, /Unsupported agent: qoder\. Use qodercli instead\./);
+  assert.equal(option.code, 1);
+  assert.match(option.stderr, /Unsupported agent: qoder\. Use qodercli instead\./);
+});
+
 test("cli supports update command", async () => {
   const result = await spawnCli(["update"], {
     env: { ...process.env, KAGE_UPDATE_COMMAND: "printf 'Updated KAGE\\n'" },
@@ -642,7 +650,7 @@ test("cli shows the selected session card when only one match exists", async () 
   await fs.writeFile(
     path.join(projectDir, "session.jsonl"),
     [
-      `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-one","message":{"role":"user","content":[{"type":"text","text":"先看一下 qoder session"}]}}`,
+      `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-one","message":{"role":"user","content":[{"type":"text","text":"先看一下 qodercli session"}]}}`,
       `{"type":"assistant","cwd":"${currentDir}","sessionId":"qoder-one","message":{"role":"assistant","content":[{"type":"text","text":"好的"}]}}`,
     ].join("\n") + "\n",
     "utf8",
@@ -651,7 +659,7 @@ test("cli shows the selected session card when only one match exists", async () 
     path.join(projectDir, "session-session.json"),
     JSON.stringify({
       id: "qoder-one",
-      title: "Qoder Only Session",
+      title: "QoderCLI Only Session",
       working_dir: currentDir,
       updated_at: Date.parse("2026-03-21T10:00:00.000Z"),
     }),
@@ -665,7 +673,7 @@ test("cli shows the selected session card when only one match exists", async () 
   });
 
   assert.equal(result.code, 0);
-  assert.match(result.stderr, /\[1\] Qoder Only Session/);
+  assert.match(result.stderr, /\[1\] QoderCLI Only Session/);
   assert.match(result.stderr, /Selected: qoder-one/);
   assert.match(result.stdout, /claude --resume qoder-one/);
 });
@@ -773,7 +781,7 @@ test("cli supports q2x and q2c", async () => {
   assert.equal(JSON.parse(q2c.stdout).mode, "claude-session");
 });
 
-test("cli supports q2q as a qoder fork export", async () => {
+test("cli supports q2q as a qodercli fork export", async () => {
   const sessionPath = path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl");
   const fakeHome = await makeTempDir("q2q-home");
   const workingDir = await canonicalPath("/workspace/demo");
@@ -792,25 +800,18 @@ test("cli supports q2q as a qoder fork export", async () => {
   assert.equal(payload.resumeCommand, `qodercli --cwd ${workingDir} --resume ${payload.sessionId}`);
 });
 
-test("cli supports explicit qodercli self and qoder target forks", async () => {
+test("cli supports explicit qodercli self forks", async () => {
   const sessionPath = path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl");
   const fakeHome = await makeTempDir("qodercli-fork-home");
   const qodercliResult = await spawnCli(["qodercli", "qodercli", "--session", sessionPath, "--json"], {
     env: { ...process.env, HOME: fakeHome },
   });
-  const qoderTargetResult = await spawnCli(["qodercli", "qoder", "--session", sessionPath, "--json"], {
-    env: { ...process.env, HOME: fakeHome },
-  });
 
   const qodercliPayload = JSON.parse(qodercliResult.stdout);
-  const qoderTargetPayload = JSON.parse(qoderTargetResult.stdout);
   assert.equal(qodercliPayload.mode, "qoder-session");
   assert.match(qodercliPayload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(qodercliPayload.sessionId, "qoder-session");
   assert.match(qodercliPayload.resumeCommand, /^qodercli --cwd .* --resume [0-9a-f-]{36}$/u);
-  assert.equal(qoderTargetPayload.mode, "qoder-session");
-  assert.match(qoderTargetPayload.sessionId, /^[0-9a-f-]{36}$/);
-  assert.notEqual(qoderTargetPayload.sessionId, "qoder-session");
 });
 
 test("cli supports x2q and c2q", async () => {
@@ -1056,7 +1057,7 @@ test("cli can emit machine-readable json for codex and claude session exports", 
   assert.equal(JSON.parse(claudeResult.stdout).outputPath, claudePath);
 });
 
-test("cli can emit machine-readable json for qoder session exports", async () => {
+test("cli can emit machine-readable json for qodercli session exports", async () => {
   const outDir = await makeTempDir("json-qoder-export");
   const exportPath = path.join(outDir, "sample-session.jsonl");
 
@@ -1119,7 +1120,7 @@ test("cli can split a session before export", async () => {
   const exportPath = path.join(outDir, "split.jsonl");
   const result = await spawnCli([
     "claude",
-    "qoder",
+    "qodercli",
     "--session",
     path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
     "--split-recent",
@@ -1140,7 +1141,7 @@ test("cli can fork a session before export", async () => {
   const exportPath = path.join(outDir, "fork.jsonl");
   const result = await spawnCli([
     "claude",
-    "qoder",
+    "qodercli",
     "--session",
     path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
     "--fork",
@@ -1185,7 +1186,7 @@ test("cli fails clearly when both --fork and --fork-file are provided", async ()
 
   const result = await spawnCli([
     "claude",
-    "qoder",
+    "qodercli",
     "--session",
     path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
     "--fork",

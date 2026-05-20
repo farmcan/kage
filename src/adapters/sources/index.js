@@ -7,7 +7,6 @@ import * as qoder from "./qoder.js";
 const adapters = {
   claude,
   codex,
-  qoder,
   qodercli: qoder,
 };
 

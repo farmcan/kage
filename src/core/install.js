@@ -17,7 +17,7 @@ function resolveClaudeInstallPath(projectKey, fileName) {
 }
 
 function resolveQoderInstallPath(projectKey, fileName) {
-  return path.join(getDefaultRoot("qoder"), projectKey, fileName);
+  return path.join(getDefaultRoot("qodercli"), projectKey, fileName);
 }
 
 function resolveDefaultTmpPath(fileName) {
@@ -82,7 +82,7 @@ export function resolveInstallPlan({ args, exported, targetAgent }) {
     };
   }
 
-  if (exported.mode === "qoder-session" && ["qoder", "qodercli"].includes(normalizeAgent(targetAgent))) {
+  if (exported.mode === "qoder-session" && normalizeAgent(targetAgent) === "qodercli") {
     return {
       files: exported.files.map((file) => withPath(file, resolveQoderInstallPath(exported.projectKey, file.fileName))),
       resumeCommand: `qodercli --cwd ${shellQuote(exported.workingDir)} --resume ${exported.sessionId}`,

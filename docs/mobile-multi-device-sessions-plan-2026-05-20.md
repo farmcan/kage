@@ -22,7 +22,7 @@ The user story from the issue:
 
 KAGE is currently a local CLI session bridge:
 
-- `README.md` defines the core behavior as exporting local Codex, Claude, and Qoder session files.
+- `README.md` defines the core behavior as exporting local Codex, Claude, and QoderCLI session files.
 - `src/core/agents.js` only knows local agent roots such as `~/.codex/sessions` and `~/.claude/projects`.
 - `src/core/discovery.js` scans local JSONL files and matches them to the current working directory.
 - `src/adapters/sources/index.js` parses one local session path into the internal session model.
@@ -265,7 +265,7 @@ Control-side later:
 - [ ] Extract session discovery into a reusable inventory layer separate from CLI export flows.
 - [ ] Return normalized session summaries without requiring export.
 - [ ] Include `agent`, `session_id`, `cwd`, `title`, `updated_at`, `message_count`, and source metadata.
-- [ ] Add tests using existing Codex / Claude / Qoder fixtures.
+- [ ] Add tests using existing Codex / Claude / QoderCLI fixtures.
 
 ### Phase 2: Daemon MVP
 
@@ -315,7 +315,7 @@ Control-side later:
 
 - [ ] For Codex, prefer official remote access / resume flows where available.
 - [ ] For Claude, prefer Claude Code Remote Control semantics where available.
-- [ ] For Qoder, keep export-only behavior until resume/import support is verified.
+- [ ] For QoderCLI, use the verified `qodercli --resume` path.
 - [ ] Do not fabricate private native session files from mobile unless the target agent format is stable and tested.
 
 ## Acceptance Criteria for MVP
@@ -339,7 +339,7 @@ Control-side later:
    Agent sessions may contain secrets, source snippets, credentials, or private user messages. Sync summaries first.
 
 3. Agent private format instability.
-   Codex, Claude, Cursor, and Qoder session formats can change. Treat native session writes as adapter-level capabilities, not as a universal platform assumption.
+   Codex, Claude, Cursor, and QoderCLI session formats can change. Treat native session writes as adapter-level capabilities, not as a universal platform assumption.
 
 4. Device liveness ambiguity.
    Sleeping laptops and network changes can look like failures. Use stale state before offline state.

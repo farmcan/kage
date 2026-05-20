@@ -1,6 +1,6 @@
 # KAGE
 
-Export local agent sessions into native `Codex`, `Claude`, and `Qoder` session files.
+Export local agent sessions into native `Codex`, `Claude`, and `QoderCLI` session files.
 
 The CLI reads the latest session for the current working directory, normalizes it into one internal session model, then exports it into the target agent's native format.
 
@@ -46,8 +46,8 @@ kage c2c
 Fork or trim before exporting:
 
 ```bash
-kage claude qoder --split-recent 1 --out ./tmp/split.jsonl
-kage claude qoder --fork "另外开一个分支，去做 session split" --out ./tmp/fork.jsonl
+kage claude qodercli --split-recent 1 --out ./tmp/split.jsonl
+kage claude qodercli --fork "另外开一个分支，去做 session split" --out ./tmp/fork.jsonl
 ```
 
 ## What It Supports
@@ -58,11 +58,11 @@ kage claude qoder --fork "另外开一个分支，去做 session split" --out ./
 | `claude` | `codex` | `codex-session` | `codex resume ...` |
 | `claude` | `claude` | `claude-session` fork | `claude --resume ...` |
 | `codex` | `codex` | `codex-session` fork | `codex resume ...` |
-| `qoder` / `qodercli` | `codex` | `codex-session` | `codex resume ...` |
-| `qoder` / `qodercli` | `claude` | `claude-session` | `claude --resume ...` |
-| `qoder` / `qodercli` | `qoder` / `qodercli` | `qoder-session` fork | `qodercli --cwd ... --resume ...` |
-| `codex` | `qoder` / `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
-| `claude` | `qoder` / `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
+| `qodercli` | `codex` | `codex-session` | `codex resume ...` |
+| `qodercli` | `claude` | `claude-session` | `claude --resume ...` |
+| `qodercli` | `qodercli` | `qoder-session` fork | `qodercli --cwd ... --resume ...` |
+| `codex` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
+| `claude` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 
 ## Install
 
@@ -156,22 +156,22 @@ If the export worked, Codex opens in the same project directory and continues fr
 |---|---|---|
 | `x2x` | `codex -> codex` | `codex-session` |
 | `x2c` | `codex -> claude` | `claude-session` |
-| `x2q` | `codex -> qoder` | `qoder-session` |
+| `x2q` | `codex -> qodercli` | `qoder-session` |
 | `x2v` | `codex -> visualize` | `session-story-html` |
 | `c2c` | `claude -> claude` | `claude-session` |
 | `c2x` | `claude -> codex` | `codex-session` |
-| `c2q` | `claude -> qoder` | `qoder-session` |
+| `c2q` | `claude -> qodercli` | `qoder-session` |
 | `c2v` | `claude -> visualize` | `session-story-html` |
-| `q2q` | `qoder -> qoder` | `qoder-session` |
-| `q2x` | `qoder -> codex` | `codex-session` |
-| `q2c` | `qoder -> claude` | `claude-session` |
-| `q2v` | `qoder -> visualize` | `session-story-html` |
+| `q2q` | `qodercli -> qodercli` | `qoder-session` |
+| `q2x` | `qodercli -> codex` | `codex-session` |
+| `q2c` | `qodercli -> claude` | `claude-session` |
+| `q2v` | `qodercli -> visualize` | `session-story-html` |
 
 Agent shorthands:
 
 - `x`: `codex`
 - `c`: `claude`
-- `q`: `qoder`
+- `q`: `qodercli`
 
 You can also run `kage x`, `kage c`, or `kage q` to list matching sessions for the current directory without exporting.
 
@@ -179,8 +179,8 @@ Use explicit source and target instead of aliases:
 
 ```bash
 kage codex claude
-kage qoder codex
-kage claude qoder
+kage qodercli codex
+kage claude qodercli
 ```
 
 If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and prints the supported alias list.
@@ -289,7 +289,7 @@ Matching rules:
 
 - `codex`: `session_meta.payload.cwd`
 - `claude`: `cwd` from transcript rows
-- `qoder` / `qodercli`: `working_dir`
+- `qodercli`: `working_dir`
 
 ## Export Behavior
 
@@ -333,6 +333,21 @@ qodercli --cwd <working-dir> --resume <session-id>
 ```
 
 QoderCLI resume support requires a recent QoderCLI release. It is verified with `qodercli 1.0.0`.
+
+If `qodercli` is not installed, install the latest QoderCLI with one of the official methods:
+
+```bash
+curl -fsSL https://qoder.com/install | bash
+brew install qoderai/qoder/qodercli --cask
+npm install -g @qoder-ai/qodercli
+```
+
+To upgrade an existing install:
+
+```bash
+qodercli update
+curl -fsSL https://qoder.com/install | bash -s -- --force
+```
 
 If you use `--out` or `--output-dir`, missing parent directories are created automatically.
 

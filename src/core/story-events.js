@@ -416,7 +416,7 @@ export function buildStoryEvents(session) {
   if (session.agent === "claude") {
     return extractClaudeEvents(session.rawItems, session);
   }
-  if (session.agent === "qoder" || session.agent === "qodercli") {
+  if (session.agent === "qodercli") {
     return extractQoderEvents(session.rawItems, session);
   }
   return extractMessageFallback(session);

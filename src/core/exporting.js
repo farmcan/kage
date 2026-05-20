@@ -17,7 +17,7 @@ function applySessionTransforms(session, options) {
 }
 
 function isQoderAgent(agent) {
-  return ["qoder", "qodercli"].includes(normalizeAgent(agent));
+  return normalizeAgent(agent) === "qodercli";
 }
 
 export async function exportSession({

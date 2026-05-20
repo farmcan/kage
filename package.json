@@ -1,7 +1,7 @@
 {
   "name": "kage",
   "version": "0.1.0",
-  "description": "Fork and bridge local agent sessions across Codex, Claude, and Qoder.",
+  "description": "Fork and bridge local agent sessions across Codex, Claude, and QoderCLI.",
   "type": "module",
   "main": "./src/index.js",
   "bin": {
@@ -26,6 +26,7 @@
   "keywords": [
     "codex",
     "qoder",
+    "qodercli",
     "agent",
     "session",
     "cli"

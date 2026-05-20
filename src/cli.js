@@ -14,6 +14,7 @@ import { inferDefaultExportFormat, routeAliases } from "./core/routing.js";
 const shorthandAgents = ["c", "x", "q"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
 const removedRouteAliases = new Set(["x2r", "c2r", "q2r", "r2x", "r2c", "r2q"]);
+const removedAgentNames = new Set(["qoder"]);
 const removedOptions = new Set(["--handoff", "--copy", "--cursor"]);
 
 const helpText = `Usage:
@@ -25,21 +26,21 @@ const helpText = `Usage:
 Route aliases:
   x2x   codex -> codex
   x2c   codex -> claude
-  x2q   codex -> qoder
+  x2q   codex -> qodercli
   x2v   codex -> visualize
   c2c   claude -> claude
   c2x   claude -> codex
-  c2q   claude -> qoder
+  c2q   claude -> qodercli
   c2v   claude -> visualize
-  q2q   qoder -> qoder
-  q2x   qoder -> codex
-  q2c   qoder -> claude
-  q2v   qoder -> visualize
+  q2q   qodercli -> qodercli
+  q2x   qodercli -> codex
+  q2c   qodercli -> claude
+  q2v   qodercli -> visualize
 
 Agent shorthands:
   x     codex
   c     claude
-  q     qoder
+  q     qodercli
 
 Options:
   --agent <agent>
@@ -136,8 +137,14 @@ function parseArgs(argv) {
   }
 
   const [first, second] = positional;
+  if ([args.agent, args.target].some((value) => removedAgentNames.has(value))) {
+    return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
+  }
   if (first === "update" && !second) {
     return { ...args, update: true };
+  }
+  if (positional.some((value) => removedAgentNames.has(value))) {
+    return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
   }
   if (first && !second && (supportedAgents.includes(first) || shorthandAgents.includes(first))) {
     return { ...args, listAgent: first };
