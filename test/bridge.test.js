@@ -927,6 +927,23 @@ test("cli supports c2c as a Claude fork export", async () => {
   assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(payload.sessionId, "claude-session");
   assert.equal(payload.resumeCommand, `claude --resume ${payload.sessionId}`);
+  assert.deepEqual(payload.hints, [
+    "Claude Code supports native forks now: claude --resume claude-session --fork-session",
+    "Inside Claude Code, use /branch; /fork is an alias.",
+  ]);
+});
+
+test("cli prints native Claude fork guidance for c2c", async () => {
+  const sessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
+  const fakeHome = await makeTempDir("c2c-hint-home");
+  const result = await spawnCli(["c2c", "--session", sessionPath], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Run:\nclaude --resume [0-9a-f-]{36}/);
+  assert.match(result.stdout, /Hint:\nClaude Code supports native forks now: claude --resume claude-session --fork-session/);
+  assert.match(result.stdout, /Inside Claude Code, use \/branch; \/fork is an alias\./);
 });
 
 test("cli supports x2x as a Codex fork export", async () => {
@@ -941,6 +958,10 @@ test("cli supports x2x as a Codex fork export", async () => {
   assert.equal(payload.mode, "codex-session");
   assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(payload.sessionId, "sample-session");
+  assert.deepEqual(payload.hints, [
+    "Codex supports native forks now: codex fork sample-session",
+    "Use codex fork --last to fork the most recent session.",
+  ]);
 });
 
 test("cli supports q2x and q2c", async () => {

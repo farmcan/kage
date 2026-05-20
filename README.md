@@ -43,6 +43,8 @@ Fork the current Claude session into a new Claude session:
 kage c2c
 ```
 
+For same-agent forks, KAGE also prints first-party guidance when the agent already has native support. For example, `c2c` points to `claude --resume <source-session-id> --fork-session`, and `x2x` points to `codex fork <source-session-id>`.
+
 Fork or trim before exporting:
 
 ```bash

@@ -449,6 +449,10 @@ function emitResult(payload, asJson) {
   if (payload.resumeCommand) {
     process.stdout.write(`Run:\n${payload.resumeCommand}\n`);
   }
+
+  if (Array.isArray(payload.hints) && payload.hints.length > 0) {
+    process.stdout.write(`Hint:\n${payload.hints.join("\n")}\n`);
+  }
 }
 
 function compactPreviewText(text, maxLength = 120) {
@@ -461,7 +465,7 @@ function compactPreviewText(text, maxLength = 120) {
   return `${normalized.slice(0, maxLength - 3)}...`;
 }
 
-function formatExportPreview({ exported, installPlan }) {
+function formatExportPreview({ exported, installPlan, hints = [] }) {
   const lines = [
     "Export preview",
     `Source: ${exported.sourceAgent}`,
@@ -482,12 +486,35 @@ function formatExportPreview({ exported, installPlan }) {
     lines.push(installPlan.resumeCommand);
   }
 
+  if (hints.length > 0) {
+    lines.push("Hints:");
+    lines.push(...hints);
+  }
+
   lines.push("Message preview:");
   for (const [index, message] of exported.session.messages.entries()) {
     lines.push(`${index + 1}. ${message.role}: ${compactPreviewText(message.text)}`);
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function buildNativeForkHints({ exported }) {
+  if (exported.sourceAgent === "claude" && exported.targetAgent === "claude") {
+    return [
+      `Claude Code supports native forks now: claude --resume ${exported.session.sessionId} --fork-session`,
+      "Inside Claude Code, use /branch; /fork is an alias.",
+    ];
+  }
+
+  if (exported.sourceAgent === "codex" && exported.targetAgent === "codex") {
+    return [
+      `Codex supports native forks now: codex fork ${exported.session.sessionId}`,
+      "Use codex fork --last to fork the most recent session.",
+    ];
+  }
+
+  return [];
 }
 
 function formatCleanResult(result, asJson) {
@@ -790,9 +817,10 @@ async function main() {
     exported,
     targetAgent: args.target,
   });
+  const hints = buildNativeForkHints({ exported });
 
   if (args.preview) {
-    process.stdout.write(formatExportPreview({ exported, installPlan }));
+    process.stdout.write(formatExportPreview({ exported, installPlan, hints }));
     return;
   }
 
@@ -818,6 +846,7 @@ async function main() {
       ...(mainFile ? { outputPath: mainFile.path } : {}),
       ...(sidecarFile ? { sidecarPath: sidecarFile.path } : {}),
       ...(installPlan.resumeCommand ? { resumeCommand: installPlan.resumeCommand } : {}),
+      ...(hints.length > 0 ? { hints } : {}),
       paths: installPlan.files.map((file) => file.path),
     },
     args.json,

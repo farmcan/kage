@@ -183,3 +183,21 @@ Some source sessions do not put `cwd` on the first row that contains `sessionId`
 - [x] Add regression tests for Claude, Codex, and QoderCLI same-agent forks preserving project cwd.
 - [x] Re-run `npm test`.
 - [x] Re-run `git diff --check`.
+
+## Update: Native Same-Agent Fork Guidance
+
+Follow-up from local CLI research on 2026-05-20.
+
+- Claude Code exposes native fork support through `claude --resume <session-id> --fork-session`; inside Claude Code, `/branch` is available and `/fork` is an alias.
+- Codex exposes native fork support through `codex fork <session-id>` and `codex fork --last`.
+- KAGE same-agent exports are still useful for transformed forks, compatibility checks, and explicit session-file generation.
+
+### Fix Plan
+
+- [x] Add a `c2c` output hint that points users to Claude Code's native fork flow.
+- [x] Add the same hint to JSON payloads so integrations can surface it.
+- [x] Reuse the hint mechanism for `x2x`, where Codex has native fork support.
+- [x] Keep `q2q` unchanged until QoderCLI exposes a verified native fork command.
+- [x] Add regression coverage for ordinary `c2c` output and JSON payload hints.
+- [x] Re-run `npm test`.
+- [x] Re-run `git diff --check`.
