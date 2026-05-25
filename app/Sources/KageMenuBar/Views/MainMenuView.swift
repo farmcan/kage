@@ -3,6 +3,7 @@ import KageContracts
 import SwiftUI
 
 struct MainMenuView: View {
+  @Environment(\.openSettings) private var openSettings
   @EnvironmentObject private var appState: AppState
   @EnvironmentObject private var poller: SessionPoller
   @EnvironmentObject private var notifications: NotificationManager
@@ -56,7 +57,15 @@ struct MainMenuView: View {
         .buttonStyle(.borderless)
         .disabled(poller.isRefreshing)
 
-        SettingsLink {
+        Button {
+          let popoverWindow = NSApp.keyWindow
+          openSettings()
+          NSApp.activate(ignoringOtherApps: true)
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            popoverWindow?.close()
+            NSApp.activate(ignoringOtherApps: true)
+          }
+        } label: {
           Label("Settings", systemImage: "gearshape")
         }
       }

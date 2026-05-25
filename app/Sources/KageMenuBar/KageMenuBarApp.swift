@@ -28,7 +28,7 @@ struct KageMenuBarApp: App {
         .environmentObject(appState)
         .environmentObject(poller)
         .environmentObject(notifications)
-        .frame(width: 520, height: 560)
+        .frame(width: 660, height: 640)
     }
   }
 }

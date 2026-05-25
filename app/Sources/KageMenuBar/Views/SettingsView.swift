@@ -9,29 +9,38 @@ struct SettingsView: View {
   var body: some View {
     Form {
       Section("Directory") {
-        HStack {
+        HStack(alignment: .top, spacing: 12) {
           Text(appState.watchedDirectory)
             .font(.system(.body, design: .monospaced))
-            .lineLimit(1)
+            .lineLimit(2)
             .truncationMode(.middle)
-          Spacer()
-          Button("Choose...") {
-            appState.chooseWatchedDirectory()
-            Task {
-              await poller.refresh(appState: appState, notifications: notifications)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+          HStack(spacing: 8) {
+            Button("Choose...") {
+              appState.chooseWatchedDirectory()
+              Task {
+                await poller.refresh(appState: appState, notifications: notifications)
+              }
+            }
+            Button("Home") {
+              appState.useHomeDirectory()
+              Task {
+                await poller.refresh(appState: appState, notifications: notifications)
+              }
             }
           }
-          Button("Home") {
-            appState.useHomeDirectory()
-            Task {
-              await poller.refresh(appState: appState, notifications: notifications)
-            }
-          }
+          .controlSize(.small)
         }
 
         Picker("Recent", selection: $appState.watchedDirectory) {
           ForEach(appState.watchedDirectoryHistory, id: \.self) { directory in
-            Text(directory).tag(directory)
+            Text(directory)
+              .lineLimit(1)
+              .truncationMode(.middle)
+              .tag(directory)
           }
         }
       }
@@ -49,14 +58,10 @@ struct SettingsView: View {
           )
         )
         if let launchAtLoginError = appState.launchAtLoginError {
-          Text(launchAtLoginError)
-            .font(.caption)
-            .foregroundStyle(.orange)
+          SettingsWarningText(launchAtLoginError)
         }
         if let notificationError = notifications.lastError {
-          Text(notificationError)
-            .font(.caption)
-            .foregroundStyle(.orange)
+          SettingsWarningText(notificationError)
         }
       }
 
@@ -77,11 +82,14 @@ struct SettingsView: View {
               Text(agent.sessionRoot.path)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .lineLimit(2)
                 .truncationMode(.middle)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
               Text("exists \(flag(agent.sessionRoot.exists))  readable \(flag(agent.sessionRoot.readable))  writable \(flag(agent.sessionRoot.writable))")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
           }
         } else {
@@ -95,5 +103,22 @@ struct SettingsView: View {
 
   private func flag(_ value: Bool) -> String {
     value ? "yes" : "no"
+  }
+}
+
+private struct SettingsWarningText: View {
+  let message: String
+
+  init(_ message: String) {
+    self.message = message
+  }
+
+  var body: some View {
+    Text(message)
+      .font(.caption)
+      .foregroundStyle(.orange)
+      .lineLimit(3)
+      .fixedSize(horizontal: false, vertical: true)
+      .textSelection(.enabled)
   }
 }

@@ -67,6 +67,17 @@ cd app
 swift run kage-contract-smoke
 ```
 
+## Step 4: Local UI Validation Polish
+
+Goal: make the locally installed menu bar app feel usable after the first real run.
+
+Implement:
+
+- [x] open Settings without leaving the menu popover covering the window
+- [x] widen Settings enough for normal macOS form content
+- [x] make long directory and Doctor paths selectable and resilient to narrow windows
+- [x] let Settings warning messages wrap instead of disappearing behind the window edge
+
 ## Later, Only If Needed
 
 - multi-directory watching
