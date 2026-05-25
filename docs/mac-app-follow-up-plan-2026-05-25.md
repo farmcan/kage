@@ -24,10 +24,10 @@ Goal: make local builds easy to hand to another Mac user.
 
 Implement:
 
-- keep `bundle.sh` focused on `.app`
-- add a separate packaging script for `.dmg`
-- support unsigned local DMGs by default
-- support optional codesign/notarize paths only when Apple credentials are provided
+- [x] keep `bundle.sh` focused on `.app`
+- [x] add a separate packaging script for `.dmg`
+- [x] support unsigned local DMGs by default
+- [x] support optional codesign/notarize paths only when Apple credentials are provided
 
 Non-goals:
 

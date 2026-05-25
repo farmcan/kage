@@ -151,6 +151,7 @@ Implemented the first native app scaffold under `app/`:
 - `AppState` for watched directory, history, refresh interval, notifications, and launch-at-login preference.
 - Menu views for watched directory, agent tabs, session list, actions, footer warnings, and settings.
 - `bundle.sh` for a minimal `.app` bundle with `LSUIElement = true`.
+- `package.sh` for local unsigned DMGs plus optional Developer ID signing and notarization when credentials are provided.
 
 Additional UI references checked while implementing:
 

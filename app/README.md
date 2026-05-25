@@ -18,6 +18,16 @@ swift build
 open .build/release/KAGE.app
 ```
 
+Package a local DMG:
+
+```bash
+cd app
+./package.sh
+open .build/release/KAGE-0.1.0.dmg
+```
+
+`package.sh` creates an unsigned DMG by default. Set `KAGE_CODESIGN_IDENTITY` to sign the `.app` and `.dmg`, and set `KAGE_NOTARY_PROFILE` to submit the DMG through `xcrun notarytool`.
+
 ## Architecture
 
 ```text
