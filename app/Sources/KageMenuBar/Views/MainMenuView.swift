@@ -16,7 +16,11 @@ struct MainMenuView: View {
 
       Divider()
 
-      SessionListView(sessions: visibleSessions)
+      SessionListView(
+        sessions: visibleSessions,
+        actionsBySession: actionsBySession,
+        onRunAction: runAction
+      )
         .frame(maxHeight: .infinity)
 
       Divider()
@@ -39,6 +43,13 @@ struct MainMenuView: View {
       return sessions
     }
     return sessions.filter { $0.agent == appState.selectedAgent }
+  }
+
+  private var actionsBySession: [String: [KageAction]] {
+    Dictionary(
+      grouping: poller.actionsResponse?.actions.filter { $0.sessionId != nil } ?? [],
+      by: { action in "\(action.agent):\(action.sessionId ?? "")" }
+    )
   }
 
   private var actionsSection: some View {
@@ -70,7 +81,7 @@ struct MainMenuView: View {
         }
       }
 
-      let actions = poller.actionsResponse?.actions ?? []
+      let actions = quickActions
       if actions.isEmpty {
         Text("No actions available for this directory.")
           .font(.caption)
@@ -79,9 +90,7 @@ struct MainMenuView: View {
         VStack(alignment: .leading, spacing: 4) {
           ForEach(actions) { action in
             Button {
-              Task {
-                await poller.runAction(action, appState: appState, notifications: notifications)
-              }
+              runAction(action)
             } label: {
               Label(action.label, systemImage: actionIcon(action))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -97,6 +106,16 @@ struct MainMenuView: View {
           .foregroundStyle(.secondary)
           .lineLimit(2)
       }
+    }
+  }
+
+  private var quickActions: [KageAction] {
+    (poller.actionsResponse?.actions ?? []).filter { $0.isLatest ?? true }
+  }
+
+  private func runAction(_ action: KageAction) {
+    Task {
+      await poller.runAction(action, appState: appState, notifications: notifications)
     }
   }
 

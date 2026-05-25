@@ -972,7 +972,12 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
   await fs.mkdir(claudeProject, { recursive: true });
   await fs.writeFile(
-    path.join(claudeProject, "claude-action.jsonl"),
+    path.join(claudeProject, "claude-older.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"older bridge candidate"},"timestamp":"2026-05-20T09:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-older"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(claudeProject, "zz-claude-action.jsonl"),
     `{"type":"user","message":{"role":"user","content":"ship the app contract"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-action"}\n`,
     "utf8",
   );
@@ -988,6 +993,11 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(payload.mode, "actions");
   assert.equal(resumeAction.id, "resume:claude:claude-action");
   assert.equal(resumeAction.command, "claude --resume claude-action");
+  assert.equal(resumeAction.isLatest, true);
+  assert.ok(payload.actions.find((action) => action.id === "resume:claude:claude-older"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:c2x:claude-action"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:c2q:claude-action"));
+  assert.equal(payload.actions.find((action) => action.id === "bridge:c2x:claude-older").isLatest, false);
 
   const runResult = await spawnCli(["run-action", resumeAction.id, "--agent", "claude", "--json"], {
     cwd: currentDir,
@@ -995,8 +1005,22 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   });
 
   assert.equal(runResult.code, 0);
-  assert.match(runResult.stdout, /"mode": "run-action"/);
-  assert.match(runResult.stdout, /ACTION_OK/);
+  const runPayload = JSON.parse(runResult.stdout);
+  assert.equal(runPayload.mode, "run-action");
+  assert.equal(runPayload.ok, true);
+  assert.match(runPayload.stdout, /ACTION_OK/);
+
+  const bridgeAction = payload.actions.find((action) => action.id === "bridge:c2x:claude-action");
+  const bridgeResult = await spawnCli(["run-action", bridgeAction.id, "--agent", "claude", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const bridgePayload = JSON.parse(bridgeResult.stdout);
+
+  assert.equal(bridgeResult.code, 0);
+  assert.equal(bridgePayload.mode, "run-action");
+  assert.equal(bridgePayload.action.id, bridgeAction.id);
+  assert.match(bridgePayload.stdout, /codex resume claude-action/);
 });
 
 test("cli shows the selected session card when only one match exists", async () => {

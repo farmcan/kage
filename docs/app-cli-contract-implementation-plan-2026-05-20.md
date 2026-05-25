@@ -51,12 +51,14 @@ Each session should include:
 
 ### Actions
 
-Builds a small action list from the current project sessions:
+Builds an action list from the current project sessions:
 
-- resume latest session per agent
-- bridge latest Claude Code session to Codex
-- bridge latest Codex session to Claude Code
-- replay latest session per agent
+- resume each matching session
+- replay each matching session
+- bridge each matching session to every supported different target agent
+- include `isLatest` so app surfaces can keep compact quick actions while still offering per-session choices
+
+Bridge targets include Claude Code, Codex, and QoderCLI through the existing route aliases such as `c2x`, `c2q`, `x2c`, `x2q`, `q2c`, and `q2x`.
 
 The action id must be stable enough for a local menu bar refresh cycle, but it does not need to be a permanent database id yet.
 
@@ -64,7 +66,7 @@ The action id must be stable enough for a local menu bar refresh cycle, but it d
 
 Executes an action by id.
 
-For phase 1, `run-action` delegates to the existing KAGE CLI command surface instead of adding a new execution engine.
+For phase 1, `run-action` delegates to the existing KAGE CLI command surface instead of adding a new execution engine. When called with `--json`, delegated command output must be captured inside the JSON payload so GUI consumers can decode the response reliably.
 
 ## Non-Goals
 

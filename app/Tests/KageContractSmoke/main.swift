@@ -92,7 +92,8 @@ do {
           "agent": "codex",
           "sessionId": "session-1",
           "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
-          "command": "codex resume session-1"
+          "command": "codex resume session-1",
+          "isLatest": true
         },
         {
           "id": "bridge:x2c:session-1",
@@ -103,7 +104,8 @@ do {
           "sessionId": "session-1",
           "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
           "routeAlias": "x2c",
-          "cliArgs": ["x2c", "--session", "/Users/test/.codex/sessions/session-1.jsonl"]
+          "cliArgs": ["x2c", "--session", "/Users/test/.codex/sessions/session-1.jsonl"],
+          "isLatest": false
         }
       ],
       "errors": []
@@ -113,6 +115,7 @@ do {
   try require(actions.actions.count == 2, "actions should decode")
   try require(actions.actions[0].command == "codex resume session-1", "resume command should decode")
   try require(actions.actions[1].targetAgent == "claude", "bridge target should decode")
+  try require(actions.actions[0].isLatest == true, "latest marker should decode")
 } catch {
   fputs("KAGE contract smoke failed: \(error)\n", stderr)
   exit(1)

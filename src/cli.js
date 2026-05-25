@@ -392,6 +392,7 @@ export async function runUpdateCommand({
 export async function runResumeCommand({
   command,
   commandOverride = process.env.KAGE_RUN_COMMAND,
+  capture = false,
 } = {}) {
   const shell = process.env.SHELL || "sh";
   const commandToRun = commandOverride ?? command;
@@ -399,16 +400,27 @@ export async function runResumeCommand({
     throw new Error("--run requires a resume command");
   }
 
-  await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child = spawn(shell, ["-lc", commandToRun], {
-      stdio: "inherit",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
       env: process.env,
     });
+
+    let stdout = "";
+    let stderr = "";
+    if (capture) {
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+    }
 
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) {
-        resolve();
+        resolve({ stdout, stderr });
         return;
       }
       reject(new Error(`Run failed with exit code ${code}`));
@@ -416,18 +428,29 @@ export async function runResumeCommand({
   });
 }
 
-async function runCliCommand(args) {
+async function runCliCommand(args, { capture = false } = {}) {
   const cliPath = fileURLToPath(import.meta.url);
-  await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliPath, ...args], {
-      stdio: "inherit",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
       env: process.env,
     });
+
+    let stdout = "";
+    let stderr = "";
+    if (capture) {
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+    }
 
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) {
-        resolve();
+        resolve({ stdout, stderr });
         return;
       }
       reject(new Error(`Action failed with exit code ${code}`));
@@ -1126,6 +1149,20 @@ function routeAliasForAgent(agent, suffix) {
   return `${prefix}2${suffix}`;
 }
 
+function routeSuffixForAgent(agent) {
+  if (agent === "claude") {
+    return "c";
+  }
+  if (agent === "codex") {
+    return "x";
+  }
+  return "q";
+}
+
+function routeAliasBetweenAgents(sourceAgent, targetAgent) {
+  return routeAliasForAgent(sourceAgent, routeSuffixForAgent(targetAgent));
+}
+
 function buildResumeCommandForSession(session) {
   if (session.agent === "claude") {
     return `claude --resume ${shellQuote(session.sessionId)}`;
@@ -1139,78 +1176,60 @@ function buildResumeCommandForSession(session) {
   return null;
 }
 
-function latestSessionByAgent(inventory) {
-  const latest = new Map();
-  for (const group of inventory.agents) {
-    const [session] = group.sessions;
-    if (session) {
-      latest.set(group.agent, session);
-    }
-  }
-  return latest;
-}
-
 function buildActionList(inventory) {
-  const latest = latestSessionByAgent(inventory);
   const actions = [];
 
-  for (const agent of supportedAgents) {
-    const session = latest.get(agent);
-    if (!session) {
-      continue;
+  for (const group of inventory.agents) {
+    for (const [index, session] of group.sessions.entries()) {
+      const isLatest = index === 0;
+      const sessionTitle = formatSessionTitle(session.title);
+      const resumeCommand = buildResumeCommandForSession(session);
+      actions.push({
+        id: `resume:${session.agent}:${session.sessionId}`,
+        type: "resume",
+        label: isLatest
+          ? `Resume latest ${formatSessionLabel(session.agent)} session`
+          : `Resume ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
+        agent: session.agent,
+        sessionId: session.sessionId,
+        sessionPath: session.path,
+        command: resumeCommand,
+        isLatest,
+      });
+
+      const replayAlias = routeAliasForAgent(session.agent, "v");
+      actions.push({
+        id: `replay:${replayAlias}:${session.sessionId}`,
+        type: "replay",
+        label: isLatest
+          ? `Replay latest ${formatSessionLabel(session.agent)} session`
+          : `Replay ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
+        agent: session.agent,
+        sessionId: session.sessionId,
+        sessionPath: session.path,
+        routeAlias: replayAlias,
+        cliArgs: [replayAlias, "--session", session.path],
+        isLatest,
+      });
+
+      for (const targetAgent of supportedAgents.filter((agent) => agent !== session.agent)) {
+        const routeAlias = routeAliasBetweenAgents(session.agent, targetAgent);
+        actions.push({
+          id: `bridge:${routeAlias}:${session.sessionId}`,
+          type: "bridge",
+          label: isLatest
+            ? `Bridge latest ${formatSessionLabel(session.agent)} session to ${formatSessionLabel(targetAgent)}`
+            : `Bridge ${formatSessionLabel(session.agent)} session to ${formatSessionLabel(targetAgent)}: ${sessionTitle}`,
+          agent: session.agent,
+          targetAgent,
+          sessionId: session.sessionId,
+          sessionPath: session.path,
+          routeAlias,
+          cliArgs: [routeAlias, "--session", session.path],
+          isLatest,
+        });
+      }
     }
-    const resumeCommand = buildResumeCommandForSession(session);
-    actions.push({
-      id: `resume:${agent}:${session.sessionId}`,
-      type: "resume",
-      label: `Resume latest ${formatSessionLabel(agent)} session`,
-      agent,
-      sessionId: session.sessionId,
-      sessionPath: session.path,
-      command: resumeCommand,
-    });
-
-    const replayAlias = routeAliasForAgent(agent, "v");
-    actions.push({
-      id: `replay:${replayAlias}:${session.sessionId}`,
-      type: "replay",
-      label: `Replay latest ${formatSessionLabel(agent)} session`,
-      agent,
-      sessionId: session.sessionId,
-      sessionPath: session.path,
-      routeAlias: replayAlias,
-      cliArgs: [replayAlias, "--session", session.path],
-    });
-  }
-
-  const latestClaude = latest.get("claude");
-  if (latestClaude) {
-    actions.push({
-      id: `bridge:c2x:${latestClaude.sessionId}`,
-      type: "bridge",
-      label: "Bridge latest Claude Code session to Codex",
-      agent: "claude",
-      targetAgent: "codex",
-      sessionId: latestClaude.sessionId,
-      sessionPath: latestClaude.path,
-      routeAlias: "c2x",
-      cliArgs: ["c2x", "--session", latestClaude.path],
-    });
-  }
-
-  const latestCodex = latest.get("codex");
-  if (latestCodex) {
-    actions.push({
-      id: `bridge:x2c:${latestCodex.sessionId}`,
-      type: "bridge",
-      label: "Bridge latest Codex session to Claude Code",
-      agent: "codex",
-      targetAgent: "claude",
-      sessionId: latestCodex.sessionId,
-      sessionPath: latestCodex.path,
-      routeAlias: "x2c",
-      cliArgs: ["x2c", "--session", latestCodex.path],
-    });
   }
 
   return actions;
@@ -1255,21 +1274,33 @@ async function runAction(args) {
     throw new Error(`Unknown action id: ${args.runActionId}`);
   }
 
-  if (args.json) {
-    process.stdout.write(`${JSON.stringify({ mode: "run-action", cwd: result.cwd, action, executed: true }, null, 2)}\n`);
-  }
-
+  let output = { stdout: "", stderr: "" };
   if (action.type === "resume") {
-    await runResumeCommand({ command: action.command });
-    return;
+    output = await runResumeCommand({ command: action.command, capture: args.json });
+  } else if (Array.isArray(action.cliArgs)) {
+    output = await runCliCommand(action.cliArgs, { capture: args.json });
+  } else {
+    throw new Error(`Unsupported action type: ${action.type}`);
   }
 
-  if (Array.isArray(action.cliArgs)) {
-    await runCliCommand(action.cliArgs);
-    return;
+  if (args.json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          mode: "run-action",
+          cwd: result.cwd,
+          actionId: action.id,
+          action,
+          executed: true,
+          ok: true,
+          stdout: output.stdout,
+          stderr: output.stderr,
+        },
+        null,
+        2,
+      )}\n`,
+    );
   }
-
-  throw new Error(`Unsupported action type: ${action.type}`);
 }
 
 async function resolveSessionPath(args) {

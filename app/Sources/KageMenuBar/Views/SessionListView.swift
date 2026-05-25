@@ -4,6 +4,8 @@ import SwiftUI
 
 struct SessionListView: View {
   let sessions: [AgentSession]
+  let actionsBySession: [String: [KageAction]]
+  let onRunAction: (KageAction) -> Void
 
   var body: some View {
     ScrollView {
@@ -16,7 +18,11 @@ struct SessionListView: View {
             .padding(.vertical, 24)
         } else {
           ForEach(sessions) { session in
-            SessionRowView(session: session)
+            SessionRowView(
+              session: session,
+              actions: actionsBySession[session.id] ?? [],
+              onRunAction: onRunAction
+            )
           }
         }
       }
@@ -26,6 +32,8 @@ struct SessionListView: View {
 
 private struct SessionRowView: View {
   let session: AgentSession
+  let actions: [KageAction]
+  let onRunAction: (KageAction) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
@@ -40,6 +48,23 @@ private struct SessionRowView: View {
           .lineLimit(1)
           .truncationMode(.tail)
         Spacer()
+        if !actions.isEmpty {
+          Menu {
+            ForEach(actions) { action in
+              Button {
+                onRunAction(action)
+              } label: {
+                Label(actionMenuLabel(action), systemImage: actionIcon(action))
+              }
+            }
+          } label: {
+            Image(systemName: "ellipsis.circle")
+              .imageScale(.medium)
+              .accessibilityLabel("Session actions")
+          }
+          .menuStyle(.borderlessButton)
+          .fixedSize()
+        }
         Text(relativeUpdatedAt)
           .font(.caption2)
           .foregroundStyle(.secondary)
@@ -64,6 +89,16 @@ private struct SessionRowView: View {
         .fill(Color.secondary.opacity(0.08))
     )
     .contextMenu {
+      if !actions.isEmpty {
+        ForEach(actions) { action in
+          Button {
+            onRunAction(action)
+          } label: {
+            Label(actionMenuLabel(action), systemImage: actionIcon(action))
+          }
+        }
+        Divider()
+      }
       Button("Show in Finder") {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
       }
@@ -90,5 +125,44 @@ private struct SessionRowView: View {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
     return formatter.localizedString(for: date, relativeTo: Date())
+  }
+
+  private func actionMenuLabel(_ action: KageAction) -> String {
+    switch action.type {
+    case "resume":
+      return "Resume Session"
+    case "replay":
+      return "Replay Session"
+    case "bridge":
+      return "Bridge to \(agentLabel(action.targetAgent))"
+    default:
+      return action.label
+    }
+  }
+
+  private func actionIcon(_ action: KageAction) -> String {
+    switch action.type {
+    case "resume":
+      return "play.circle"
+    case "bridge":
+      return "arrow.left.arrow.right"
+    case "replay":
+      return "film"
+    default:
+      return "terminal"
+    }
+  }
+
+  private func agentLabel(_ agent: String?) -> String {
+    switch agent {
+    case "claude":
+      return "Claude Code"
+    case "codex":
+      return "Codex"
+    case "qodercli":
+      return "QoderCLI"
+    default:
+      return agent ?? "Target"
+    }
   }
 }

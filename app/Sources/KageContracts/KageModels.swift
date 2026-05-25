@@ -97,6 +97,7 @@ public struct KageAction: Decodable, Identifiable, Hashable, Sendable {
   public let command: String?
   public let routeAlias: String?
   public let cliArgs: [String]?
+  public let isLatest: Bool?
 }
 
 public struct RunActionResponse: Decodable, Sendable {
