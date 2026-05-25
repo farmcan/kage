@@ -98,6 +98,7 @@ npm link
 kage c2x
 kage doctor
 kage sessions --json
+kage search "resume"
 kage actions
 kage c2c
 kage c2v
@@ -210,6 +211,9 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 --preview
 --run
 --older-than <duration>
+--since <date|duration>
+--until <date|duration>
+--project <path>
 --stdout
 --json
 --version
@@ -237,6 +241,14 @@ Generate menu-bar friendly actions and run one:
 ```bash
 kage actions --json
 kage run-action resume:claude:<session-id>
+```
+
+Find a past session by content, agent, date, or project:
+
+```bash
+kage search "auth"
+kage search "resume" --agent codex --since 7d
+kage search --project ~/wrksp/kage --json
 ```
 
 Upgrade an existing install:

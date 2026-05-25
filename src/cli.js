@@ -12,6 +12,7 @@ import { findMatchingSessions, findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
 import { resolveInstallPlan } from "./core/install.js";
 import { inferDefaultExportFormat, routeAliases } from "./core/routing.js";
+import { searchSessions } from "./core/search.js";
 
 const shorthandAgents = ["c", "x", "q"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
@@ -23,6 +24,7 @@ const helpText = `Usage:
   kage update
   kage doctor [--json]
   kage sessions [--agent claude|codex|qodercli] [--json]
+  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--json]
   kage actions [--json]
   kage run-action <id> [--json]
   kage clean [--confirm] [--older-than 7d] [--json]
@@ -64,6 +66,9 @@ Options:
   --preview
   --run
   --older-than <duration>
+  --since <date|duration>
+  --until <date|duration>
+  --project <path>
   --stdout
   --json
   --version
@@ -73,6 +78,7 @@ const completionCommands = [
   "update",
   "doctor",
   "sessions",
+  "search",
   "actions",
   "run-action",
   "clean",
@@ -95,6 +101,9 @@ const completionOptions = [
   "--preview",
   "--run",
   "--older-than",
+  "--since",
+  "--until",
+  "--project",
   "--stdout",
   "--json",
   "--confirm",
@@ -131,6 +140,11 @@ function parseArgs(argv) {
     update: false,
     doctor: false,
     sessions: false,
+    search: false,
+    searchQuery: null,
+    since: null,
+    until: null,
+    project: null,
     actions: false,
     runActionId: null,
     clean: false,
@@ -211,6 +225,15 @@ function parseArgs(argv) {
       } else if (arg === "--older-than") {
         args.cleanOlderThan = readOptionValue(argv, i, arg);
         i += 1;
+      } else if (arg === "--since") {
+        args.since = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--until") {
+        args.until = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--project") {
+        args.project = readOptionValue(argv, i, arg);
+        i += 1;
       } else if (arg === "--stdout") {
         args.stdout = true;
       } else if (arg === "--json") {
@@ -237,6 +260,9 @@ function parseArgs(argv) {
   if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
     return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
   }
+  if ((args.since || args.until || args.project) && first !== "search") {
+    return { ...args, error: "--since, --until, and --project are only supported with kage search" };
+  }
   if ([args.agent, args.target].some((value) => removedAgentNames.has(value))) {
     return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
   }
@@ -254,6 +280,15 @@ function parseArgs(argv) {
       return { ...args, error: "Usage: kage sessions [--agent claude|codex|qodercli] [--json]" };
     }
     return { ...args, sessions: true };
+  }
+  if (first === "search") {
+    if (positional.length > 2) {
+      return {
+        ...args,
+        error: "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--json]",
+      };
+    }
+    return { ...args, search: true, searchQuery: second ?? null };
   }
   if (first === "actions") {
     if (second) {
@@ -603,6 +638,9 @@ complete -c kage -l output-dir -r
 complete -c kage -l split-recent -r
 complete -c kage -l fork -r
 complete -c kage -l fork-file -r
+complete -c kage -l since -r
+complete -c kage -l until -r
+complete -c kage -l project -r
 complete -c kage -l preview
 complete -c kage -l run
 complete -c kage -l older-than -r
@@ -1037,6 +1075,44 @@ function formatSessionsResult(result, asJson) {
   return `${lines.join("\n")}\n`;
 }
 
+function formatSearchResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const title = result.query ? `Search results for "${result.query}"` : "Search results";
+  const lines = [`${title}:`];
+  if (result.results.length === 0) {
+    lines.push("No matching sessions found.");
+  }
+
+  for (const [index, session] of result.results.entries()) {
+    lines.push("");
+    lines.push(`[${index + 1}] ${session.agentLabel} ${formatSessionTitle(session.title)}`);
+    lines.push(`    Updated: ${session.updatedAt ?? "unknown time"}`);
+    lines.push(`    Session: ${session.sessionId}`);
+    lines.push(`    Project: ${session.cwd}`);
+    lines.push(`    Path: ${session.path}`);
+    if (session.match) {
+      lines.push(`    Match: ${session.match.field}: ${session.match.text}`);
+    }
+    if (session.recentUserMessages.length > 0) {
+      lines.push("    Recent user messages:");
+      for (const message of session.recentUserMessages) {
+        lines.push(`    - ${message}`);
+      }
+    }
+  }
+
+  const errors = result.agents.filter((agent) => agent.error);
+  for (const error of errors) {
+    lines.push("");
+    lines.push(`${formatSessionLabel(error.agent)}: ${error.error}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function shellQuote(value) {
   const text = String(value ?? "");
   if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) {
@@ -1243,6 +1319,18 @@ async function main() {
   if (args.sessions) {
     const result = await buildSessionInventory(args);
     process.stdout.write(formatSessionsResult(result, args.json));
+    return;
+  }
+  if (args.search) {
+    const result = await searchSessions({
+      query: args.searchQuery,
+      agent: args.agent,
+      root: args.root,
+      since: args.since,
+      until: args.until,
+      project: args.project,
+    });
+    process.stdout.write(formatSearchResult(result, args.json));
     return;
   }
   if (args.actions) {

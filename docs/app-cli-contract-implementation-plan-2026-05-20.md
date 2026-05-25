@@ -72,8 +72,9 @@ For phase 1, `run-action` delegates to the existing KAGE CLI command surface ins
 - DMG packaging
 - background daemon
 - persistent export manifest
-- global text search across all sessions
 - destructive actions
+
+Global text search was intentionally left out of phase 1, then implemented separately as `kage search` once the session inventory contract was stable.
 
 ## Implementation Order
 

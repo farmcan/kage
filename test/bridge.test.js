@@ -714,6 +714,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
   assert.match(result.stdout, /kage doctor \[--json\]/);
   assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--json\]/);
+  assert.match(result.stdout, /kage search \[query\]/);
   assert.match(result.stdout, /kage actions \[--json\]/);
   assert.match(result.stdout, /kage run-action <id> \[--json\]/);
   assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
@@ -893,6 +894,76 @@ test("cli sessions lists current-project sessions across agents as json", async 
     ["claude-one", "codex-one", "qoder-one"].sort(),
   );
   assert.equal(payload.sessions.find((session) => session.sessionId === "qoder-one").agent, "qodercli");
+});
+
+test("cli search finds sessions by query, agent, project, and date filters", async () => {
+  const fakeHome = await makeTempDir("search-home");
+  const currentDir = await makeTempDir("search-current");
+  const otherDir = await makeTempDir("search-other");
+  const claudeProject = path.join(fakeHome, ".claude", "projects", "-current");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
+  await fs.mkdir(claudeProject, { recursive: true });
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".qoder", "projects"), { recursive: true });
+  await fs.writeFile(
+    path.join(claudeProject, "claude-auth.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"fix auth login"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-auth"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(codexProject, "rollout-codex-auth.jsonl"),
+    [
+      `{"timestamp":"2026-05-20T11:00:00.000Z","type":"session_meta","payload":{"id":"codex-auth","cwd":"${otherDir}","timestamp":"2026-05-20T11:00:00.000Z"}}`,
+      '{"timestamp":"2026-05-20T11:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"billing auth check"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const allResult = await spawnCli(["search", "auth", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const allPayload = JSON.parse(allResult.stdout);
+  assert.equal(allResult.code, 0);
+  assert.deepEqual(
+    allPayload.results.map((session) => session.sessionId).sort(),
+    ["claude-auth", "codex-auth"].sort(),
+  );
+
+  const filteredResult = await spawnCli(
+    [
+      "search",
+      "auth",
+      "--agent",
+      "claude",
+      "--project",
+      currentDir,
+      "--since",
+      "2026-05-19",
+      "--until",
+      "2026-05-20",
+      "--json",
+    ],
+    {
+      env: { ...process.env, HOME: fakeHome },
+    },
+  );
+  const filteredPayload = JSON.parse(filteredResult.stdout);
+  assert.equal(filteredResult.code, 0);
+  assert.deepEqual(filteredPayload.results.map((session) => session.sessionId), ["claude-auth"]);
+  assert.equal(filteredPayload.results[0].match.field, "title");
+
+  const emptyResult = await spawnCli(["search", "--agent", "claude", "--since", "2099-01-01", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const emptyPayload = JSON.parse(emptyResult.stdout);
+  assert.equal(emptyResult.code, 0);
+  assert.deepEqual(emptyPayload.results, []);
+
+  const invalidResult = await spawnCli(["search", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  assert.equal(invalidResult.code, 1);
+  assert.match(invalidResult.stderr, /requires a query or at least one filter/);
 });
 
 test("cli actions and run-action expose menu-bar friendly operations", async () => {

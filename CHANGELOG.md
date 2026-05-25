@@ -41,6 +41,9 @@
 - Fixed `kage clean` so Claude subagent transcripts are not treated as duplicate or stale exports.
 - 修复 `kage clean`，避免把 Claude subagent transcript 误判为重复或过期导出。
 
+- Added `kage search` for finding sessions by text, agent, date range, and project.
+- 增加 `kage search`，支持按文本、agent、时间范围和项目路径查找 session。
+
 ## Earlier Work / 早期工作
 
 - Added native Codex, Claude, and QoderCLI session export flows.
