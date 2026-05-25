@@ -11,6 +11,8 @@ Homepage: <https://farmcan.github.io/kage/>
 
 Product plan: [macOS menu bar app](docs/mac-menu-bar-app-plan-2026-05-20.md)
 
+Experimental native macOS menu bar app source lives in [app](app/). It consumes the KAGE JSON CLI contract instead of parsing agent transcripts directly.
+
 ## Why It Exists
 
 KAGE is built around two practical workflows.
@@ -90,6 +92,15 @@ For local development:
 ```bash
 npm install
 npm link
+```
+
+Build the experimental menu bar app:
+
+```bash
+cd app
+swift build
+./bundle.sh
+open .build/release/KAGE.app
 ```
 
 ## Quick Start

@@ -135,3 +135,27 @@ The app icon can use the richer color version. The menu bar icon should have a s
 - Electron Tray API: https://www.electronjs.org/docs/api/tray/
 - Electron auto updater: https://www.electronjs.org/docs/latest/api/auto-updater
 - Sparkle update framework: https://sparkle-project.github.io/documentation/
+
+## Update: Native SwiftPM App Scaffold
+
+Date: 2026-05-25
+
+Issue: https://github.com/farmcan/kage/issues/23
+
+Implemented the first native app scaffold under `app/`:
+
+- SwiftPM executable target `kage-menubar`.
+- SwiftUI `MenuBarExtra` scene with `.window` presentation.
+- `KageCLI` actor that locates `kage`, sets `Process.currentDirectoryURL`, and decodes JSON contract output.
+- `SessionPoller` for sessions, doctor, actions, refresh interval, and new-session notification diffing.
+- `AppState` for watched directory, history, refresh interval, notifications, and launch-at-login preference.
+- Menu views for watched directory, agent tabs, session list, actions, footer warnings, and settings.
+- `bundle.sh` for a minimal `.app` bundle with `LSUIElement = true`.
+
+Additional UI references checked while implementing:
+
+- MeetingBar: https://github.com/leits/MeetingBar
+- SwiftBar: https://github.com/swiftbar/SwiftBar
+- SwiftBar product pattern: https://ameba.co/swiftbar/
+
+The architectural boundary remains unchanged: the app is a renderer and action trigger for the CLI contract. Transcript parsing stays in the Node.js CLI.

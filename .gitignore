@@ -4,3 +4,4 @@ cursor-handoff-*.md
 *.log
 .worktrees/
 tmp/
+app/.build/
