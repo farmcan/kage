@@ -19,6 +19,7 @@ Keep KAGE CLI as the action authority. The app should not build bridge commands 
 - [x] Include QoderCLI bridge targets in menu-bar actions through existing `c2q`, `x2q`, `q2c`, and `q2x` aliases.
 - [x] Mark latest actions so the menu footer can keep a compact quick-action area.
 - [x] Add per-session action menus in the app so the user can choose the exact session before bridge.
+- [x] Collapse bridge UI to one visible `Bridge` entry that opens session selection before target selection.
 - [x] Add CLI and Swift contract regression coverage.
 
 ## Non-Goals

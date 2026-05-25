@@ -18,7 +18,7 @@ struct MainMenuView: View {
 
       SessionListView(
         sessions: visibleSessions,
-        actionsBySession: actionsBySession,
+        actionsBySession: nonBridgeActionsBySession,
         onRunAction: runAction
       )
         .frame(maxHeight: .infinity)
@@ -52,6 +52,22 @@ struct MainMenuView: View {
     )
   }
 
+  private var nonBridgeActionsBySession: [String: [KageAction]] {
+    Dictionary(
+      uniqueKeysWithValues: actionsBySession.map { key, actions in
+        (key, actions.filter { $0.type != "bridge" })
+      }
+    )
+  }
+
+  private var bridgeActionsBySession: [String: [KageAction]] {
+    Dictionary(
+      uniqueKeysWithValues: actionsBySession.map { key, actions in
+        (key, actions.filter { $0.type == "bridge" })
+      }
+    )
+  }
+
   private var actionsSection: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
@@ -82,12 +98,32 @@ struct MainMenuView: View {
       }
 
       let actions = quickActions
-      if actions.isEmpty {
+      if actions.isEmpty && !hasBridgeActions {
         Text("No actions available for this directory.")
           .font(.caption)
           .foregroundStyle(.secondary)
       } else {
         VStack(alignment: .leading, spacing: 4) {
+          if hasBridgeActions {
+            Menu {
+              ForEach(visibleSessionsWithBridgeActions) { session in
+                Menu(sessionMenuLabel(session)) {
+                  ForEach(bridgeActionsBySession[session.id] ?? []) { action in
+                    Button {
+                      runAction(action)
+                    } label: {
+                      Label("To \(agentLabel(action.targetAgent))", systemImage: actionIcon(action))
+                    }
+                  }
+                }
+              }
+            } label: {
+              Label("Bridge", systemImage: "arrow.left.arrow.right")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+          }
+
           ForEach(actions) { action in
             Button {
               runAction(action)
@@ -110,7 +146,17 @@ struct MainMenuView: View {
   }
 
   private var quickActions: [KageAction] {
-    (poller.actionsResponse?.actions ?? []).filter { $0.isLatest ?? true }
+    (poller.actionsResponse?.actions ?? []).filter { action in
+      action.type != "bridge" && (action.isLatest ?? true)
+    }
+  }
+
+  private var hasBridgeActions: Bool {
+    !visibleSessionsWithBridgeActions.isEmpty
+  }
+
+  private var visibleSessionsWithBridgeActions: [AgentSession] {
+    visibleSessions.filter { !(bridgeActionsBySession[$0.id] ?? []).isEmpty }
   }
 
   private func runAction(_ action: KageAction) {
@@ -129,6 +175,23 @@ struct MainMenuView: View {
       return "film"
     default:
       return "terminal"
+    }
+  }
+
+  private func sessionMenuLabel(_ session: AgentSession) -> String {
+    "\(session.agentLabel) · \(session.title)"
+  }
+
+  private func agentLabel(_ agent: String?) -> String {
+    switch agent {
+    case "claude":
+      return "Claude Code"
+    case "codex":
+      return "Codex"
+    case "qodercli":
+      return "QoderCLI"
+    default:
+      return agent ?? "Target"
     }
   }
 }
