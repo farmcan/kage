@@ -1719,6 +1719,51 @@ test("cli clean previews and confirms duplicate export deletion", async () => {
   await fs.access(secondPath);
 });
 
+test("cli clean ignores Claude subagent transcripts", async () => {
+  const fakeHome = await makeTempDir("clean-subagents-home");
+  const subagentsDir = path.join(fakeHome, ".claude", "projects", "-tmp-demo", "subagents");
+  const firstPath = path.join(subagentsDir, "agent-alpha.jsonl");
+  const secondPath = path.join(subagentsDir, "agent-beta.jsonl");
+  await fs.mkdir(subagentsDir, { recursive: true });
+  await fs.writeFile(
+    firstPath,
+    JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "subagent alpha" },
+      timestamp: "2026-05-20T10:00:00.000Z",
+      cwd: "/tmp/demo",
+      sessionId: "same-parent-session",
+      agentId: "alpha",
+    }) + "\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    secondPath,
+    JSON.stringify({
+      type: "user",
+      message: { role: "user", content: "subagent beta" },
+      timestamp: "2026-05-20T10:01:00.000Z",
+      cwd: "/tmp/demo",
+      sessionId: "same-parent-session",
+      agentId: "beta",
+    }) + "\n",
+    "utf8",
+  );
+  await fs.utimes(firstPath, new Date("2020-01-01T00:00:00.000Z"), new Date("2020-01-01T00:00:00.000Z"));
+  await fs.utimes(secondPath, new Date("2020-01-02T00:00:00.000Z"), new Date("2020-01-02T00:00:00.000Z"));
+
+  const result = await spawnCli(["clean", "--older-than", "1d", "--confirm", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.deleteCandidates.length, 0);
+  assert.deepEqual(payload.deleted, []);
+  await fs.access(firstPath);
+  await fs.access(secondPath);
+});
+
 test("cli clean supports older-than stale cleanup", async () => {
   const fakeHome = await makeTempDir("clean-stale-home");
   const codexDir = path.join(fakeHome, ".codex", "sessions", "2026", "03", "01");

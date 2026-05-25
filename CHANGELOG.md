@@ -38,6 +38,9 @@
 - Added the first menu-bar app CLI contract with `doctor`, `sessions`, `actions`, and `run-action`.
 - 增加第一版状态栏应用 CLI 合同：`doctor`、`sessions`、`actions` 和 `run-action`。
 
+- Fixed `kage clean` so Claude subagent transcripts are not treated as duplicate or stale exports.
+- 修复 `kage clean`，避免把 Claude subagent transcript 误判为重复或过期导出。
+
 ## Earlier Work / 早期工作
 
 - Added native Codex, Claude, and QoderCLI session export flows.

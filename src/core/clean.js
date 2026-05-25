@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import { listAgentRoots } from "./agents.js";
 import { walk } from "./files.js";
@@ -24,7 +25,7 @@ async function collectSessionFiles(roots) {
       }
     }
 
-    for (const sessionPath of paths) {
+    for (const sessionPath of paths.filter((filePath) => isCleanableSessionFile(agent, filePath))) {
       try {
         const [session, stat] = await Promise.all([
           parseSession({ sessionPath, agent }),
@@ -44,6 +45,13 @@ async function collectSessionFiles(roots) {
     }
   }
   return files;
+}
+
+function isCleanableSessionFile(agent, filePath) {
+  if (agent !== "claude") {
+    return true;
+  }
+  return !path.normalize(filePath).split(path.sep).includes("subagents");
 }
 
 function groupBySession(files) {
