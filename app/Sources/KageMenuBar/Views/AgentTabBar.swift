@@ -1,3 +1,4 @@
+import KageContracts
 import SwiftUI
 
 struct AgentTabBar: View {

@@ -54,11 +54,18 @@ Goal: catch App/CLI JSON drift early.
 
 Implement Swift tests that decode representative JSON for:
 
-- `doctor --json`
-- `sessions --json`
-- `actions --json`
+- [x] `doctor --json`
+- [x] `sessions --json`
+- [x] `actions --json`
 
 This does not replace Node CLI tests. It verifies the Swift app's Codable contract layer.
+
+Because this local command line tools environment does not expose XCTest or Swift Testing, the contract check is implemented as a small SwiftPM smoke executable:
+
+```bash
+cd app
+swift run kage-contract-smoke
+```
 
 ## Later, Only If Needed
 

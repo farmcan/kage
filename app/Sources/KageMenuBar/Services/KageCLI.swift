@@ -1,4 +1,5 @@
 import Foundation
+import KageContracts
 
 enum KageCLIError: LocalizedError {
   case notFound

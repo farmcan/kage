@@ -14,6 +14,7 @@ The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, 
 ```bash
 cd app
 swift build
+swift run kage-contract-smoke
 ./bundle.sh
 open .build/release/KAGE.app
 ```
@@ -44,6 +45,7 @@ KAGE CLI JSON
   -> Views/*
 ```
 
+- `KageContracts` is the shared Swift module for Codable CLI JSON payloads.
 - `KageCLI` is the only process boundary.
 - `SessionPoller` owns refresh, doctor/action loading, and new-session detection.
 - `AppState` owns watched-directory settings and persistence.

@@ -148,6 +148,7 @@ Implemented the first native app scaffold under `app/`:
 - SwiftUI `MenuBarExtra` scene with `.window` presentation.
 - `KageCLI` actor that locates `kage`, sets `Process.currentDirectoryURL`, and decodes JSON contract output.
 - `SessionPoller` for sessions, doctor, actions, refresh interval, and new-session notification diffing.
+- `KageContracts` Swift module plus `kage-contract-smoke` for CLI JSON contract decode checks.
 - `AppState` for watched directory, history, refresh interval, notifications, and launch-at-login preference.
 - Menu views for watched directory, agent tabs, session list, actions, footer warnings, and settings.
 - `bundle.sh` for a minimal `.app` bundle with `LSUIElement = true`.

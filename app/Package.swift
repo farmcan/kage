@@ -8,12 +8,24 @@ let package = Package(
     .macOS(.v14)
   ],
   products: [
-    .executable(name: "kage-menubar", targets: ["KageMenuBar"])
+    .library(name: "KageContracts", targets: ["KageContracts"]),
+    .executable(name: "kage-menubar", targets: ["KageMenuBar"]),
+    .executable(name: "kage-contract-smoke", targets: ["KageContractSmoke"])
   ],
   targets: [
+    .target(
+      name: "KageContracts",
+      path: "Sources/KageContracts"
+    ),
     .executableTarget(
       name: "KageMenuBar",
+      dependencies: ["KageContracts"],
       path: "Sources/KageMenuBar"
+    ),
+    .executableTarget(
+      name: "KageContractSmoke",
+      dependencies: ["KageContracts"],
+      path: "Tests/KageContractSmoke"
     )
   ]
 )

@@ -1,4 +1,5 @@
 import Foundation
+import KageContracts
 
 @MainActor
 final class SessionPoller: ObservableObject {

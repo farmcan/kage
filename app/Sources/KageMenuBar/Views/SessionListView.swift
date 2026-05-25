@@ -1,4 +1,5 @@
 import AppKit
+import KageContracts
 import SwiftUI
 
 struct SessionListView: View {
