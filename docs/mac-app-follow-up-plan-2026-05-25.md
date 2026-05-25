@@ -41,10 +41,10 @@ Goal: reduce the classic macOS GUI app problem where `$PATH` differs from an int
 
 Implement lookup order:
 
-1. `KAGE_PATH` environment override
-2. app bundle `Contents/Resources/kage` placeholder path
-3. common Homebrew/npm/local paths
-4. login shell `command -v kage`
+1. [x] `KAGE_PATH` environment override
+2. [x] app bundle `Contents/Resources/kage` placeholder path
+3. [x] common Homebrew/npm/local paths
+4. [x] login shell `command -v kage`
 
 The app still treats KAGE CLI as the source of truth.
 

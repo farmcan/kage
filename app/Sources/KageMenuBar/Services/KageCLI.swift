@@ -56,14 +56,18 @@ actor KageCLI {
       return cachedBinary
     }
 
+    let environmentPath = ProcessInfo.processInfo.environment["KAGE_PATH"]
+    let bundledPath = Bundle.main.resourceURL?.appendingPathComponent("kage").path
     let candidates = [
+      environmentPath,
+      bundledPath,
       "/usr/local/bin/kage",
       "/opt/homebrew/bin/kage",
       "\(NSHomeDirectory())/.npm-global/bin/kage",
       "\(NSHomeDirectory())/.local/bin/kage",
     ]
 
-    for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
+    for candidate in candidates.compactMap(\.self) where FileManager.default.isExecutableFile(atPath: candidate) {
       cachedBinary = candidate
       return candidate
     }
