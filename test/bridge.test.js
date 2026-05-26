@@ -1593,6 +1593,78 @@ test("cli shows recent real user messages in session choices", async () => {
   assert.doesNotMatch(result.stderr, /<turn_aborted>/);
 });
 
+test("cli sessions emits bounded titles and sanitized recent user messages", async () => {
+  const currentDir = await makeTempDir("codex-cli-bounded-title-workspace");
+  const sessionsRoot = await makeTempDir("codex-cli-bounded-title-sessions");
+  const targetDir = path.join(sessionsRoot, "2026", "03", "22");
+  const longPrompt = [
+    "实现一个足够长的 session 标题，用来验证菜单栏不会被撑坏。",
+    "这里插入工具输出标签",
+    "<local-command-stdout>hidden tool output</local-command-stdout>",
+    "然后继续补充很多很多上下文。",
+    "更多细节 ".repeat(80),
+  ].join(" ");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    path.join(targetDir, "rollout-2026-03-22T12-00-00-bounded.jsonl"),
+    [
+      JSON.stringify({
+        timestamp: "2026-03-22T12:00:00.000Z",
+        type: "session_meta",
+        payload: { id: "bounded", cwd: currentDir },
+      }),
+      JSON.stringify({
+        timestamp: "2026-03-22T12:00:01.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "<task-notification>hidden notification</task-notification>" }],
+        },
+      }),
+      JSON.stringify({
+        timestamp: "2026-03-22T12:00:02.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "user", content: [{ type: "input_text", text: longPrompt }] },
+      }),
+      JSON.stringify({
+        timestamp: "2026-03-22T12:00:03.000Z",
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "kage c2q\n<local-command-caveat>hidden caveat</local-command-caveat>\n继续排查 qodercli resume",
+            },
+          ],
+        },
+      }),
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["sessions", "--agent", "codex", "--root", sessionsRoot, "--json"], {
+    cwd: currentDir,
+  });
+  const payload = JSON.parse(result.stdout);
+  const session = payload.sessions[0];
+  const serialized = JSON.stringify(session);
+
+  assert.equal(result.code, 0);
+  assert.equal(session.sessionId, "bounded");
+  assert.ok(session.title.length <= 240);
+  assert.ok(session.shortTitle.length <= 60);
+  assert.match(session.shortTitle, /\.\.\.$/u);
+  assert.ok(session.recentUserMessages.every((message) => message.length <= 160));
+  assert.match(session.recentUserMessages[0], /kage c2q/);
+  assert.match(session.recentUserMessages[0], /继续排查 qodercli resume/);
+  assert.doesNotMatch(serialized, /hidden/);
+  assert.doesNotMatch(serialized, /<local-command-stdout>/);
+  assert.doesNotMatch(serialized, /<task-notification>/);
+});
+
 test("cli installs default Codex exports into the real Codex session directory", async () => {
   const fakeHome = await makeTempDir("codex-home");
   const result = await spawnCli(

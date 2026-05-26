@@ -3,32 +3,11 @@ import path from "node:path";
 
 import { formatAgentName, listAgentRoots, supportedAgents } from "./agents.js";
 import { sameOrSubpath, samePath, walk } from "./files.js";
+import { getRecentUserMessages, getSessionTitle, getShortSessionTitle } from "./session-labels.js";
 import { parseSession } from "../adapters/sources/index.js";
 
 function normalizeText(value) {
   return String(value ?? "").toLowerCase();
-}
-
-function cleanTitle(value) {
-  const text = String(value ?? "")
-    .replace(/\s+/gu, " ")
-    .trim();
-  return text || "(untitled)";
-}
-
-function isIgnorableUserMessage(text) {
-  const normalized = String(text ?? "").trimStart();
-  return normalized.startsWith("<environment_context>") || normalized.startsWith("<turn_aborted>");
-}
-
-function firstRealUserMessage(session) {
-  return session.messages.find(
-    (message) => message.role === "user" && message.text.trim() && !isIgnorableUserMessage(message.text),
-  );
-}
-
-function getSessionTitle(session) {
-  return cleanTitle(session.title ?? firstRealUserMessage(session)?.text);
 }
 
 function agentLabel(agent) {
@@ -82,14 +61,6 @@ function isSearchableSessionFile(agent, filePath) {
     return true;
   }
   return !path.normalize(filePath).split(path.sep).includes("subagents");
-}
-
-function recentUserMessages(session, count = 3) {
-  return session.messages
-    .filter((message) => message.role === "user" && message.text.trim() && !isIgnorableUserMessage(message.text))
-    .slice(-count)
-    .reverse()
-    .map((message) => cleanTitle(message.text));
 }
 
 function findMatchContext(session, title, query) {
@@ -206,10 +177,11 @@ async function searchAgent(agent, rootDir, filters) {
         agentLabel: agentLabel(agent),
         sessionId: session.sessionId,
         title,
+        shortTitle: getShortSessionTitle(session),
         updatedAt: session.updatedAt ?? null,
         cwd: session.cwd,
         path: sessionPath,
-        recentUserMessages: recentUserMessages(session),
+        recentUserMessages: getRecentUserMessages(session),
         match: findMatchContext(session, title, filters.query),
       });
     } catch {

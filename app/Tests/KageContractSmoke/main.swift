@@ -46,6 +46,7 @@ do {
           "agentLabel": "Claude",
           "sessionId": "session-1",
           "title": "Fix login",
+          "shortTitle": "Fix login",
           "updatedAt": "2026-05-25T06:56:02.409Z",
           "cwd": "/tmp/project",
           "path": "/Users/test/.claude/projects/-tmp-project/session-1.jsonl",
@@ -63,6 +64,7 @@ do {
               "agentLabel": "Claude",
               "sessionId": "session-1",
               "title": "Fix login",
+              "shortTitle": "Fix login",
               "updatedAt": "2026-05-25T06:56:02.409Z",
               "cwd": "/tmp/project",
               "path": "/Users/test/.claude/projects/-tmp-project/session-1.jsonl",
@@ -76,6 +78,7 @@ do {
     """
   )
   try require(sessions.sessions[0].id == "claude:session-1", "session id should compose from agent and id")
+  try require(sessions.sessions[0].displayTitle == "Fix login", "short session title should drive display title")
   try require(sessions.agents[0].sessions[0].recentUserMessages == ["Fix login"], "recent user messages should decode")
 
   let actions = try decode(

@@ -13,10 +13,15 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
   public let agentLabel: String
   public let sessionId: String
   public let title: String
+  public let shortTitle: String?
   public let updatedAt: String?
   public let cwd: String
   public let path: String
   public let recentUserMessages: [String]
+
+  public var displayTitle: String {
+    shortTitle ?? title
+  }
 
   public var id: String {
     "\(agent):\(sessionId)"

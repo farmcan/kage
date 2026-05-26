@@ -13,6 +13,12 @@ import { exportSession } from "./core/exporting.js";
 import { resolveInstallPlan } from "./core/install.js";
 import { inferDefaultExportFormat, routeAliases } from "./core/routing.js";
 import { searchSessions } from "./core/search.js";
+import {
+  compactSessionText,
+  getRecentUserMessages,
+  getSessionTitle,
+  getShortSessionTitle,
+} from "./core/session-labels.js";
 
 const shorthandAgents = ["c", "x", "q"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
@@ -872,35 +878,7 @@ function formatBytes(value) {
 }
 
 function formatSessionTitle(title, maxLength = Number.POSITIVE_INFINITY) {
-  const normalized = String(title ?? "")
-    .replace(/\s+/gu, " ")
-    .trim();
-  if (!normalized) {
-    return "(untitled)";
-  }
-  if (!Number.isFinite(maxLength) || normalized.length <= maxLength) {
-    return normalized;
-  }
-  return `${normalized.slice(0, maxLength - 3)}...`;
-}
-
-function isIgnorableSessionTitleMessage(text) {
-  const normalized = String(text ?? "").trimStart();
-  return normalized.startsWith("<environment_context>") || normalized.startsWith("<turn_aborted>");
-}
-
-function getRealUserMessages(session) {
-  return session.messages.filter(
-    (message) => message.role === "user" && message.text.trim() && !isIgnorableSessionTitleMessage(message.text),
-  );
-}
-
-function getSessionTitle(session) {
-  if (session.title) {
-    return formatSessionTitle(session.title);
-  }
-  const firstUserMessage = getRealUserMessages(session)[0];
-  return formatSessionTitle(firstUserMessage?.text);
+  return compactSessionText(title, { maxLength });
 }
 
 function formatSessionCandidate(candidate, index) {
@@ -1012,10 +990,8 @@ async function buildSessionCandidates(args) {
           cwd: session.cwd,
           updatedAt: session.updatedAt,
           title: getSessionTitle(session),
-          recentUserMessages: getRealUserMessages(session)
-            .slice(-3)
-            .reverse()
-            .map((message) => formatSessionTitle(message.text)),
+          shortTitle: getShortSessionTitle(session),
+          recentUserMessages: getRecentUserMessages(session),
         };
       }),
   );
@@ -1027,6 +1003,7 @@ function toSessionPayload(candidate) {
     agentLabel: candidate.agentLabel,
     sessionId: candidate.sessionId,
     title: candidate.title,
+    shortTitle: candidate.shortTitle,
     updatedAt: candidate.updatedAt ?? null,
     cwd: candidate.cwd,
     path: candidate.sessionPath,
@@ -1087,7 +1064,7 @@ function formatSessionsResult(result, asJson) {
       continue;
     }
     for (const [index, session] of group.sessions.entries()) {
-      lines.push(`  [${index + 1}] ${formatSessionTitle(session.title)}`);
+      lines.push(`  [${index + 1}] ${session.shortTitle ?? formatSessionTitle(session.title, 60)}`);
       lines.push(`      Updated: ${session.updatedAt ?? "unknown time"}`);
       lines.push(`      Session: ${session.sessionId}`);
       lines.push(`      Path: ${session.path}`);
@@ -1121,7 +1098,7 @@ function formatSearchResult(result, asJson) {
 
   for (const [index, session] of result.results.entries()) {
     lines.push("");
-    lines.push(`[${index + 1}] ${session.agentLabel} ${formatSessionTitle(session.title)}`);
+    lines.push(`[${index + 1}] ${session.agentLabel} ${session.shortTitle ?? formatSessionTitle(session.title, 60)}`);
     lines.push(`    Updated: ${session.updatedAt ?? "unknown time"}`);
     lines.push(`    Session: ${session.sessionId}`);
     lines.push(`    Project: ${session.cwd}`);
@@ -1192,7 +1169,7 @@ function buildActionList(inventory) {
   for (const group of inventory.agents) {
     for (const [index, session] of group.sessions.entries()) {
       const isLatest = index === 0;
-      const sessionTitle = formatSessionTitle(session.title);
+      const sessionTitle = session.shortTitle ?? formatSessionTitle(session.title, 60);
       const resumeCommand = buildResumeCommandForSession(session);
       actions.push({
         id: `resume:${session.agent}:${session.sessionId}`,

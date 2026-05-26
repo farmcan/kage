@@ -31,7 +31,7 @@ final class NotificationManager: ObservableObject {
 
     let content = UNMutableNotificationContent()
     content.title = "New \(session.agentLabel) session"
-    content.body = "\(session.title)\n\(session.cwd)"
+    content.body = "\(session.displayTitle)\n\(session.cwd)"
     content.sound = .default
 
     let request = UNNotificationRequest(

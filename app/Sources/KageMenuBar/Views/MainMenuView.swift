@@ -189,7 +189,7 @@ struct MainMenuView: View {
   }
 
   private func sessionMenuLabel(_ session: AgentSession) -> String {
-    "\(session.agentLabel) · \(session.title)"
+    "\(session.agentLabel) · \(session.displayTitle)"
   }
 
   private func agentLabel(_ agent: String?) -> String {

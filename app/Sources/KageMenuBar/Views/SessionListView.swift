@@ -42,7 +42,7 @@ private struct SessionRowView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
           .frame(width: 70, alignment: .leading)
-        Text(session.title)
+        Text(session.displayTitle)
           .font(.callout)
           .fontWeight(.medium)
           .lineLimit(1)
