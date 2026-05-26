@@ -97,10 +97,10 @@ npm link
 Build the experimental menu bar app:
 
 ```bash
-cd app
-swift build
-./bundle.sh
-open .build/release/KAGE.app
+swift build --package-path app
+swift run --package-path app kage-contract-smoke
+(cd app && ./bundle.sh)
+open app/.build/release/KAGE.app
 ```
 
 ## Quick Start

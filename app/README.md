@@ -11,20 +11,20 @@ The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, 
 
 ## Build
 
+From the repository root:
+
 ```bash
-cd app
-swift build
-swift run kage-contract-smoke
-./bundle.sh
-open .build/release/KAGE.app
+swift build --package-path app
+swift run --package-path app kage-contract-smoke
+(cd app && ./bundle.sh)
+open app/.build/release/KAGE.app
 ```
 
 Package a local DMG:
 
 ```bash
-cd app
-./package.sh
-open .build/release/KAGE-0.1.0.dmg
+(cd app && ./package.sh)
+open app/.build/release/KAGE-0.1.0.dmg
 ```
 
 `package.sh` creates an unsigned DMG by default. Set `KAGE_CODESIGN_IDENTITY` to sign the `.app` and `.dmg`, and set `KAGE_NOTARY_PROFILE` to submit the DMG through `xcrun notarytool`.
@@ -32,7 +32,7 @@ open .build/release/KAGE-0.1.0.dmg
 If the GUI app cannot find the CLI because macOS did not inherit your terminal PATH, set `KAGE_PATH` before launching it during local testing:
 
 ```bash
-KAGE_PATH="$(command -v kage)" open .build/release/KAGE.app
+KAGE_PATH="$(command -v kage)" open app/.build/release/KAGE.app
 ```
 
 ## Architecture
