@@ -46,8 +46,9 @@ actor KageCLI {
   }
 
   private func decode<T: Decodable>(_ type: T.Type, args: [String], cwd: String) async throws -> T {
-    let command = try await commandLine(args)
-    let data = try runShell(command, cwd: cwd)
+    let binary = try locateBinary()
+    let command = commandLine(binary: binary, args: args)
+    let data = try runBinary(binary: binary, args: args, cwd: cwd, command: command)
     do {
       return try JSONDecoder().decode(T.self, from: data)
     } catch {
@@ -55,8 +56,7 @@ actor KageCLI {
     }
   }
 
-  private func commandLine(_ args: [String]) async throws -> String {
-    let binary = try locateBinary()
+  private func commandLine(binary: String, args: [String]) -> String {
     return ([binary] + args).map(shellQuote).joined(separator: " ")
   }
 
@@ -124,6 +124,55 @@ actor KageCLI {
     }
 
     return stdoutData
+  }
+
+  private func runBinary(binary: String, args: [String], cwd: String, command: String) throws -> Data {
+    let process = Process()
+    let stdout = Pipe()
+    let stderr = Pipe()
+
+    process.executableURL = URL(fileURLWithPath: binary)
+    process.arguments = args
+    process.standardOutput = stdout
+    process.standardError = stderr
+    process.currentDirectoryURL = URL(fileURLWithPath: cwd, isDirectory: true)
+    process.environment = executionEnvironment()
+
+    try process.run()
+    process.waitUntilExit()
+
+    let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
+    let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+
+    guard process.terminationStatus == 0 else {
+      let stderrText = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      throw KageCLIError.executionFailed(
+        command: command,
+        exitCode: Int(process.terminationStatus),
+        stderr: stderrText
+      )
+    }
+
+    return stdoutData
+  }
+
+  private func executionEnvironment() -> [String: String] {
+    var environment = ProcessInfo.processInfo.environment
+    let fallbackPath = [
+      environment["PATH"],
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "\(NSHomeDirectory())/.npm-global/bin",
+      "\(NSHomeDirectory())/.local/bin",
+      "/usr/bin",
+      "/bin",
+      "/usr/sbin",
+      "/sbin",
+    ]
+      .compactMap(\.self)
+      .joined(separator: ":")
+    environment["PATH"] = fallbackPath
+    return environment
   }
 
   private func shellQuote(_ value: String) -> String {

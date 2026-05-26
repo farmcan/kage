@@ -4,9 +4,13 @@ struct MenuBarLabelView: View {
   @EnvironmentObject private var poller: SessionPoller
 
   var body: some View {
-    Label {
-      Text("\(poller.totalSessions)")
-    } icon: {
+    if poller.totalSessions > 0 {
+      Label {
+        Text("\(poller.totalSessions)")
+      } icon: {
+        Image(systemName: symbolName)
+      }
+    } else {
       Image(systemName: symbolName)
     }
   }

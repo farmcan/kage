@@ -14,7 +14,6 @@ struct KageMenuBarApp: App {
         .environmentObject(notifications)
         .frame(width: 430, height: 560)
         .task {
-          await notifications.requestAuthorizationIfNeeded()
           poller.start(appState: appState, notifications: notifications)
         }
     } label: {

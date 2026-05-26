@@ -1,7 +1,9 @@
+import AppKit
 import KageContracts
 import SwiftUI
 
 struct FooterView: View {
+  @Environment(\.openSettings) private var openSettings
   @EnvironmentObject private var poller: SessionPoller
 
   var body: some View {
@@ -27,6 +29,28 @@ struct FooterView: View {
           .lineLimit(1)
           .truncationMode(.middle)
       }
+
+      HStack(spacing: 10) {
+        Button {
+          openSettings()
+        } label: {
+          Label("Settings", systemImage: "gearshape")
+        }
+        Button {
+          NSApp.orderFrontStandardAboutPanel(nil)
+          NSApp.activate(ignoringOtherApps: true)
+        } label: {
+          Label("About", systemImage: "info.circle")
+        }
+        Spacer()
+        Button {
+          NSApp.terminate(nil)
+        } label: {
+          Label("Quit", systemImage: "power")
+        }
+      }
+      .buttonStyle(.borderless)
+      .controlSize(.small)
     }
   }
 

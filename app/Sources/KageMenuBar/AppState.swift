@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     static let refreshIntervalSec = "refreshIntervalSec"
     static let notificationsEnabled = "notificationsEnabled"
     static let launchAtLogin = "launchAtLogin"
+    static let selectedAgent = "selectedAgent"
   }
 
   private let defaults: UserDefaults
@@ -51,7 +52,12 @@ final class AppState: ObservableObject {
   }
 
   @Published var launchAtLoginError: String?
-  @Published var selectedAgent: String = "all"
+
+  @Published var selectedAgent: String {
+    didSet {
+      defaults.set(selectedAgent, forKey: Keys.selectedAgent)
+    }
+  }
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -61,9 +67,10 @@ final class AppState: ObservableObject {
     self.watchedDirectoryHistory = defaults.stringArray(forKey: Keys.watchedDirectoryHistory) ?? [normalizedDirectory]
     self.includeSubdirectories = defaults.object(forKey: Keys.includeSubdirectories) as? Bool ?? false
     let savedInterval = defaults.double(forKey: Keys.refreshIntervalSec)
-    self.refreshIntervalSec = savedInterval > 0 ? savedInterval : 300
+    self.refreshIntervalSec = savedInterval > 0 ? savedInterval : 60
     self.notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? true
     self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+    self.selectedAgent = defaults.string(forKey: Keys.selectedAgent) ?? "all"
   }
 
   func chooseWatchedDirectory() {

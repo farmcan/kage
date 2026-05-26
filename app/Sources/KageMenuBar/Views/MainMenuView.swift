@@ -12,6 +12,10 @@ struct MainMenuView: View {
     VStack(alignment: .leading, spacing: 12) {
       WatchedDirectoryHeader()
 
+      if let launchAtLoginError = appState.launchAtLoginError {
+        WarningBanner(message: "Launch at login: \(launchAtLoginError)")
+      }
+
       AgentTabBar(agents: poller.sessionsResponse?.agents ?? [])
 
       Divider()
@@ -210,6 +214,23 @@ struct MainMenuView: View {
   }
 }
 
+private struct WarningBanner: View {
+  let message: String
+
+  var body: some View {
+    Label(message, systemImage: "exclamationmark.triangle")
+      .font(.caption)
+      .foregroundStyle(.orange)
+      .lineLimit(3)
+      .padding(8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: 6)
+          .fill(Color.orange.opacity(0.08))
+      )
+  }
+}
+
 private struct ActionResultCard: View {
   let result: RunActionResponse
   let cwd: String
@@ -245,16 +266,16 @@ private struct ActionResultCard: View {
       HStack(spacing: 8) {
         if result.resumeCommand != nil {
           Button {
-            openResumeCommand()
+            copyResumeCommand()
           } label: {
-            Label("Open", systemImage: "terminal")
+            Label("Copy", systemImage: "doc.on.doc")
           }
           .controlSize(.small)
 
           Button {
-            copyResumeCommand()
+            openResumeCommand()
           } label: {
-            Label("Copy", systemImage: "doc.on.doc")
+            Label("Open", systemImage: "terminal")
           }
           .controlSize(.small)
         }
@@ -312,17 +333,38 @@ private struct ActionResultCard: View {
   }
 
   private func writeTerminalCommand(_ resumeCommand: String) throws -> URL {
+    cleanupOldTerminalCommands()
     let fileName = "kage-resume-\(UUID().uuidString).command"
     let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
     let script = """
     #!/bin/zsh
     cd \(shellQuote(cwd))
     \(resumeCommand)
+    rm -f \(shellQuote(fileURL.path))
 
     """
     try script.write(to: fileURL, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fileURL.path)
     return fileURL
+  }
+
+  private func cleanupOldTerminalCommands() {
+    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    guard let files = try? FileManager.default.contentsOfDirectory(
+      at: tempURL,
+      includingPropertiesForKeys: [.contentModificationDateKey],
+      options: [.skipsHiddenFiles]
+    ) else {
+      return
+    }
+
+    let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+    for file in files where file.lastPathComponent.hasPrefix("kage-resume-") && file.pathExtension == "command" {
+      let modifiedAt = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+      if modifiedAt < cutoff {
+        try? FileManager.default.removeItem(at: file)
+      }
+    }
   }
 
   private func shellQuote(_ value: String) -> String {

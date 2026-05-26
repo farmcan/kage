@@ -16,6 +16,8 @@ final class SessionPoller: ObservableObject {
   private var task: Task<Void, Never>?
   private var previousSessionIds = Set<String>()
   private var lastScope: String?
+  private var lastDoctorRefresh: Date?
+  private let doctorRefreshInterval: TimeInterval = 300
 
   var totalSessions: Int {
     sessionsResponse?.sessions.count ?? 0
@@ -36,7 +38,7 @@ final class SessionPoller: ObservableObject {
           return
         }
         await self.refresh(appState: appState, notifications: notifications)
-        let interval = UInt64(max(appState.refreshIntervalSec, 30) * 1_000_000_000)
+        let interval = UInt64(max(appState.refreshIntervalSec, 15) * 1_000_000_000)
         try? await Task.sleep(nanoseconds: interval)
       }
     }
@@ -51,8 +53,10 @@ final class SessionPoller: ObservableObject {
     let watchedDirectory = appState.watchedDirectory
     let includeSubdirectories = appState.includeSubdirectories
     let scope = "\(watchedDirectory)|includeSubdirectories=\(includeSubdirectories)"
+    let scopeChanged = lastScope != scope
     if lastScope != scope {
       previousSessionIds.removeAll()
+      lastDoctorRefresh = nil
       lastScope = scope
     }
 
@@ -65,17 +69,22 @@ final class SessionPoller: ObservableObject {
 
     do {
       async let sessions = cli.sessions(cwd: watchedDirectory, includeSubdirectories: includeSubdirectories)
-      async let doctor = cli.doctor(cwd: watchedDirectory)
       async let actions = cli.actions(cwd: watchedDirectory, includeSubdirectories: includeSubdirectories)
+      let doctorTask: Task<DoctorResult, Error>? = shouldRefreshDoctor || scopeChanged
+        ? Task { try await cli.doctor(cwd: watchedDirectory) }
+        : nil
 
       let resolvedSessions = try await sessions
-      let resolvedDoctor = try await doctor
       let resolvedActions = try await actions
+      let resolvedDoctor = try await doctorTask?.value
 
       notifyNewSessions(resolvedSessions.sessions, appState: appState, notifications: notifications)
 
       sessionsResponse = resolvedSessions
-      doctorResult = resolvedDoctor
+      if let resolvedDoctor {
+        doctorResult = resolvedDoctor
+        lastDoctorRefresh = Date()
+      }
       actionsResponse = resolvedActions
     } catch {
       errorMessage = error.localizedDescription
@@ -121,5 +130,12 @@ final class SessionPoller: ObservableObject {
     for session in sessions where newIds.contains(session.id) {
       notifications.notifyNewSession(session)
     }
+  }
+
+  private var shouldRefreshDoctor: Bool {
+    guard let lastDoctorRefresh else {
+      return true
+    }
+    return Date().timeIntervalSince(lastDoctorRefresh) >= doctorRefreshInterval
   }
 }

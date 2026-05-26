@@ -25,6 +25,14 @@ final class NotificationManager: ObservableObject {
   }
 
   func notifyNewSession(_ session: AgentSession) {
+    Task {
+      await deliverNewSessionNotification(session)
+    }
+  }
+
+  private func deliverNewSessionNotification(_ session: AgentSession) async {
+    await requestAuthorizationIfNeeded()
+
     guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
       return
     }
@@ -39,6 +47,10 @@ final class NotificationManager: ObservableObject {
       content: content,
       trigger: nil
     )
-    UNUserNotificationCenter.current().add(request)
+    do {
+      try await UNUserNotificationCenter.current().add(request)
+    } catch {
+      lastError = error.localizedDescription
+    }
   }
 }

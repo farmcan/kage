@@ -72,7 +72,7 @@ struct SettingsView: View {
       }
 
       Section("Refresh") {
-        Stepper(value: $appState.refreshIntervalSec, in: 30...3600, step: 30) {
+        Stepper(value: $appState.refreshIntervalSec, in: 15...3600, step: 15) {
           Text("\(Int(appState.refreshIntervalSec)) seconds")
         }
         Toggle("Notifications", isOn: $appState.notificationsEnabled)
