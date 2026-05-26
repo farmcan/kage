@@ -7,6 +7,7 @@ final class AppState: ObservableObject {
   private enum Keys {
     static let watchedDirectory = "watchedDirectory"
     static let watchedDirectoryHistory = "watchedDirectoryHistory"
+    static let includeSubdirectories = "includeSubdirectories"
     static let refreshIntervalSec = "refreshIntervalSec"
     static let notificationsEnabled = "notificationsEnabled"
     static let launchAtLogin = "launchAtLogin"
@@ -24,6 +25,12 @@ final class AppState: ObservableObject {
   }
 
   @Published var watchedDirectoryHistory: [String]
+
+  @Published var includeSubdirectories: Bool {
+    didSet {
+      defaults.set(includeSubdirectories, forKey: Keys.includeSubdirectories)
+    }
+  }
 
   @Published var refreshIntervalSec: Double {
     didSet {
@@ -52,6 +59,7 @@ final class AppState: ObservableObject {
     let normalizedDirectory = DirectoryHistory.normalized(savedDirectory)
     self.watchedDirectory = normalizedDirectory
     self.watchedDirectoryHistory = defaults.stringArray(forKey: Keys.watchedDirectoryHistory) ?? [normalizedDirectory]
+    self.includeSubdirectories = defaults.object(forKey: Keys.includeSubdirectories) as? Bool ?? false
     let savedInterval = defaults.double(forKey: Keys.refreshIntervalSec)
     self.refreshIntervalSec = savedInterval > 0 ? savedInterval : 300
     self.notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool ?? true

@@ -25,16 +25,24 @@ actor KageCLI {
     try await decode(DoctorResult.self, args: ["doctor", "--json"], cwd: cwd)
   }
 
-  func sessions(cwd: String) async throws -> SessionsResponse {
-    try await decode(SessionsResponse.self, args: ["sessions", "--json"], cwd: cwd)
+  func sessions(cwd: String, includeSubdirectories: Bool) async throws -> SessionsResponse {
+    try await decode(SessionsResponse.self, args: scopedArgs(["sessions", "--json"], includeSubdirectories), cwd: cwd)
   }
 
-  func actions(cwd: String) async throws -> ActionsResponse {
-    try await decode(ActionsResponse.self, args: ["actions", "--json"], cwd: cwd)
+  func actions(cwd: String, includeSubdirectories: Bool) async throws -> ActionsResponse {
+    try await decode(ActionsResponse.self, args: scopedArgs(["actions", "--json"], includeSubdirectories), cwd: cwd)
   }
 
-  func runAction(id: String, cwd: String) async throws -> RunActionResponse {
-    try await decode(RunActionResponse.self, args: ["run-action", id, "--json"], cwd: cwd)
+  func runAction(id: String, cwd: String, includeSubdirectories: Bool) async throws -> RunActionResponse {
+    try await decode(
+      RunActionResponse.self,
+      args: scopedArgs(["run-action", id, "--json"], includeSubdirectories),
+      cwd: cwd
+    )
+  }
+
+  private func scopedArgs(_ args: [String], _ includeSubdirectories: Bool) -> [String] {
+    includeSubdirectories ? args + ["--include-subdirs"] : args
   }
 
   private func decode<T: Decodable>(_ type: T.Type, args: [String], cwd: String) async throws -> T {

@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { formatAgentName, listAgentRoots, supportedAgents } from "./agents.js";
-import { samePath, walk } from "./files.js";
+import { sameOrSubpath, samePath, walk } from "./files.js";
 import { parseSession } from "../adapters/sources/index.js";
 
 function normalizeText(value) {
@@ -128,14 +128,14 @@ function findMatchContext(session, title, query) {
   return null;
 }
 
-async function matchesProject(sessionCwd, projectPath) {
+async function matchesProject(sessionCwd, projectPath, { includeSubdirs = false } = {}) {
   if (!projectPath) {
     return true;
   }
   if (!sessionCwd) {
     return false;
   }
-  return samePath(sessionCwd, projectPath);
+  return includeSubdirs ? sameOrSubpath(sessionCwd, projectPath) : samePath(sessionCwd, projectPath);
 }
 
 function isWithinDateRange(updatedAt, sinceDate, untilDate) {
@@ -191,7 +191,7 @@ async function searchAgent(agent, rootDir, filters) {
     try {
       const session = await parseSession({ sessionPath, agent });
       const title = getSessionTitle(session);
-      if (!(await matchesProject(session.cwd, filters.projectPath))) {
+      if (!(await matchesProject(session.cwd, filters.projectPath, filters))) {
         continue;
       }
       if (!isWithinDateRange(session.updatedAt, filters.sinceDate, filters.untilDate)) {
@@ -227,6 +227,7 @@ export async function searchSessions({
   since = null,
   until = null,
   project = null,
+  includeSubdirs = false,
   limit = 50,
   now = Date.now(),
 } = {}) {
@@ -248,6 +249,7 @@ export async function searchSessions({
     sinceDate: parseDateFilter(since, { now, option: "--since" }),
     untilDate: parseDateFilter(until, { now, option: "--until", boundary: "end" }),
     projectPath: project ? path.resolve(expandHome(project)) : null,
+    includeSubdirs,
   };
   const roots = listAgentRoots();
   const groups = [];
@@ -269,6 +271,7 @@ export async function searchSessions({
       since: filters.sinceDate?.toISOString() ?? null,
       until: filters.untilDate?.toISOString() ?? null,
       project: filters.projectPath,
+      includeSubdirs: filters.includeSubdirs,
       limit,
     },
     results,

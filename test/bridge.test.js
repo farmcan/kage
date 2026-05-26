@@ -529,6 +529,41 @@ test("findMatchingSessions returns Claude cwd matches", async () => {
   assert.deepEqual(matches.map((filePath) => path.basename(filePath)), ["aaa.jsonl", "bbb.jsonl"]);
 });
 
+test("findMatchingSessions can include subdirectory cwd matches", async () => {
+  const currentDir = await makeTempDir("claude-subdir-workspace");
+  const childDir = path.join(currentDir, "packages", "web");
+  const siblingDir = await makeTempDir("claude-subdir-sibling");
+  const sessionsRoot = await makeTempDir("claude-subdir-projects");
+  const targetDir = path.join(sessionsRoot, "-workspace");
+  await fs.mkdir(childDir, { recursive: true });
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    path.join(targetDir, "aaa.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"root"},"timestamp":"2026-03-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"aaa"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(targetDir, "bbb.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"child"},"timestamp":"2026-03-20T11:00:00.000Z","cwd":"${childDir}","sessionId":"bbb"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(targetDir, "ccc.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"sibling"},"timestamp":"2026-03-20T12:00:00.000Z","cwd":"${siblingDir}","sessionId":"ccc"}\n`,
+    "utf8",
+  );
+
+  const strictMatches = await findMatchingSessions(sessionsRoot, { cwd: currentDir, agent: "claude" });
+  const subtreeMatches = await findMatchingSessions(sessionsRoot, {
+    cwd: currentDir,
+    agent: "claude",
+    includeSubdirs: true,
+  });
+
+  assert.deepEqual(strictMatches.map((filePath) => path.basename(filePath)), ["aaa.jsonl"]);
+  assert.deepEqual(subtreeMatches.map((filePath) => path.basename(filePath)), ["aaa.jsonl", "bbb.jsonl"]);
+});
+
 test("findMatchingSessions skips unreadable Claude jsonl rows and keeps scanning", async () => {
   const currentDir = await makeTempDir("claude-corrupt-match-workspace");
   const sessionsRoot = await makeTempDir("claude-corrupt-projects");
@@ -713,10 +748,10 @@ test("cli --help only documents native export commands", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
   assert.match(result.stdout, /kage doctor \[--json\]/);
-  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--json\]/);
+  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--include-subdirs\] \[--json\]/);
   assert.match(result.stdout, /kage search \[query\]/);
-  assert.match(result.stdout, /kage actions \[--json\]/);
-  assert.match(result.stdout, /kage run-action <id> \[--json\]/);
+  assert.match(result.stdout, /kage actions \[--include-subdirs\] \[--json\]/);
+  assert.match(result.stdout, /kage run-action <id> \[--include-subdirs\] \[--json\]/);
   assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
   assert.match(result.stdout, /kage completions bash\|zsh\|fish/);
   assert.match(result.stdout, /kage <route-alias> \[options\]/);
@@ -725,6 +760,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /q2v\s+qodercli -> visualize/);
   assert.match(result.stdout, /--preview/);
   assert.match(result.stdout, /--run/);
+  assert.match(result.stdout, /--include-subdirs/);
   assert.match(result.stdout, /--version/);
   assert.doesNotMatch(result.stdout, /--handoff/);
   assert.doesNotMatch(result.stdout, /--copy/);
@@ -856,9 +892,11 @@ test("cli doctor emits machine-readable readiness checks", async () => {
 test("cli sessions lists current-project sessions across agents as json", async () => {
   const fakeHome = await makeTempDir("sessions-home");
   const currentDir = await makeTempDir("sessions-workspace");
+  const childDir = path.join(currentDir, "packages", "app");
   const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
   const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
   const qoderProject = path.join(fakeHome, ".qoder", "projects", "-workspace");
+  await fs.mkdir(childDir, { recursive: true });
   await fs.mkdir(claudeProject, { recursive: true });
   await fs.mkdir(codexProject, { recursive: true });
   await fs.mkdir(qoderProject, { recursive: true });
@@ -872,6 +910,14 @@ test("cli sessions lists current-project sessions across agents as json", async 
     [
       `{"timestamp":"2026-05-20T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-one","cwd":"${currentDir}"}}`,
       '{"timestamp":"2026-05-20T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex plan"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(codexProject, "rollout-codex-child.jsonl"),
+    [
+      `{"timestamp":"2026-05-20T10:05:00.000Z","type":"session_meta","payload":{"id":"codex-child","cwd":"${childDir}"}}`,
+      '{"timestamp":"2026-05-20T10:05:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"child plan"}]}}',
     ].join("\n") + "\n",
     "utf8",
   );
@@ -894,14 +940,28 @@ test("cli sessions lists current-project sessions across agents as json", async 
     ["claude-one", "codex-one", "qoder-one"].sort(),
   );
   assert.equal(payload.sessions.find((session) => session.sessionId === "qoder-one").agent, "qodercli");
+
+  const subtreeResult = await spawnCli(["sessions", "--include-subdirs", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const subtreePayload = JSON.parse(subtreeResult.stdout);
+  assert.equal(subtreeResult.code, 0);
+  assert.equal(subtreePayload.includeSubdirs, true);
+  assert.deepEqual(
+    subtreePayload.sessions.map((session) => session.sessionId).sort(),
+    ["claude-one", "codex-child", "codex-one", "qoder-one"].sort(),
+  );
 });
 
 test("cli search finds sessions by query, agent, project, and date filters", async () => {
   const fakeHome = await makeTempDir("search-home");
   const currentDir = await makeTempDir("search-current");
+  const childDir = path.join(currentDir, "packages", "ui");
   const otherDir = await makeTempDir("search-other");
   const claudeProject = path.join(fakeHome, ".claude", "projects", "-current");
   const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
+  await fs.mkdir(childDir, { recursive: true });
   await fs.mkdir(claudeProject, { recursive: true });
   await fs.mkdir(codexProject, { recursive: true });
   await fs.mkdir(path.join(fakeHome, ".qoder", "projects"), { recursive: true });
@@ -918,6 +978,14 @@ test("cli search finds sessions by query, agent, project, and date filters", asy
     ].join("\n") + "\n",
     "utf8",
   );
+  await fs.writeFile(
+    path.join(codexProject, "rollout-codex-child.jsonl"),
+    [
+      `{"timestamp":"2026-05-20T12:00:00.000Z","type":"session_meta","payload":{"id":"codex-child","cwd":"${childDir}","timestamp":"2026-05-20T12:00:00.000Z"}}`,
+      '{"timestamp":"2026-05-20T12:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"child auth check"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
 
   const allResult = await spawnCli(["search", "auth", "--json"], {
     env: { ...process.env, HOME: fakeHome },
@@ -926,7 +994,7 @@ test("cli search finds sessions by query, agent, project, and date filters", asy
   assert.equal(allResult.code, 0);
   assert.deepEqual(
     allPayload.results.map((session) => session.sessionId).sort(),
-    ["claude-auth", "codex-auth"].sort(),
+    ["claude-auth", "codex-auth", "codex-child"].sort(),
   );
 
   const filteredResult = await spawnCli(
@@ -951,6 +1019,24 @@ test("cli search finds sessions by query, agent, project, and date filters", asy
   assert.equal(filteredResult.code, 0);
   assert.deepEqual(filteredPayload.results.map((session) => session.sessionId), ["claude-auth"]);
   assert.equal(filteredPayload.results[0].match.field, "title");
+
+  const strictChildResult = await spawnCli(["search", "child", "--project", currentDir, "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const strictChildPayload = JSON.parse(strictChildResult.stdout);
+  assert.equal(strictChildResult.code, 0);
+  assert.deepEqual(strictChildPayload.results, []);
+
+  const subtreeChildResult = await spawnCli(
+    ["search", "child", "--project", currentDir, "--include-subdirs", "--json"],
+    {
+      env: { ...process.env, HOME: fakeHome },
+    },
+  );
+  const subtreeChildPayload = JSON.parse(subtreeChildResult.stdout);
+  assert.equal(subtreeChildResult.code, 0);
+  assert.equal(subtreeChildPayload.filters.includeSubdirs, true);
+  assert.deepEqual(subtreeChildPayload.results.map((session) => session.sessionId), ["codex-child"]);
 
   const emptyResult = await spawnCli(["search", "--agent", "claude", "--since", "2099-01-01", "--json"], {
     env: { ...process.env, HOME: fakeHome },

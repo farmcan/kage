@@ -29,6 +29,17 @@ struct SettingsView: View {
           .controlSize(.small)
         }
 
+        Toggle(
+          "Include subdirectories",
+          isOn: Binding(
+            get: { appState.includeSubdirectories },
+            set: { enabled in
+              appState.includeSubdirectories = enabled
+              refresh()
+            }
+          )
+        )
+
         VStack(alignment: .leading, spacing: 8) {
           Text("Recent")
             .font(.caption)

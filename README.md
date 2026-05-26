@@ -225,6 +225,7 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 --since <date|duration>
 --until <date|duration>
 --project <path>
+--include-subdirs
 --stdout
 --json
 --version
@@ -245,6 +246,7 @@ List current-project sessions across agents:
 ```bash
 kage sessions
 kage sessions --agent claude --json
+kage sessions --include-subdirs
 ```
 
 Generate menu-bar friendly actions and run one:
@@ -260,6 +262,7 @@ Find a past session by content, agent, date, or project:
 kage search "auth"
 kage search "resume" --agent codex --since 7d
 kage search --project ~/wrksp/kage --json
+kage search --project ~/wrksp/kage --include-subdirs --json
 ```
 
 Upgrade an existing install:

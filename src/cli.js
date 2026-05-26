@@ -23,10 +23,10 @@ const removedOptions = new Set(["--handoff", "--copy", "--cursor"]);
 const helpText = `Usage:
   kage update
   kage doctor [--json]
-  kage sessions [--agent claude|codex|qodercli] [--json]
-  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--json]
-  kage actions [--json]
-  kage run-action <id> [--json]
+  kage sessions [--agent claude|codex|qodercli] [--include-subdirs] [--json]
+  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--json]
+  kage actions [--include-subdirs] [--json]
+  kage run-action <id> [--include-subdirs] [--json]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
   kage <agent>
@@ -69,6 +69,7 @@ Options:
   --since <date|duration>
   --until <date|duration>
   --project <path>
+  --include-subdirs
   --stdout
   --json
   --version
@@ -104,6 +105,7 @@ const completionOptions = [
   "--since",
   "--until",
   "--project",
+  "--include-subdirs",
   "--stdout",
   "--json",
   "--confirm",
@@ -145,6 +147,7 @@ function parseArgs(argv) {
     since: null,
     until: null,
     project: null,
+    includeSubdirs: false,
     actions: false,
     runActionId: null,
     clean: false,
@@ -234,6 +237,8 @@ function parseArgs(argv) {
       } else if (arg === "--project") {
         args.project = readOptionValue(argv, i, arg);
         i += 1;
+      } else if (arg === "--include-subdirs") {
+        args.includeSubdirs = true;
       } else if (arg === "--stdout") {
         args.stdout = true;
       } else if (arg === "--json") {
@@ -277,7 +282,7 @@ function parseArgs(argv) {
   }
   if (first === "sessions") {
     if (second) {
-      return { ...args, error: "Usage: kage sessions [--agent claude|codex|qodercli] [--json]" };
+      return { ...args, error: "Usage: kage sessions [--agent claude|codex|qodercli] [--include-subdirs] [--json]" };
     }
     return { ...args, sessions: true };
   }
@@ -285,20 +290,21 @@ function parseArgs(argv) {
     if (positional.length > 2) {
       return {
         ...args,
-        error: "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--json]",
+        error:
+          "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--json]",
       };
     }
     return { ...args, search: true, searchQuery: second ?? null };
   }
   if (first === "actions") {
     if (second) {
-      return { ...args, error: "Usage: kage actions [--json]" };
+      return { ...args, error: "Usage: kage actions [--include-subdirs] [--json]" };
     }
     return { ...args, actions: true };
   }
   if (first === "run-action") {
     if (!second || positional.length > 2) {
-      return { ...args, error: "Usage: kage run-action <id> [--json]" };
+      return { ...args, error: "Usage: kage run-action <id> [--include-subdirs] [--json]" };
     }
     return { ...args, runActionId: second };
   }
@@ -664,6 +670,7 @@ complete -c kage -l fork-file -r
 complete -c kage -l since -r
 complete -c kage -l until -r
 complete -c kage -l project -r
+complete -c kage -l include-subdirs
 complete -c kage -l preview
 complete -c kage -l run
 complete -c kage -l older-than -r
@@ -989,6 +996,7 @@ async function buildSessionCandidates(args) {
   const matches = await findMatchingSessions(rootDir, {
     cwd: process.cwd(),
     agent: resolvedAgent,
+    includeSubdirs: args.includeSubdirs,
   });
   return Promise.all(
     matches
@@ -1057,6 +1065,7 @@ async function buildSessionInventory(args = {}) {
   return {
     mode: "sessions",
     cwd: process.cwd(),
+    includeSubdirs: Boolean(args.includeSubdirs),
     sessions: groups.flatMap((group) => group.sessions),
     agents: groups,
     errors,
@@ -1068,7 +1077,8 @@ function formatSessionsResult(result, asJson) {
     return `${JSON.stringify(result, null, 2)}\n`;
   }
 
-  const lines = [`Matching sessions for ${result.cwd}:`];
+  const scope = result.includeSubdirs ? `${result.cwd} and subdirectories` : result.cwd;
+  const lines = [`Matching sessions for ${scope}:`];
   for (const group of result.agents) {
     lines.push("");
     lines.push(`${group.agentLabel}`);
@@ -1390,6 +1400,7 @@ async function main() {
       since: args.since,
       until: args.until,
       project: args.project,
+      includeSubdirs: args.includeSubdirs,
     });
     process.stdout.write(formatSearchResult(result, args.json));
     return;

@@ -43,3 +43,26 @@ export async function samePath(leftPath, rightPath) {
     return path.resolve(leftPath) === path.resolve(rightPath);
   }
 }
+
+async function realOrResolved(filePath) {
+  try {
+    return await fs.realpath(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+export async function sameOrSubpath(candidatePath, parentPath) {
+  const [candidate, parent] = await Promise.all([realOrResolved(candidatePath), realOrResolved(parentPath)]);
+  if (candidate === parent) {
+    return true;
+  }
+
+  const relativePath = path.relative(parent, candidate);
+  return (
+    Boolean(relativePath) &&
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativePath)
+  );
+}

@@ -32,6 +32,10 @@ struct WatchedDirectoryHeader: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
+
+      Text(appState.includeSubdirectories ? "Including subdirectories" : "Exact directory")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
     }
   }
 }

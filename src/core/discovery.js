@@ -1,5 +1,5 @@
 import { detectAgent, getDefaultRoot, normalizeAgent } from "./agents.js";
-import { samePath, walk } from "./files.js";
+import { sameOrSubpath, samePath, walk } from "./files.js";
 import { parseSession, readSessionCwd } from "../adapters/sources/index.js";
 import path from "node:path";
 
@@ -9,6 +9,13 @@ function fileLooksLikeSessionId(filePath, sessionId) {
     return true;
   }
   return baseName.endsWith(`-${sessionId}`);
+}
+
+async function matchesCwd(sessionCwd, cwd, { includeSubdirs = false } = {}) {
+  if (!sessionCwd) {
+    return false;
+  }
+  return includeSubdirs ? sameOrSubpath(sessionCwd, cwd) : samePath(sessionCwd, cwd);
 }
 
 export async function findLatestSession(rootDir = getDefaultRoot("codex"), options = {}) {
@@ -27,7 +34,7 @@ export async function findLatestSession(rootDir = getDefaultRoot("codex"), optio
 
   for (const filePath of [...sortedFiles].reverse()) {
     const sessionCwd = await readSessionCwd(filePath, agent);
-    if (sessionCwd && (await samePath(sessionCwd, cwd))) {
+    if (await matchesCwd(sessionCwd, cwd, options)) {
       return filePath;
     }
   }
@@ -52,7 +59,7 @@ export async function findMatchingSessions(rootDir = getDefaultRoot("codex"), op
   const matches = [];
   for (const filePath of sortedFiles) {
     const sessionCwd = await readSessionCwd(filePath, agent);
-    if (sessionCwd && (await samePath(sessionCwd, cwd))) {
+    if (await matchesCwd(sessionCwd, cwd, options)) {
       matches.push(filePath);
     }
   }
