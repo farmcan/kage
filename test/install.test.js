@@ -19,3 +19,14 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /npm install -g --force/);
   assert.match(content, /kage c2x/);
 });
+
+test("menu bar bundle script ships the KAGE CLI resources", async () => {
+  const bundlePath = path.join(__dirname, "..", "app", "bundle.sh");
+  const content = await fs.readFile(bundlePath, "utf8");
+
+  assert.match(content, /RESOURCES_DIR="\$CONTENTS_DIR\/Resources"/);
+  assert.match(content, /kage-cli/);
+  assert.match(content, /cp -R "\$REPO_ROOT\/src"/);
+  assert.match(content, /exec \/usr\/bin\/env node "\$SCRIPT_DIR\/kage-cli\/src\/cli\.js"/);
+  assert.match(content, /chmod \+x "\$CLI_LAUNCHER"/);
+});
