@@ -10,6 +10,7 @@ final class SessionPoller: ObservableObject {
   @Published var isRefreshing = false
   @Published var lastRefresh: Date?
   @Published var actionMessage: String?
+  @Published var actionResult: RunActionResponse?
 
   private let cli = KageCLI()
   private var task: Task<Void, Never>?
@@ -81,13 +82,19 @@ final class SessionPoller: ObservableObject {
 
   func runAction(_ action: KageAction, appState: AppState, notifications: NotificationManager) async {
     actionMessage = nil
+    actionResult = nil
     do {
-      _ = try await cli.runAction(id: action.id, cwd: appState.watchedDirectory)
-      actionMessage = "Ran \(action.label)"
+      let result = try await cli.runAction(id: action.id, cwd: appState.watchedDirectory)
+      actionResult = result
+      actionMessage = result.resumeCommand == nil ? "Ran \(action.label)" : nil
       await refresh(appState: appState, notifications: notifications)
     } catch {
       actionMessage = error.localizedDescription
     }
+  }
+
+  func clearActionResult() {
+    actionResult = nil
   }
 
   private func notifyNewSessions(

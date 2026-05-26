@@ -116,6 +116,40 @@ do {
   try require(actions.actions[0].command == "codex resume session-1", "resume command should decode")
   try require(actions.actions[1].targetAgent == "claude", "bridge target should decode")
   try require(actions.actions[0].isLatest == true, "latest marker should decode")
+
+  let runAction = try decode(
+    RunActionResponse.self,
+    """
+    {
+      "mode": "run-action",
+      "actionId": "bridge:x2c:session-1",
+      "ok": true,
+      "sourceAgent": "codex",
+      "targetAgent": "claude",
+      "sessionId": "session-1",
+      "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
+      "resumeCommand": "claude --resume session-1",
+      "outputPath": "/Users/test/.claude/projects/project/session-1.jsonl",
+      "paths": ["/Users/test/.claude/projects/project/session-1.jsonl"],
+      "stdout": "{\\"mode\\":\\"claude-session\\"}",
+      "stderr": "",
+      "action": {
+        "id": "bridge:x2c:session-1",
+        "type": "bridge",
+        "label": "Bridge latest Codex session to Claude Code",
+        "agent": "codex",
+        "targetAgent": "claude",
+        "sessionId": "session-1",
+        "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
+        "routeAlias": "x2c",
+        "cliArgs": ["x2c", "--session", "/Users/test/.codex/sessions/session-1.jsonl"],
+        "isLatest": true
+      }
+    }
+    """
+  )
+  try require(runAction.resumeCommand == "claude --resume session-1", "run-action resume command should decode")
+  try require(runAction.outputPath?.hasSuffix("session-1.jsonl") == true, "run-action output path should decode")
 } catch {
   fputs("KAGE contract smoke failed: \(error)\n", stderr)
   exit(1)

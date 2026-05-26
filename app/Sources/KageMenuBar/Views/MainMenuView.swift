@@ -97,6 +97,16 @@ struct MainMenuView: View {
         }
       }
 
+      if let actionResult = poller.actionResult, shouldShowResultCard(actionResult) {
+        ActionResultCard(
+          result: actionResult,
+          cwd: appState.watchedDirectory,
+          onDismiss: {
+            poller.clearActionResult()
+          }
+        )
+      }
+
       let actions = quickActions
       if actions.isEmpty && !hasBridgeActions {
         Text("No actions available for this directory.")
@@ -192,6 +202,143 @@ struct MainMenuView: View {
       return "QoderCLI"
     default:
       return agent ?? "Target"
+    }
+  }
+
+  private func shouldShowResultCard(_ result: RunActionResponse) -> Bool {
+    result.ok == true && (result.resumeCommand != nil || result.outputPath != nil || result.paths?.isEmpty == false)
+  }
+}
+
+private struct ActionResultCard: View {
+  let result: RunActionResponse
+  let cwd: String
+  let onDismiss: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline) {
+        Label(title, systemImage: "checkmark.circle")
+          .font(.caption)
+          .fontWeight(.medium)
+          .foregroundStyle(.green)
+        Spacer()
+        Button {
+          onDismiss()
+        } label: {
+          Image(systemName: "xmark")
+            .imageScale(.small)
+            .accessibilityLabel("Dismiss")
+        }
+        .buttonStyle(.borderless)
+      }
+
+      if let resumeCommand = result.resumeCommand {
+        Text(resumeCommand)
+          .font(.caption2.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+      }
+
+      HStack(spacing: 8) {
+        if result.resumeCommand != nil {
+          Button {
+            openResumeCommand()
+          } label: {
+            Label("Open", systemImage: "terminal")
+          }
+          .controlSize(.small)
+
+          Button {
+            copyResumeCommand()
+          } label: {
+            Label("Copy", systemImage: "doc.on.doc")
+          }
+          .controlSize(.small)
+        }
+
+        if let filePath = revealPath {
+          Button {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
+          } label: {
+            Label("Show", systemImage: "folder")
+          }
+          .controlSize(.small)
+        }
+      }
+    }
+    .padding(10)
+    .background(
+      RoundedRectangle(cornerRadius: 6)
+        .fill(Color.green.opacity(0.08))
+    )
+  }
+
+  private var title: String {
+    if result.action?.type == "bridge" {
+      return "Created \(agentLabel(result.targetAgent)) session"
+    }
+    if result.action?.type == "resume" {
+      return "Ready to resume \(agentLabel(result.targetAgent ?? result.sourceAgent))"
+    }
+    return "Action completed"
+  }
+
+  private var revealPath: String? {
+    result.outputPath ?? result.paths?.first
+  }
+
+  private func copyResumeCommand() {
+    guard let resumeCommand = result.resumeCommand else {
+      return
+    }
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(resumeCommand, forType: .string)
+  }
+
+  private func openResumeCommand() {
+    guard let resumeCommand = result.resumeCommand else {
+      return
+    }
+    do {
+      let scriptPath = try writeTerminalCommand(resumeCommand)
+      NSWorkspace.shared.open(scriptPath)
+    } catch {
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(resumeCommand, forType: .string)
+    }
+  }
+
+  private func writeTerminalCommand(_ resumeCommand: String) throws -> URL {
+    let fileName = "kage-resume-\(UUID().uuidString).command"
+    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
+    let script = """
+    #!/bin/zsh
+    cd \(shellQuote(cwd))
+    \(resumeCommand)
+
+    """
+    try script.write(to: fileURL, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fileURL.path)
+    return fileURL
+  }
+
+  private func shellQuote(_ value: String) -> String {
+    "'\(value.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
+  }
+
+  private func agentLabel(_ agent: String?) -> String {
+    switch agent {
+    case "claude":
+      return "Claude Code"
+    case "codex":
+      return "Codex"
+    case "qodercli":
+      return "QoderCLI"
+    default:
+      return agent ?? "target"
     }
   }
 }

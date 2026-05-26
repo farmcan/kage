@@ -1267,6 +1267,18 @@ function formatActionsResult(result, asJson) {
   return `${lines.join("\n")}\n`;
 }
 
+function parseDelegatedJson(stdout) {
+  const text = stdout.trim();
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 async function runAction(args) {
   const result = await buildActionsResult(args);
   const action = result.actions.find((candidate) => candidate.id === args.runActionId);
@@ -1275,15 +1287,24 @@ async function runAction(args) {
   }
 
   let output = { stdout: "", stderr: "" };
+  let delegatedResult = null;
   if (action.type === "resume") {
     output = await runResumeCommand({ command: action.command, capture: args.json });
   } else if (Array.isArray(action.cliArgs)) {
-    output = await runCliCommand(action.cliArgs, { capture: args.json });
+    const cliArgs = args.json ? [...action.cliArgs, "--json"] : action.cliArgs;
+    output = await runCliCommand(cliArgs, { capture: args.json });
+    if (args.json) {
+      delegatedResult = parseDelegatedJson(output.stdout);
+    }
   } else {
     throw new Error(`Unsupported action type: ${action.type}`);
   }
 
   if (args.json) {
+    const resumeCommand = delegatedResult?.resumeCommand ?? (action.type === "resume" ? action.command : null);
+    const outputPath = delegatedResult?.outputPath ?? null;
+    const sidecarPath = delegatedResult?.sidecarPath ?? null;
+    const paths = delegatedResult?.paths ?? [];
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -1293,6 +1314,15 @@ async function runAction(args) {
           action,
           executed: true,
           ok: true,
+          sourceAgent: delegatedResult?.sourceAgent ?? action.agent,
+          targetAgent: delegatedResult?.targetAgent ?? action.targetAgent ?? action.agent,
+          sessionId: delegatedResult?.sessionId ?? action.sessionId ?? null,
+          sessionPath: delegatedResult?.sessionPath ?? action.sessionPath ?? null,
+          ...(resumeCommand ? { resumeCommand } : {}),
+          ...(outputPath ? { outputPath } : {}),
+          ...(sidecarPath ? { sidecarPath } : {}),
+          paths,
+          ...(delegatedResult ? { result: delegatedResult } : {}),
           stdout: output.stdout,
           stderr: output.stderr,
         },

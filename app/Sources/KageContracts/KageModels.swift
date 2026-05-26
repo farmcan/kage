@@ -104,4 +104,15 @@ public struct RunActionResponse: Decodable, Sendable {
   public let mode: String?
   public let actionId: String?
   public let ok: Bool?
+  public let action: KageAction?
+  public let sourceAgent: String?
+  public let targetAgent: String?
+  public let sessionId: String?
+  public let sessionPath: String?
+  public let resumeCommand: String?
+  public let outputPath: String?
+  public let sidecarPath: String?
+  public let paths: [String]?
+  public let stdout: String?
+  public let stderr: String?
 }

@@ -1008,6 +1008,7 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   const runPayload = JSON.parse(runResult.stdout);
   assert.equal(runPayload.mode, "run-action");
   assert.equal(runPayload.ok, true);
+  assert.equal(runPayload.resumeCommand, "claude --resume claude-action");
   assert.match(runPayload.stdout, /ACTION_OK/);
 
   const bridgeAction = payload.actions.find((action) => action.id === "bridge:c2x:claude-action");
@@ -1020,7 +1021,11 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(bridgeResult.code, 0);
   assert.equal(bridgePayload.mode, "run-action");
   assert.equal(bridgePayload.action.id, bridgeAction.id);
-  assert.match(bridgePayload.stdout, /codex resume claude-action/);
+  assert.equal(bridgePayload.targetAgent, "codex");
+  assert.equal(bridgePayload.resumeCommand, "codex resume claude-action");
+  assert.match(bridgePayload.outputPath, /rollout-claude-action\.jsonl$/);
+  assert.ok(Array.isArray(bridgePayload.paths));
+  assert.equal(bridgePayload.result.resumeCommand, "codex resume claude-action");
 });
 
 test("cli shows the selected session card when only one match exists", async () => {
