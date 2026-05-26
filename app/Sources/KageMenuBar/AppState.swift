@@ -71,7 +71,11 @@ final class AppState: ObservableObject {
   }
 
   func useHomeDirectory() {
-    watchedDirectory = NSHomeDirectory()
+    useWatchedDirectory(NSHomeDirectory())
+  }
+
+  func useWatchedDirectory(_ directory: String) {
+    watchedDirectory = DirectoryHistory.normalized(directory)
   }
 
   func setLaunchAtLogin(_ enabled: Bool) {

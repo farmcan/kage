@@ -10,37 +10,52 @@ struct SettingsView: View {
     Form {
       Section("Directory") {
         HStack(alignment: .top, spacing: 12) {
-          Text(appState.watchedDirectory)
-            .font(.system(.body, design: .monospaced))
-            .lineLimit(2)
-            .truncationMode(.middle)
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+          DirectoryPathSummary(path: appState.watchedDirectory)
 
           HStack(spacing: 8) {
-            Button("Choose...") {
+            Button {
               appState.chooseWatchedDirectory()
-              Task {
-                await poller.refresh(appState: appState, notifications: notifications)
-              }
+              refresh()
+            } label: {
+              Label("Choose", systemImage: "folder")
             }
-            Button("Home") {
+            Button {
               appState.useHomeDirectory()
-              Task {
-                await poller.refresh(appState: appState, notifications: notifications)
-              }
+              refresh()
+            } label: {
+              Label("Home", systemImage: "house")
             }
           }
           .controlSize(.small)
         }
 
-        Picker("Recent", selection: $appState.watchedDirectory) {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Recent")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
           ForEach(appState.watchedDirectoryHistory, id: \.self) { directory in
-            Text(directory)
-              .lineLimit(1)
-              .truncationMode(.middle)
-              .tag(directory)
+            HStack(alignment: .center, spacing: 12) {
+              DirectoryPathSummary(
+                path: directory,
+                nameFont: .caption,
+                pathFont: .caption2
+              )
+
+              if isCurrentDirectory(directory) {
+                Text("Current")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              } else {
+                Button {
+                  appState.useWatchedDirectory(directory)
+                  refresh()
+                } label: {
+                  Label("Use", systemImage: "arrow.turn.down.right")
+                }
+                .controlSize(.small)
+              }
+            }
           }
         }
       }
@@ -103,6 +118,16 @@ struct SettingsView: View {
 
   private func flag(_ value: Bool) -> String {
     value ? "yes" : "no"
+  }
+
+  private func isCurrentDirectory(_ directory: String) -> Bool {
+    DirectoryHistory.normalized(directory) == DirectoryHistory.normalized(appState.watchedDirectory)
+  }
+
+  private func refresh() {
+    Task {
+      await poller.refresh(appState: appState, notifications: notifications)
+    }
   }
 }
 

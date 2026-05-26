@@ -10,10 +10,11 @@ struct WatchedDirectoryHeader: View {
       HStack(spacing: 8) {
         Image(systemName: "scope")
           .foregroundStyle(.secondary)
-        Text(appState.watchedDirectory)
-          .font(.system(.callout, design: .monospaced))
-          .lineLimit(1)
-          .truncationMode(.middle)
+        DirectoryPathSummary(
+          path: appState.watchedDirectory,
+          nameFont: .callout,
+          pathFont: .caption2
+        )
         Spacer()
         Button {
           appState.chooseWatchedDirectory()
