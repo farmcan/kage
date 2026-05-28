@@ -339,7 +339,7 @@ Control-side later:
    Agent sessions may contain secrets, source snippets, credentials, or private user messages. Sync summaries first.
 
 3. Agent private format instability.
-   Codex, Claude, Cursor, and QoderCLI session formats can change. Treat native session writes as adapter-level capabilities, not as a universal platform assumption.
+   Codex, Claude Code, QoderCLI, and future agent session formats can change. Treat native session writes as adapter-level capabilities, not as a universal platform assumption.
 
 4. Device liveness ambiguity.
    Sleeping laptops and network changes can look like failures. Use stale state before offline state.

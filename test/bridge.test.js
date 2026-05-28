@@ -92,7 +92,6 @@ test("detectAgent recognizes Codex, Claude, and QoderCLI paths", () => {
   assert.equal(detectAgent("/tmp/.claude/projects/foo.jsonl"), "claude");
   assert.equal(detectAgent("/tmp/.qoder/projects/demo.jsonl"), "qodercli");
   assert.equal(detectAgent("/tmp/.qoder/bin/qodercli/demo.jsonl"), "qodercli");
-  assert.equal(detectAgent("/tmp/.cursor/projects/foo/agent-transcripts/id/session.jsonl"), null);
 });
 
 test("inferDefaultExportFormat prefers native exports for supported aliases", () => {
@@ -762,9 +761,6 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /--run/);
   assert.match(result.stdout, /--include-subdirs/);
   assert.match(result.stdout, /--version/);
-  assert.doesNotMatch(result.stdout, /--handoff/);
-  assert.doesNotMatch(result.stdout, /--copy/);
-  assert.doesNotMatch(result.stdout, /x2r/);
 });
 
 test("cli shows help with no arguments", async () => {
@@ -786,18 +782,6 @@ test("package.json exposes KAGE bin", async () => {
   const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
   assert.deepEqual(Object.keys(packageJson.bin), ["kage"]);
   assert.equal(packageJson.bin.kage, "./src/cli.js");
-});
-
-test("cli fails clearly for removed handoff flags and cursor aliases", async () => {
-  const sessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
-
-  const removedFlagResult = await spawnCli(["x2c", "--session", sessionPath, "--handoff"]);
-  assert.equal(removedFlagResult.code, 1);
-  assert.match(removedFlagResult.stderr, /Unsupported option: --handoff/);
-
-  const removedAliasResult = await spawnCli(["x2r", "--session", sessionPath]);
-  assert.equal(removedAliasResult.code, 1);
-  assert.match(removedAliasResult.stderr, /Unsupported route alias: x2r/);
 });
 
 test("cli rejects unknown flags", async () => {

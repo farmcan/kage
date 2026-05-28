@@ -22,9 +22,7 @@ import {
 
 const shorthandAgents = ["c", "x", "q"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
-const removedRouteAliases = new Set(["x2r", "c2r", "q2r", "r2x", "r2c", "r2q"]);
 const removedAgentNames = new Set(["qoder"]);
-const removedOptions = new Set(["--handoff", "--copy", "--cursor"]);
 
 const helpText = `Usage:
   kage update
@@ -190,9 +188,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     try {
-      if (removedOptions.has(arg)) {
-        args.error = `Unsupported option: ${arg}`;
-      } else if (arg === "--agent") {
+      if (arg === "--agent") {
         args.agent = readOptionValue(argv, i, arg);
         i += 1;
       } else if (arg === "--root") {
@@ -331,9 +327,6 @@ function parseArgs(argv) {
   }
   if (first && !second && (supportedAgents.includes(first) || shorthandAgents.includes(first))) {
     return { ...args, listAgent: first };
-  }
-  if (first && removedRouteAliases.has(first)) {
-    return { ...args, error: `Unsupported route alias: ${first}` };
   }
   if (first && routeAliases[first]) {
     return inferDefaultExportFormat({
