@@ -10,6 +10,7 @@ This directory keeps current product, growth, release, and future architecture d
 - [Growth plan](growth-plan-2026-05-28.md)
 - [GitHub presence guide](github-presence-guide.md)
 - [Release and launch checklist](release-launch-checklist.md)
+- [v0.1.0 release notes draft](release-notes/v0.1.0.md)
 
 ## Future Direction
 

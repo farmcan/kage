@@ -29,9 +29,9 @@ Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.
 
 Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
 
-## Try It In 60 Seconds
+![KAGE desktop preview](docs/assets/screenshots/kage-desktop-preview.svg)
 
-The first screenshot/GIF should land here: desktop search -> matched session -> bridge -> copy/open resume command.
+## Try It In 60 Seconds
 
 Install the CLI:
 

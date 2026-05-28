@@ -1,0 +1,62 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="900" rx="34" fill="#f4f2ed"/>
+  <rect x="28" y="28" width="1384" height="844" rx="28" fill="#fbfaf7" stroke="#dedbd2"/>
+  <rect x="28" y="28" width="1384" height="64" rx="28" fill="#f7f6f2"/>
+  <circle cx="62" cy="60" r="8" fill="#d7d4cc"/>
+  <circle cx="88" cy="60" r="8" fill="#d7d4cc"/>
+  <circle cx="114" cy="60" r="8" fill="#d7d4cc"/>
+  <text x="154" y="68" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="21" font-weight="700" fill="#333333">KAGE</text>
+
+  <rect x="52" y="112" width="372" height="724" rx="18" fill="#efeee9"/>
+  <text x="90" y="154" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="700" fill="#252525">demo-app</text>
+  <text x="90" y="180" font-family="SFMono-Regular, Menlo, monospace" font-size="13" fill="#77736c">~/wrksp/demo-app</text>
+  <rect x="336" y="136" width="50" height="36" rx="9" fill="#dddad3"/>
+  <path d="M349 152h24v15h-24z" stroke="#343434" stroke-width="2" fill="none"/>
+
+  <rect x="72" y="212" width="326" height="36" rx="9" fill="#e4e1da"/>
+  <rect x="142" y="212" width="92" height="36" rx="9" fill="#ccc8bf"/>
+  <text x="94" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="16" fill="#55524d">All</text>
+  <text x="164" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="16" fill="#252525">Claude 4</text>
+  <text x="252" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="16" fill="#55524d">Codex 3</text>
+
+  <rect x="72" y="270" width="326" height="48" rx="9" fill="#e5e3dd"/>
+  <text x="108" y="300" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="16" fill="#77736c">Search transcripts</text>
+  <circle cx="92" cy="292" r="8" stroke="#77736c" stroke-width="2"/>
+  <path d="M99 299l8 8" stroke="#77736c" stroke-width="2"/>
+
+  <text x="74" y="370" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#77736c">demo-app</text>
+  <text x="74" y="392" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#77736c">~/wrksp</text>
+  <rect x="68" y="412" width="340" height="98" rx="12" fill="#d7d3ca"/>
+  <text x="92" y="442" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#55524d">Claude Code</text>
+  <text x="92" y="472" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">Auth refactor plan</text>
+  <text x="92" y="498" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#55524d">~/wrksp/demo-app</text>
+  <text x="338" y="442" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#55524d">2m ago</text>
+
+  <rect x="68" y="532" width="340" height="98" rx="12" fill="#f6f5f0"/>
+  <text x="92" y="562" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#55524d">Codex</text>
+  <text x="92" y="592" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">Fix login tests</text>
+  <text x="92" y="618" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#77736c">~/wrksp/demo-app</text>
+
+  <rect x="468" y="126" width="858" height="690" rx="18" fill="#ffffff"/>
+  <text x="518" y="174" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#77736c">Claude Code</text>
+  <text x="518" y="214" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="28" font-weight="750" fill="#252525">Auth refactor plan</text>
+  <text x="518" y="246" font-family="SFMono-Regular, Menlo, monospace" font-size="14" fill="#77736c">~/wrksp/demo-app</text>
+
+  <rect x="518" y="286" width="286" height="42" rx="21" fill="#2e6f5c"/>
+  <polygon points="544,300 544,314 557,307" fill="#ffffff"/>
+  <text x="572" y="313" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#ffffff">Continue in KAGE terminal</text>
+
+  <rect x="518" y="354" width="758" height="268" rx="10" fill="#111315"/>
+  <text x="544" y="392" font-family="SFMono-Regular, Menlo, monospace" font-size="15" fill="#9be89f">$ claude --resume auth-refactor-plan</text>
+  <text x="544" y="426" font-family="SFMono-Regular, Menlo, monospace" font-size="15" fill="#d7d7d7">Continuing session in ~/wrksp/demo-app</text>
+  <text x="544" y="460" font-family="SFMono-Regular, Menlo, monospace" font-size="15" fill="#d7d7d7">Ready for your next instruction.</text>
+  <rect x="544" y="482" width="9" height="18" fill="#75d27b"/>
+
+  <text x="518" y="676" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="750" fill="#252525">Actions</text>
+  <rect x="518" y="700" width="154" height="38" rx="19" fill="#efeee9"/>
+  <text x="548" y="724" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#252525">Replay session</text>
+  <rect x="690" y="700" width="178" height="38" rx="19" fill="#efeee9"/>
+  <text x="720" y="724" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#252525">Bridge to Codex</text>
+  <rect x="886" y="700" width="196" height="38" rx="19" fill="#efeee9"/>
+  <text x="916" y="724" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#252525">Bridge to QoderCLI</text>
+</svg>

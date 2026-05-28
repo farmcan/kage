@@ -164,12 +164,12 @@ struct DesktopDashboardView: View {
         actions: actionsBySession[session.path] ?? [],
         actionResult: poller.actionResult,
         actionMessage: poller.actionMessage,
-        watchedDirectory: appState.watchedDirectory,
         primaryResumeAction: primaryResumeAction(for: session),
         terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
         isOpening: autoOpeningActionID != nil,
         onContinue: runAndOpenAction,
         onRunAction: runAction,
+        onOpenResultTerminal: openResultInKageTerminal,
         onDismissResult: {
           poller.clearActionResult()
         }
@@ -388,12 +388,7 @@ struct DesktopDashboardView: View {
   private func runAndOpenAction(_ action: KageAction) {
     autoOpeningActionID = action.id
     if action.type == "resume", let command = action.command {
-      terminalSession = EmbeddedTerminalSession(
-        title: action.label,
-        command: command,
-        cwd: selectedSession?.cwd ?? appState.watchedDirectory,
-        sessionPath: action.sessionPath ?? selectedSession?.path ?? ""
-      )
+      openTerminal(title: action.label, command: command, sessionPath: action.sessionPath)
       autoOpeningActionID = nil
       return
     }
@@ -403,15 +398,33 @@ struct DesktopDashboardView: View {
       defer {
         autoOpeningActionID = nil
       }
-      guard let command = poller.actionResult?.resumeCommand else {
-        return
-      }
-      do {
-        try TerminalCommandLauncher.open(command: command, cwd: appState.watchedDirectory)
-      } catch {
-        TerminalCommandLauncher.copy(command)
+      if let result = poller.actionResult, result.resumeCommand != nil {
+        openResultInKageTerminal(result)
       }
     }
+  }
+
+  private func openResultInKageTerminal(_ result: RunActionResponse) {
+    guard let command = result.resumeCommand else {
+      return
+    }
+    let title = result.action?.type == "bridge"
+      ? "Continue bridged \(agentLabel(result.targetAgent)) session"
+      : "Continue \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    openTerminal(
+      title: title,
+      command: command,
+      sessionPath: result.sessionPath ?? result.outputPath ?? result.paths?.first
+    )
+  }
+
+  private func openTerminal(title: String, command: String, sessionPath: String?) {
+    terminalSession = EmbeddedTerminalSession(
+      title: title,
+      command: command,
+      cwd: selectedSession?.cwd ?? appState.watchedDirectory,
+      sessionPath: sessionPath ?? selectedSession?.path ?? ""
+    )
   }
 
   private func primaryResumeAction(for session: AgentSession) -> KageAction? {
@@ -576,23 +589,23 @@ private struct DesktopSessionDetailView: View {
   let actions: [KageAction]
   let actionResult: RunActionResponse?
   let actionMessage: String?
-  let watchedDirectory: String
   let primaryResumeAction: KageAction?
   let terminalSession: EmbeddedTerminalSession?
   let isOpening: Bool
   let onContinue: (KageAction) -> Void
   let onRunAction: (KageAction) -> Void
+  let onOpenResultTerminal: (RunActionResponse) -> Void
   let onDismissResult: () -> Void
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
+      VStack(alignment: .leading, spacing: 18) {
         header
 
         if let actionResult, shouldShowResultCard(actionResult) {
           DesktopActionResultBanner(
             result: actionResult,
-            cwd: watchedDirectory,
+            onOpenInKageTerminal: onOpenResultTerminal,
             onDismiss: onDismissResult
           )
         } else if let actionMessage {
@@ -601,11 +614,10 @@ private struct DesktopSessionDetailView: View {
             .foregroundStyle(.secondary)
         }
 
-        actionSection
         terminalSection
+        actionSection
         searchMatchSection
-        metadataSection
-        recentMessagesSection
+        insightGrid
       }
       .padding(24)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -713,6 +725,12 @@ private struct DesktopSessionDetailView: View {
               .stroke(Color.secondary.opacity(0.18))
           )
       }
+    } else if let primaryResumeAction {
+      DesktopTerminalReadyPanel(
+        session: session,
+        action: primaryResumeAction,
+        onContinue: onContinue
+      )
     }
   }
 
@@ -790,6 +808,19 @@ private struct DesktopSessionDetailView: View {
         }
       }
     }
+  }
+
+  private var insightGrid: some View {
+    LazyVGrid(columns: insightColumns, alignment: .leading, spacing: 14) {
+      metadataSection
+      recentMessagesSection
+    }
+  }
+
+  private var insightColumns: [GridItem] {
+    [
+      GridItem(.adaptive(minimum: 320), spacing: 14, alignment: .top)
+    ]
   }
 
   private func metadataRow(_ label: String, _ value: String) -> some View {
@@ -870,9 +901,62 @@ private struct DesktopSessionDetailView: View {
   }
 }
 
+private struct DesktopTerminalReadyPanel: View {
+  let session: AgentSession
+  let action: KageAction
+  let onContinue: (KageAction) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "terminal")
+          .font(.title3)
+          .foregroundStyle(.secondary)
+          .frame(width: 30, height: 30)
+
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Ready to continue")
+            .font(.headline)
+          Text("KAGE will run this \(session.agentLabel) session inside the embedded terminal.")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+
+        Spacer()
+
+        Button {
+          onContinue(action)
+        } label: {
+          Label("Start", systemImage: "play.fill")
+        }
+        .buttonStyle(.borderedProminent)
+      }
+
+      if let command = action.command {
+        Text(command)
+          .font(.callout.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+      }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.secondary.opacity(0.07))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(Color.secondary.opacity(0.14))
+    )
+  }
+}
+
 private struct DesktopActionResultBanner: View {
   let result: RunActionResponse
-  let cwd: String
+  let onOpenInKageTerminal: (RunActionResponse) -> Void
   let onDismiss: () -> Void
 
   var body: some View {
@@ -903,16 +987,17 @@ private struct DesktopActionResultBanner: View {
       HStack(spacing: 8) {
         if result.resumeCommand != nil {
           Button {
+            onOpenInKageTerminal(result)
+          } label: {
+            Label("Open in KAGE Terminal", systemImage: "play.fill")
+          }
+
+          Button {
             copyResumeCommand()
           } label: {
             Label("Copy", systemImage: "doc.on.doc")
           }
 
-          Button {
-            openResumeCommand()
-          } label: {
-            Label("Open in Terminal", systemImage: "terminal")
-          }
         }
 
         if let filePath = revealPath {
@@ -951,17 +1036,6 @@ private struct DesktopActionResultBanner: View {
       return
     }
     TerminalCommandLauncher.copy(resumeCommand)
-  }
-
-  private func openResumeCommand() {
-    guard let resumeCommand = result.resumeCommand else {
-      return
-    }
-    do {
-      try TerminalCommandLauncher.open(command: resumeCommand, cwd: cwd)
-    } catch {
-      TerminalCommandLauncher.copy(resumeCommand)
-    }
   }
 
   private func agentLabel(_ agent: String?) -> String {
