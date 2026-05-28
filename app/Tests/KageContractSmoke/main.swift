@@ -120,6 +120,51 @@ do {
   try require(actions.actions[1].targetAgent == "claude", "bridge target should decode")
   try require(actions.actions[0].isLatest == true, "latest marker should decode")
 
+  let search = try decode(
+    SearchResponse.self,
+    """
+    {
+      "mode": "search",
+      "query": "login",
+      "filters": {
+        "agent": null,
+        "since": null,
+        "until": null,
+        "project": "/tmp/project",
+        "includeSubdirs": true,
+        "limit": 50
+      },
+      "results": [
+        {
+          "agent": "codex",
+          "agentLabel": "Codex",
+          "sessionId": "session-1",
+          "title": "Fix login",
+          "shortTitle": "Fix login",
+          "updatedAt": "2026-05-25T06:56:02.409Z",
+          "cwd": "/tmp/project",
+          "path": "/Users/test/.codex/sessions/session-1.jsonl",
+          "recentUserMessages": ["Fix login"],
+          "match": {
+            "field": "message:user:1",
+            "text": "Fix login button state"
+          }
+        }
+      ],
+      "agents": [
+        {
+          "agent": "codex",
+          "root": "/Users/test/.codex/sessions",
+          "resultCount": 1,
+          "error": null
+        }
+      ]
+    }
+    """
+  )
+  try require(search.results[0].agentSession.id == "codex:session-1", "search result should convert to session")
+  try require(search.results[0].match?.text == "Fix login button state", "search match should decode")
+
   let runAction = try decode(
     RunActionResponse.self,
     """

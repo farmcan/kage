@@ -1,6 +1,7 @@
-# KAGE Menu Bar App
+# KAGE Desktop App
 
-This is the native macOS menu bar client for KAGE.
+This is the native macOS desktop client for KAGE. It includes a normal desktop
+window for browsing sessions plus a compact menu bar surface for quick actions.
 
 The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, or QoderCLI transcripts. It calls the stable KAGE JSON contract instead:
 
@@ -19,6 +20,10 @@ swift run --package-path app kage-contract-smoke
 (cd app && ./bundle.sh)
 open app/.build/release/KAGE.app
 ```
+
+The main window opens to a session workspace with a sidebar, search, agent
+filters, session details, and per-session resume / bridge / replay actions. The
+menu bar item remains available for lightweight status checks and quick opens.
 
 Package a local DMG:
 

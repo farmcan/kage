@@ -33,6 +33,14 @@ actor KageCLI {
     try await decode(ActionsResponse.self, args: scopedArgs(["actions", "--json"], includeSubdirectories), cwd: cwd)
   }
 
+  func search(cwd: String, query: String, agent: String?, includeSubdirectories: Bool) async throws -> SearchResponse {
+    var args = ["search", query, "--project", cwd, "--json"]
+    if let agent, agent != "all" {
+      args += ["--agent", agent]
+    }
+    return try await decode(SearchResponse.self, args: scopedArgs(args, includeSubdirectories), cwd: cwd)
+  }
+
   func runAction(id: String, cwd: String, includeSubdirectories: Bool) async throws -> RunActionResponse {
     try await decode(
       RunActionResponse.self,

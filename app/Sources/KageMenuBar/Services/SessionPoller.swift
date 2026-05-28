@@ -6,8 +6,11 @@ final class SessionPoller: ObservableObject {
   @Published var sessionsResponse: SessionsResponse?
   @Published var doctorResult: DoctorResult?
   @Published var actionsResponse: ActionsResponse?
+  @Published var searchResponse: SearchResponse?
   @Published var errorMessage: String?
+  @Published var searchErrorMessage: String?
   @Published var isRefreshing = false
+  @Published var isSearching = false
   @Published var lastRefresh: Date?
   @Published var actionMessage: String?
   @Published var actionResult: RunActionResponse?
@@ -106,6 +109,38 @@ final class SessionPoller: ObservableObject {
     } catch {
       actionMessage = error.localizedDescription
     }
+  }
+
+  func search(query: String, appState: AppState) async {
+    let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedQuery.isEmpty else {
+      searchResponse = nil
+      searchErrorMessage = nil
+      isSearching = false
+      return
+    }
+
+    isSearching = true
+    searchErrorMessage = nil
+    defer {
+      isSearching = false
+    }
+
+    do {
+      searchResponse = try await cli.search(
+        cwd: appState.watchedDirectory,
+        query: trimmedQuery,
+        agent: appState.selectedAgent,
+        includeSubdirectories: appState.includeSubdirectories
+      )
+    } catch {
+      searchErrorMessage = error.localizedDescription
+    }
+  }
+
+  func clearSearch() {
+    searchResponse = nil
+    searchErrorMessage = nil
   }
 
   func clearActionResult() {

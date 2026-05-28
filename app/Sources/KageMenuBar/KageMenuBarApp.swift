@@ -7,6 +7,18 @@ struct KageMenuBarApp: App {
   @StateObject private var notifications = NotificationManager()
 
   var body: some Scene {
+    WindowGroup("KAGE", id: "dashboard") {
+      DesktopDashboardView()
+        .environmentObject(appState)
+        .environmentObject(poller)
+        .environmentObject(notifications)
+        .frame(minWidth: 980, minHeight: 640)
+        .task {
+          poller.start(appState: appState, notifications: notifications)
+        }
+    }
+    .windowResizability(.contentMinSize)
+
     MenuBarExtra {
       MainMenuView()
         .environmentObject(appState)
