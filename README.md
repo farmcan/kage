@@ -1,5 +1,9 @@
 # KAGE
 
+[![CI](https://github.com/farmcan/kage/actions/workflows/ci.yml/badge.svg)](https://github.com/farmcan/kage/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-desktop_app-black.svg)](app/)
+
 KAGE is a local-first desktop and CLI session manager for AI coding agents.
 
 It finds, searches, forks, replays, and moves coding sessions across `Claude Code`, `Codex`, and `QoderCLI` without asking you to copy-paste transcript context by hand.
@@ -17,11 +21,15 @@ Product strategy: [KAGE Product Strategy](docs/product-strategy-2026-05-28.md)
 
 Growth plan: [KAGE Growth Plan](docs/growth-plan-2026-05-28.md)
 
+GitHub presence: [GitHub Presence Guide](docs/github-presence-guide.md)
+
 Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.md)
 
 Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
 
 ## Try It In 60 Seconds
+
+The first screenshot/GIF should land here: desktop search -> matched session -> bridge -> copy/open resume command.
 
 Install the CLI:
 
