@@ -12,6 +12,9 @@ let package = Package(
     .executable(name: "kage-menubar", targets: ["KageMenuBar"]),
     .executable(name: "kage-contract-smoke", targets: ["KageContractSmoke"])
   ],
+  dependencies: [
+    .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.13.0")
+  ],
   targets: [
     .target(
       name: "KageContracts",
@@ -19,7 +22,10 @@ let package = Package(
     ),
     .executableTarget(
       name: "KageMenuBar",
-      dependencies: ["KageContracts"],
+      dependencies: [
+        "KageContracts",
+        .product(name: "SwiftTerm", package: "SwiftTerm")
+      ],
       path: "Sources/KageMenuBar"
     ),
     .executableTarget(

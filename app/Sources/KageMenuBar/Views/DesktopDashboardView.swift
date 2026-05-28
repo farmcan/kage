@@ -12,6 +12,7 @@ struct DesktopDashboardView: View {
   @State private var searchText = ""
   @State private var searchTask: Task<Void, Never>?
   @State private var autoOpeningActionID: String?
+  @State private var terminalSession: EmbeddedTerminalSession?
 
   var body: some View {
     NavigationSplitView {
@@ -165,6 +166,7 @@ struct DesktopDashboardView: View {
         actionMessage: poller.actionMessage,
         watchedDirectory: appState.watchedDirectory,
         primaryResumeAction: primaryResumeAction(for: session),
+        terminalSession: terminalSession,
         isOpening: autoOpeningActionID != nil,
         onContinue: runAndOpenAction,
         onRunAction: runAction,
@@ -386,11 +388,11 @@ struct DesktopDashboardView: View {
   private func runAndOpenAction(_ action: KageAction) {
     autoOpeningActionID = action.id
     if action.type == "resume", let command = action.command {
-      do {
-        try TerminalCommandLauncher.open(command: command, cwd: appState.watchedDirectory)
-      } catch {
-        TerminalCommandLauncher.copy(command)
-      }
+      terminalSession = EmbeddedTerminalSession(
+        title: action.label,
+        command: command,
+        cwd: selectedSession?.cwd ?? appState.watchedDirectory
+      )
       autoOpeningActionID = nil
       return
     }
@@ -575,6 +577,7 @@ private struct DesktopSessionDetailView: View {
   let actionMessage: String?
   let watchedDirectory: String
   let primaryResumeAction: KageAction?
+  let terminalSession: EmbeddedTerminalSession?
   let isOpening: Bool
   let onContinue: (KageAction) -> Void
   let onRunAction: (KageAction) -> Void
@@ -598,6 +601,7 @@ private struct DesktopSessionDetailView: View {
         }
 
         actionSection
+        terminalSection
         searchMatchSection
         metadataSection
         recentMessagesSection
@@ -679,6 +683,32 @@ private struct DesktopSessionDetailView: View {
             .controlSize(.large)
           }
         }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var terminalSection: some View {
+    if let terminalSession {
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          Label(terminalSession.title, systemImage: "terminal")
+            .font(.headline)
+          Spacer()
+          Text(terminalSession.cwd)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
+        EmbeddedTerminalView(session: terminalSession)
+          .id(terminalSession.id)
+          .frame(minHeight: 360)
+          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(Color.secondary.opacity(0.18))
+          )
       }
     }
   }

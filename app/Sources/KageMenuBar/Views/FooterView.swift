@@ -4,7 +4,6 @@ import SwiftUI
 
 struct FooterView: View {
   @Environment(\.openSettings) private var openSettings
-  @Environment(\.openWindow) private var openWindow
   @EnvironmentObject private var poller: SessionPoller
 
   var body: some View {
@@ -33,8 +32,7 @@ struct FooterView: View {
 
       HStack(spacing: 10) {
         Button {
-          openWindow(id: "dashboard")
-          NSApp.activate(ignoringOtherApps: true)
+          KageWindowPresenter.shared.showDashboard()
         } label: {
           Label("Open", systemImage: "macwindow")
         }
