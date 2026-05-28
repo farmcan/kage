@@ -11,6 +11,7 @@ struct DesktopDashboardView: View {
   @State private var selectedSessionID: String?
   @State private var searchText = ""
   @State private var searchTask: Task<Void, Never>?
+  @State private var autoOpeningActionID: String?
 
   var body: some View {
     NavigationSplitView {
@@ -102,9 +103,34 @@ struct DesktopDashboardView: View {
       Divider()
 
       List(selection: $selectedSessionID) {
-        ForEach(visibleSessions) { session in
-          DesktopSessionListRow(session: session, match: searchMatches[session.id])
-            .tag(session.id)
+        ForEach(sessionGroups) { group in
+          Section {
+            ForEach(group.sessions) { session in
+              DesktopSessionListRow(session: session, match: searchMatches[session.id])
+                .tag(session.id)
+                .contextMenu {
+                  if let resumeAction = primaryResumeAction(for: session) {
+                    Button {
+                      runAndOpenAction(resumeAction)
+                    } label: {
+                      Label("Continue in \(agentLabel(session.agent))", systemImage: "play.fill")
+                    }
+                  }
+                  Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
+                  } label: {
+                    Label("Show Session File", systemImage: "doc")
+                  }
+                }
+                .onTapGesture(count: 2) {
+                  if let resumeAction = primaryResumeAction(for: session) {
+                    runAndOpenAction(resumeAction)
+                  }
+                }
+            }
+          } header: {
+            DirectoryGroupHeader(group: group)
+          }
         }
       }
       .listStyle(.sidebar)
@@ -126,6 +152,9 @@ struct DesktopDashboardView: View {
         actionResult: poller.actionResult,
         actionMessage: poller.actionMessage,
         watchedDirectory: appState.watchedDirectory,
+        primaryResumeAction: primaryResumeAction(for: session),
+        isOpening: autoOpeningActionID != nil,
+        onContinue: runAndOpenAction,
         onRunAction: runAction,
         onDismissResult: {
           poller.clearActionResult()
@@ -243,6 +272,19 @@ struct DesktopDashboardView: View {
     }
   }
 
+  private var sessionGroups: [DirectorySessionGroup] {
+    let grouped = Dictionary(grouping: visibleSessions, by: \.cwd)
+    return grouped.map { cwd, sessions in
+      DirectorySessionGroup(cwd: cwd, sessions: sessions.sorted(by: isNewer))
+    }
+    .sorted { lhs, rhs in
+      if lhs.lastUpdated != rhs.lastUpdated {
+        return lhs.lastUpdated > rhs.lastUpdated
+      }
+      return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+    }
+  }
+
   private var selectedSession: AgentSession? {
     visibleSessions.first { $0.id == selectedSessionID }
   }
@@ -328,6 +370,41 @@ struct DesktopDashboardView: View {
       await poller.runAction(action, appState: appState, notifications: notifications)
     }
   }
+
+  private func runAndOpenAction(_ action: KageAction) {
+    autoOpeningActionID = action.id
+    Task {
+      await poller.runAction(action, appState: appState, notifications: notifications)
+      defer {
+        autoOpeningActionID = nil
+      }
+      guard let command = poller.actionResult?.resumeCommand else {
+        return
+      }
+      do {
+        try TerminalCommandLauncher.open(command: command, cwd: appState.watchedDirectory)
+      } catch {
+        TerminalCommandLauncher.copy(command)
+      }
+    }
+  }
+
+  private func primaryResumeAction(for session: AgentSession) -> KageAction? {
+    actionsBySession[session.id]?.first { $0.type == "resume" }
+  }
+
+  private func agentLabel(_ agent: String?) -> String {
+    switch agent {
+    case "claude":
+      return "Claude Code"
+    case "codex":
+      return "Codex"
+    case "qodercli":
+      return "QoderCLI"
+    default:
+      return agent ?? "Agent"
+    }
+  }
 }
 
 private struct DesktopSessionListRow: View {
@@ -337,7 +414,7 @@ private struct DesktopSessionListRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 5) {
       HStack {
-        Text(session.agentLabel)
+        Label(session.agentLabel, systemImage: agentIcon)
           .font(.caption)
           .foregroundStyle(.secondary)
         Spacer()
@@ -367,6 +444,19 @@ private struct DesktopSessionListRow: View {
     .padding(.vertical, 5)
   }
 
+  private var agentIcon: String {
+    switch session.agent {
+    case "claude":
+      return "sparkles"
+    case "codex":
+      return "terminal"
+    case "qodercli":
+      return "q.square"
+    default:
+      return "cpu"
+    }
+  }
+
   private var relativeUpdatedAt: String {
     guard let updatedAt = session.updatedAt else {
       return "unknown"
@@ -382,6 +472,75 @@ private struct DesktopSessionListRow: View {
   }
 }
 
+private struct DirectorySessionGroup: Identifiable {
+  let cwd: String
+  let sessions: [AgentSession]
+
+  var id: String {
+    cwd
+  }
+
+  var displayName: String {
+    URL(fileURLWithPath: cwd).lastPathComponent.isEmpty ? cwd : URL(fileURLWithPath: cwd).lastPathComponent
+  }
+
+  var parentPath: String {
+    URL(fileURLWithPath: cwd).deletingLastPathComponent().path
+  }
+
+  var lastUpdated: Date {
+    sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
+  }
+}
+
+private struct DirectoryGroupHeader: View {
+  let group: DirectorySessionGroup
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      HStack(spacing: 6) {
+        Image(systemName: "folder")
+        Text(group.displayName)
+          .fontWeight(.semibold)
+        Spacer()
+        Text("\(group.sessions.count)")
+          .foregroundStyle(.secondary)
+      }
+      Text(group.parentPath)
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+    }
+    .textCase(nil)
+    .padding(.vertical, 3)
+  }
+}
+
+private func isNewer(_ lhs: AgentSession, _ rhs: AgentSession) -> Bool {
+  let lhsDate = parseSessionDate(lhs.updatedAt) ?? .distantPast
+  let rhsDate = parseSessionDate(rhs.updatedAt) ?? .distantPast
+  if lhsDate != rhsDate {
+    return lhsDate > rhsDate
+  }
+  return lhs.displayTitle.localizedCaseInsensitiveCompare(rhs.displayTitle) == .orderedAscending
+}
+
+private func parseSessionDate(_ value: String?) -> Date? {
+  guard let value else {
+    return nil
+  }
+
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  if let date = formatter.date(from: value) {
+    return date
+  }
+
+  formatter.formatOptions = [.withInternetDateTime]
+  return formatter.date(from: value)
+}
+
 private struct DesktopSessionDetailView: View {
   let session: AgentSession
   let match: SearchMatch?
@@ -389,6 +548,9 @@ private struct DesktopSessionDetailView: View {
   let actionResult: RunActionResponse?
   let actionMessage: String?
   let watchedDirectory: String
+  let primaryResumeAction: KageAction?
+  let isOpening: Bool
+  let onContinue: (KageAction) -> Void
   let onRunAction: (KageAction) -> Void
   let onDismissResult: () -> Void
 
@@ -452,6 +614,21 @@ private struct DesktopSessionDetailView: View {
         .lineLimit(2)
         .truncationMode(.middle)
         .textSelection(.enabled)
+
+      if let primaryResumeAction {
+        Button {
+          onContinue(primaryResumeAction)
+        } label: {
+          if isOpening {
+            Label("Opening \(session.agentLabel)", systemImage: "hourglass")
+          } else {
+            Label("Continue in \(session.agentLabel)", systemImage: "play.fill")
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(isOpening)
+      }
     }
   }
 
@@ -707,8 +884,7 @@ private struct DesktopActionResultBanner: View {
     guard let resumeCommand = result.resumeCommand else {
       return
     }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(resumeCommand, forType: .string)
+    TerminalCommandLauncher.copy(resumeCommand)
   }
 
   private func openResumeCommand() {
@@ -716,51 +892,10 @@ private struct DesktopActionResultBanner: View {
       return
     }
     do {
-      let scriptPath = try writeTerminalCommand(resumeCommand)
-      NSWorkspace.shared.open(scriptPath)
+      try TerminalCommandLauncher.open(command: resumeCommand, cwd: cwd)
     } catch {
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(resumeCommand, forType: .string)
+      TerminalCommandLauncher.copy(resumeCommand)
     }
-  }
-
-  private func writeTerminalCommand(_ resumeCommand: String) throws -> URL {
-    cleanupOldTerminalCommands()
-    let fileName = "kage-resume-\(UUID().uuidString).command"
-    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
-    let script = """
-    #!/bin/zsh
-    cd \(shellQuote(cwd))
-    \(resumeCommand)
-    rm -f \(shellQuote(fileURL.path))
-
-    """
-    try script.write(to: fileURL, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fileURL.path)
-    return fileURL
-  }
-
-  private func cleanupOldTerminalCommands() {
-    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-    guard let files = try? FileManager.default.contentsOfDirectory(
-      at: tempURL,
-      includingPropertiesForKeys: [.contentModificationDateKey],
-      options: [.skipsHiddenFiles]
-    ) else {
-      return
-    }
-
-    let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
-    for file in files where file.lastPathComponent.hasPrefix("kage-resume-") && file.pathExtension == "command" {
-      let modifiedAt = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-      if modifiedAt < cutoff {
-        try? FileManager.default.removeItem(at: file)
-      }
-    }
-  }
-
-  private func shellQuote(_ value: String) -> String {
-    "'\(value.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
   }
 
   private func agentLabel(_ agent: String?) -> String {

@@ -315,8 +315,7 @@ private struct ActionResultCard: View {
     guard let resumeCommand = result.resumeCommand else {
       return
     }
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(resumeCommand, forType: .string)
+    TerminalCommandLauncher.copy(resumeCommand)
   }
 
   private func openResumeCommand() {
@@ -324,51 +323,10 @@ private struct ActionResultCard: View {
       return
     }
     do {
-      let scriptPath = try writeTerminalCommand(resumeCommand)
-      NSWorkspace.shared.open(scriptPath)
+      try TerminalCommandLauncher.open(command: resumeCommand, cwd: cwd)
     } catch {
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(resumeCommand, forType: .string)
+      TerminalCommandLauncher.copy(resumeCommand)
     }
-  }
-
-  private func writeTerminalCommand(_ resumeCommand: String) throws -> URL {
-    cleanupOldTerminalCommands()
-    let fileName = "kage-resume-\(UUID().uuidString).command"
-    let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(fileName)
-    let script = """
-    #!/bin/zsh
-    cd \(shellQuote(cwd))
-    \(resumeCommand)
-    rm -f \(shellQuote(fileURL.path))
-
-    """
-    try script.write(to: fileURL, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fileURL.path)
-    return fileURL
-  }
-
-  private func cleanupOldTerminalCommands() {
-    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-    guard let files = try? FileManager.default.contentsOfDirectory(
-      at: tempURL,
-      includingPropertiesForKeys: [.contentModificationDateKey],
-      options: [.skipsHiddenFiles]
-    ) else {
-      return
-    }
-
-    let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
-    for file in files where file.lastPathComponent.hasPrefix("kage-resume-") && file.pathExtension == "command" {
-      let modifiedAt = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-      if modifiedAt < cutoff {
-        try? FileManager.default.removeItem(at: file)
-      }
-    }
-  }
-
-  private func shellQuote(_ value: String) -> String {
-    "'\(value.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
   }
 
   private func agentLabel(_ agent: String?) -> String {
