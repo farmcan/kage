@@ -33,4 +33,4 @@ open app/.build/release/KAGE.app
 
 - [Product strategy](docs/product-strategy-2026-05-28.md)
 - [Growth plan](docs/growth-plan-2026-05-28.md)
-- [macOS desktop app plan](docs/mac-menu-bar-app-plan-2026-05-20.md)
+- [Release and launch checklist](docs/release-launch-checklist.md)

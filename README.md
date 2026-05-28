@@ -19,8 +19,6 @@ Growth plan: [KAGE Growth Plan](docs/growth-plan-2026-05-28.md)
 
 Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.md)
 
-Product plan: [macOS desktop app](docs/mac-menu-bar-app-plan-2026-05-20.md)
-
 Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
 
 ## Try It In 60 Seconds
