@@ -1,27 +1,78 @@
 # KAGE
 
-Find, fork, replay, and move AI coding sessions across `Claude Code`, `Codex`, and `QoderCLI`.
+KAGE is a local-first desktop and CLI session manager for AI coding agents.
 
-KAGE treats coding-agent sessions as local project assets. It reads sessions for the current working directory, normalizes them into one internal model, and can export, preview, replay, or resume them in another agent's native format.
+It finds, searches, forks, replays, and moves coding sessions across `Claude Code`, `Codex`, and `QoderCLI` without asking you to copy-paste transcript context by hand.
+
+> Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
+
+KAGE treats coding-agent sessions as local project assets. It reads sessions for the current working directory, normalizes them into one internal model, and can export, preview, replay, or resume them in another agent's native format. The macOS app is a thin native desktop shell over the same JSON CLI contract, so transcript parsing and route logic stay in one place.
 
 The CLI command is `kage`.
 The name comes from the "shadow clone" idea: a useful coding agent should be able to fork its current working context into parallel branches instead of forcing every task through one linear loop.
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Product plan: [macOS menu bar app](docs/mac-menu-bar-app-plan-2026-05-20.md)
+Product strategy: [KAGE Product Strategy](docs/product-strategy-2026-05-28.md)
 
-Experimental native macOS menu bar app source lives in [app](app/). It consumes the KAGE JSON CLI contract instead of parsing agent transcripts directly.
+Growth plan: [KAGE Growth Plan](docs/growth-plan-2026-05-28.md)
+
+Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.md)
+
+Product plan: [macOS desktop app](docs/mac-menu-bar-app-plan-2026-05-20.md)
+
+Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
+
+## Try It In 60 Seconds
+
+Install the CLI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash
+```
+
+Check what KAGE can see:
+
+```bash
+kage doctor
+kage sessions
+kage search "auth"
+```
+
+Bridge a useful session:
+
+```bash
+kage c2x
+```
+
+Build and open the experimental macOS desktop app from a local checkout:
+
+```bash
+swift build --package-path app
+(cd app && ./bundle.sh)
+open app/.build/release/KAGE.app
+```
 
 ## Why It Exists
 
-KAGE is built around two practical workflows.
+KAGE is built around three practical workflows.
 
 1. Fork a conversation and keep the useful context.
 You can branch an existing session, trim it, append one new user message, and continue without rebuilding context from scratch.
 
 2. Bridge between agents.
 You can move a session between tools like `Claude -> Codex` or `Codex -> Claude` and keep working with a native session file instead of a pasted transcript.
+
+3. Browse local agent memory.
+The desktop app gives you a project-scoped session list, search, recent messages, and per-session actions without leaving macOS.
+
+## Why People Star It
+
+- You use more than one AI coding agent and want context to move with you.
+- You have old local sessions that are useful but hard to find.
+- You want transcript search without uploading everything to another service.
+- You want resume, bridge, replay, and cleanup flows that are scriptable from a CLI.
+- You want a desktop workspace for local agent memory instead of raw JSONL files.
 
 ## Core Examples
 
@@ -94,7 +145,7 @@ npm install
 npm link
 ```
 
-Build the experimental menu bar app:
+Build the experimental desktop app:
 
 ```bash
 swift build --package-path app
@@ -102,6 +153,8 @@ swift run --package-path app kage-contract-smoke
 (cd app && ./bundle.sh)
 open app/.build/release/KAGE.app
 ```
+
+The app opens a desktop session workspace and also keeps a menu bar item for quick checks.
 
 ## Quick Start
 

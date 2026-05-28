@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a focused product improvement.
+title: "Feature: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        KAGE is intentionally a local-first session layer, not a replacement terminal or coding agent.
+        The best feature requests start with a real session workflow.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Desktop app
+        - CLI
+        - Search
+        - Bridge/export
+        - Replay/preview
+        - Cleanup
+        - Release/distribution
+        - Mobile/multi-device
+        - Docs/homepage
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What real workflow is blocked or clumsy today?
+      placeholder: "I have a useful Claude Code session, but..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should KAGE do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: How do you solve this today with agent-native resume, Warp, scripts, or raw files?
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary
+      options:
+        - label: This keeps transcripts local by default.
+        - label: This does not require KAGE to become a terminal emulator.
+        - label: This can be exposed through the CLI JSON contract.

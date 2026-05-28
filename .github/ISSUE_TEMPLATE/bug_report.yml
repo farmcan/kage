@@ -1,0 +1,79 @@
+name: Bug report
+description: Report a problem with KAGE CLI, desktop app, or session parsing.
+title: "Bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make local AI coding sessions less slippery.
+        Please do not paste private transcript content unless you have sanitized it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Desktop app
+        - Menu bar
+        - CLI
+        - Session discovery
+        - Search
+        - Bridge/export
+        - Install/update
+        - Docs/homepage
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex
+        - QoderCLI
+        - Multiple agents
+        - Not agent-specific
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KAGE version or commit
+      placeholder: "kage --version or git rev-parse --short HEAD"
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS 15.5, Ubuntu 24.04, Windows WSL2, etc."
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect KAGE to do?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Include commands, watched directory, and whether `--include-subdirs` was enabled.
+      placeholder: |
+        1. Run `kage doctor`
+        2. Run `kage sessions --json`
+        3. Open KAGE.app and search for ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or sanitized output
+      render: shell
+      description: Paste sanitized output from `kage doctor`, `kage sessions --json`, or the app error message.

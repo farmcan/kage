@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="KAGE finds, forks, replays, and moves AI coding sessions across Claude Code, Codex, and QoderCLI."
+      content="KAGE is a local-first desktop and CLI session manager for Claude Code, Codex, and QoderCLI."
     >
-    <title>KAGE - AI Coding Session Control</title>
+    <title>KAGE - AI Coding Session Manager</title>
     <style>
       :root {
         color-scheme: light;
@@ -363,14 +363,14 @@
     <main id="top">
       <section class="shell hero">
         <div>
-          <p class="eyebrow">AI coding session control</p>
+          <p class="eyebrow">Local-first AI coding session manager</p>
           <h1>KAGE</h1>
           <p class="hero-copy">
-            Find, fork, replay, and move local coding-agent sessions across Claude Code, Codex,
-            and QoderCLI without copy-pasting context by hand.
+            A macOS desktop app and CLI for finding, searching, forking, replaying, and moving
+            local coding-agent sessions across Claude Code, Codex, and QoderCLI.
           </p>
           <div class="actions">
-            <a class="button" href="https://github.com/farmcan/kage#install">Install KAGE</a>
+            <a class="button" href="https://github.com/farmcan/kage#install">Install CLI</a>
             <a class="button secondary" href="https://github.com/farmcan/kage">View on GitHub</a>
           </div>
         </div>
@@ -398,6 +398,10 @@ $ kage x2v
 
       <section id="workflows" class="shell panel-row" aria-label="Core workflows">
         <article class="panel">
+          <h2>Desktop Workspace</h2>
+          <p>Browse project sessions, search recent prompts, and launch resume or bridge actions from macOS.</p>
+        </article>
+        <article class="panel">
           <h2>Rescue Context</h2>
           <p>Locate the coding session where the important decision, bug, or plan actually happened.</p>
         </article>
@@ -414,10 +418,10 @@ $ kage x2v
       <section id="matrix" class="section">
         <div class="shell matrix">
           <div>
-            <h2>One tool for local agent memory</h2>
+            <h2>One local workspace for agent memory</h2>
             <p>
               Each agent has its own native session store. KAGE keeps the local-first model, then adds
-              discovery, conversion, preview, cleanup, and replay on top.
+              a desktop workspace, discovery, conversion, preview, cleanup, and replay on top.
             </p>
           </div>
           <table>
@@ -452,23 +456,23 @@ $ kage x2v
       <section id="roadmap" class="section">
         <div class="shell">
           <h2>Product direction</h2>
-          <p>KAGE is evolving from a bridge command into a lightweight session radar.</p>
+          <p>KAGE is becoming a practical control surface for local AI coding work.</p>
           <div class="roadmap">
             <article class="step">
-              <strong>Doctor</strong>
-              <p>Check agent installs, versions, session directories, and resume support.</p>
+              <strong>Desktop</strong>
+              <p>Browse sessions, filter agents, inspect context, and run per-session actions.</p>
             </article>
             <article class="step">
-              <strong>Finder</strong>
+              <strong>Search</strong>
               <p>Search local sessions by project, agent, title, and transcript text.</p>
             </article>
             <article class="step">
-              <strong>Menu Bar</strong>
-              <p>Surface live session status from the macOS menu bar.</p>
+              <strong>Bridge</strong>
+              <p>Move useful context across Claude Code, Codex, and QoderCLI native sessions.</p>
             </article>
             <article class="step">
-              <strong>Manifest</strong>
-              <p>Track exports so KAGE can clean, undo, and explain what it wrote.</p>
+              <strong>Local First</strong>
+              <p>Keep transcripts on disk and use the CLI JSON contract as the app boundary.</p>
             </article>
           </div>
         </div>

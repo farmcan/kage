@@ -1,7 +1,7 @@
 {
   "name": "kage",
   "version": "0.1.0",
-  "description": "Find, fork, replay, and move AI coding sessions across Claude Code, Codex, and QoderCLI.",
+  "description": "Local-first desktop and CLI session manager for Claude Code, Codex, and QoderCLI.",
   "type": "module",
   "main": "./src/index.js",
   "bin": {

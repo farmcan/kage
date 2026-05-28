@@ -1,0 +1,36 @@
+name: Growth task
+description: Improve adoption, docs, releases, screenshots, demos, or launch assets.
+title: "Growth: "
+labels:
+  - growth
+  - documentation
+body:
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Channel
+      options:
+        - README
+        - Homepage
+        - GitHub Release
+        - Screenshot/GIF
+        - Demo video
+        - Launch post
+        - Issue hygiene
+        - Packaging/DMG
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: What should be improved so more people understand or try KAGE?
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      placeholder: "A first-time visitor can..."
+    validations:
+      required: true

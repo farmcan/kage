@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Product strategy
+    url: https://github.com/farmcan/kage/blob/main/docs/product-strategy-2026-05-28.md
+    about: Read the current product boundary before proposing large new surfaces.
+  - name: Growth plan
+    url: https://github.com/farmcan/kage/blob/main/docs/growth-plan-2026-05-28.md
+    about: See how KAGE is being packaged for adoption and GitHub stars.
