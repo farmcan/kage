@@ -105,9 +105,9 @@ struct DesktopDashboardView: View {
       List(selection: $selectedSessionID) {
         ForEach(sessionGroups) { group in
           Section {
-            ForEach(group.sessions) { session in
-              DesktopSessionListRow(session: session, match: searchMatches[session.id])
-                .tag(session.id)
+            ForEach(group.sessions, id: \.path) { session in
+              DesktopSessionListRow(session: session, match: searchMatches[session.path])
+                .tag(sessionKey(session))
                 .contextMenu {
                   if let resumeAction = primaryResumeAction(for: session) {
                     Button {
@@ -144,11 +144,23 @@ struct DesktopDashboardView: View {
 
   @ViewBuilder
   private var detailPane: some View {
-    if let session = selectedSession {
+    if poller.isRefreshing && visibleSessions.isEmpty {
+      VStack(spacing: 14) {
+        ProgressView()
+          .controlSize(.large)
+        Text("Loading sessions...")
+          .font(.headline)
+        Text("KAGE is scanning local Codex, Claude Code, and QoderCLI transcripts.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(Color(nsColor: .textBackgroundColor))
+    } else if let session = selectedSession {
       DesktopSessionDetailView(
         session: session,
-        match: searchMatches[session.id],
-        actions: actionsBySession[session.id] ?? [],
+        match: searchMatches[session.path],
+        actions: actionsBySession[session.path] ?? [],
         actionResult: poller.actionResult,
         actionMessage: poller.actionMessage,
         watchedDirectory: appState.watchedDirectory,
@@ -286,7 +298,7 @@ struct DesktopDashboardView: View {
   }
 
   private var selectedSession: AgentSession? {
-    visibleSessions.first { $0.id == selectedSessionID }
+    visibleSessions.first { sessionKey($0) == selectedSessionID }
   }
 
   private var isSearchActive: Bool {
@@ -299,7 +311,7 @@ struct DesktopDashboardView: View {
         guard let match = result.match else {
           return nil
         }
-        return (result.id, match)
+        return (result.path, match)
       } ?? []
     )
   }
@@ -307,7 +319,7 @@ struct DesktopDashboardView: View {
   private var actionsBySession: [String: [KageAction]] {
     Dictionary(
       grouping: poller.actionsResponse?.actions.filter { $0.sessionId != nil } ?? [],
-      by: { action in "\(action.agent):\(action.sessionId ?? "")" }
+      by: { action in action.sessionPath ?? "\(action.agent):\(action.sessionId ?? "")" }
     )
   }
 
@@ -323,10 +335,10 @@ struct DesktopDashboardView: View {
   }
 
   private func ensureSelection() {
-    if let selectedSessionID, visibleSessions.contains(where: { $0.id == selectedSessionID }) {
+    if let selectedSessionID, visibleSessions.contains(where: { sessionKey($0) == selectedSessionID }) {
       return
     }
-    selectedSessionID = visibleSessions.first?.id
+    selectedSessionID = visibleSessions.first.map(sessionKey)
   }
 
   private func scheduleSearch(_ query: String) {
@@ -373,6 +385,16 @@ struct DesktopDashboardView: View {
 
   private func runAndOpenAction(_ action: KageAction) {
     autoOpeningActionID = action.id
+    if action.type == "resume", let command = action.command {
+      do {
+        try TerminalCommandLauncher.open(command: command, cwd: appState.watchedDirectory)
+      } catch {
+        TerminalCommandLauncher.copy(command)
+      }
+      autoOpeningActionID = nil
+      return
+    }
+
     Task {
       await poller.runAction(action, appState: appState, notifications: notifications)
       defer {
@@ -390,7 +412,11 @@ struct DesktopDashboardView: View {
   }
 
   private func primaryResumeAction(for session: AgentSession) -> KageAction? {
-    actionsBySession[session.id]?.first { $0.type == "resume" }
+    actionsBySession[session.path]?.first { $0.type == "resume" }
+  }
+
+  private func sessionKey(_ session: AgentSession) -> String {
+    "\(session.agent):\(session.sessionId):\(session.path)"
   }
 
   private func agentLabel(_ agent: String?) -> String {

@@ -13,5 +13,6 @@ struct AgentTabBar: View {
       }
     }
     .pickerStyle(.segmented)
+    .labelsHidden()
   }
 }
