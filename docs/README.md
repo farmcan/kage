@@ -6,6 +6,7 @@ This directory keeps current product, growth, release, and future architecture d
 
 - [Product strategy](product-strategy-2026-05-28.md)
 - [Architecture review](architecture-review-2026-05-28.md)
+- [Desktop release plan](desktop-release-plan-2026-05-29.md)
 - [Growth plan](growth-plan-2026-05-28.md)
 - [GitHub presence guide](github-presence-guide.md)
 - [Release and launch checklist](release-launch-checklist.md)

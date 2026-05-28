@@ -19,6 +19,7 @@ Avoid release notes that only list implementation files.
 - [ ] `(cd app && ./package.sh)` for unsigned DMG
 - [ ] Open the generated `KAGE.app`
 - [ ] Verify desktop search against a real session
+- [ ] Verify `Continue in KAGE terminal` starts an embedded session terminal
 - [ ] Verify one bridge flow ends with Copy, Open in Terminal, and Show in Finder options
 - [ ] Check README install instructions
 - [ ] Check homepage copy
@@ -30,6 +31,7 @@ Avoid release notes that only list implementation files.
 - [ ] Unsigned DMG
 - [ ] Screenshot or GIF
 - [ ] CLI install command
+- [ ] Known terminal limitations
 - [ ] Known limitations
 
 Suggested release title:
@@ -46,6 +48,7 @@ KAGE is a local-first desktop app and CLI for finding, resuming, and moving AI c
 This release focuses on:
 - desktop session browsing
 - transcript-aware search
+- embedded resume terminal for selected sessions
 - explicit bridge result actions
 - local-first CLI JSON contract
 

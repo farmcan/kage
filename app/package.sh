@@ -3,8 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="KAGE"
-VERSION="${KAGE_APP_VERSION:-0.1.0}"
 BUILD_DIR="$SCRIPT_DIR/.build/release"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PACKAGE_VERSION="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$REPO_ROOT/package.json" | head -n 1)"
+VERSION="${KAGE_APP_VERSION:-$PACKAGE_VERSION}"
 APP_PATH="$BUILD_DIR/$APP_NAME.app"
 PACKAGE_DIR="$BUILD_DIR/package"
 DMG_STAGING_DIR="$PACKAGE_DIR/dmg-root"

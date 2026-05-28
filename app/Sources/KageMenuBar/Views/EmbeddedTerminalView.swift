@@ -7,6 +7,7 @@ struct EmbeddedTerminalSession: Identifiable, Equatable {
   let title: String
   let command: String
   let cwd: String
+  let sessionPath: String
 }
 
 struct EmbeddedTerminalView: NSViewRepresentable {

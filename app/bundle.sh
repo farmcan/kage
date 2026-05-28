@@ -12,6 +12,8 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 CLI_BUNDLE_DIR="$RESOURCES_DIR/kage-cli"
 CLI_LAUNCHER="$RESOURCES_DIR/kage"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PACKAGE_VERSION="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$REPO_ROOT/package.json" | head -n 1)"
+VERSION="${KAGE_APP_VERSION:-$PACKAGE_VERSION}"
 
 cd "$SCRIPT_DIR"
 swift build -c release
@@ -32,7 +34,7 @@ exec /usr/bin/env node "$SCRIPT_DIR/kage-cli/src/cli.js" "$@"
 SH
 chmod +x "$CLI_LAUNCHER"
 
-cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
+cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -50,7 +52,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>LSMinimumSystemVersion</key>

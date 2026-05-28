@@ -166,7 +166,7 @@ struct DesktopDashboardView: View {
         actionMessage: poller.actionMessage,
         watchedDirectory: appState.watchedDirectory,
         primaryResumeAction: primaryResumeAction(for: session),
-        terminalSession: terminalSession,
+        terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
         isOpening: autoOpeningActionID != nil,
         onContinue: runAndOpenAction,
         onRunAction: runAction,
@@ -391,7 +391,8 @@ struct DesktopDashboardView: View {
       terminalSession = EmbeddedTerminalSession(
         title: action.label,
         command: command,
-        cwd: selectedSession?.cwd ?? appState.watchedDirectory
+        cwd: selectedSession?.cwd ?? appState.watchedDirectory,
+        sessionPath: action.sessionPath ?? selectedSession?.path ?? ""
       )
       autoOpeningActionID = nil
       return
@@ -650,9 +651,9 @@ private struct DesktopSessionDetailView: View {
           onContinue(primaryResumeAction)
         } label: {
           if isOpening {
-            Label("Opening \(session.agentLabel)", systemImage: "hourglass")
+            Label("Starting KAGE terminal", systemImage: "hourglass")
           } else {
-            Label("Continue in \(session.agentLabel)", systemImage: "play.fill")
+            Label("Continue in KAGE terminal", systemImage: "play.fill")
           }
         }
         .buttonStyle(.borderedProminent)
@@ -667,13 +668,13 @@ private struct DesktopSessionDetailView: View {
       Text("Actions")
         .font(.headline)
 
-      if actions.isEmpty {
+      if secondaryActions.isEmpty {
         Text("No actions available for this session.")
           .font(.callout)
           .foregroundStyle(.secondary)
       } else {
         LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
-          ForEach(actions) { action in
+          ForEach(secondaryActions) { action in
             Button {
               onRunAction(action)
             } label: {
@@ -681,6 +682,8 @@ private struct DesktopSessionDetailView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(1)
           }
         }
       }
@@ -715,8 +718,12 @@ private struct DesktopSessionDetailView: View {
 
   private var actionColumns: [GridItem] {
     [
-      GridItem(.adaptive(minimum: 180), spacing: 8, alignment: .leading)
+      GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 8, alignment: .leading)
     ]
+  }
+
+  private var secondaryActions: [KageAction] {
+    actions.filter { $0.type != "resume" }
   }
 
   @ViewBuilder
@@ -829,6 +836,9 @@ private struct DesktopSessionDetailView: View {
   private func actionLabel(_ action: KageAction) -> String {
     if action.type == "bridge" {
       return "Bridge to \(agentLabel(action.targetAgent))"
+    }
+    if action.type == "replay" {
+      return "Replay session"
     }
     return action.label
   }

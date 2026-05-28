@@ -19,7 +19,7 @@ Agent transcript stores
 
 The important choice is that the CLI/core layer remains the authority for transcript parsing, route logic, search, export, cleanup, and action execution. The macOS app and any future mobile surface should consume stable JSON commands instead of learning agent-specific file formats.
 
-This keeps KAGE valuable without turning it into another terminal, IDE, cloud agent, or coding model runtime.
+This keeps KAGE valuable without turning it into another general terminal, IDE, cloud agent, or coding model runtime. The desktop app can host a bounded terminal pane for explicit resume actions, but that pane should remain tied to KAGE sessions rather than becoming a general shell workspace.
 
 ## What KAGE Is
 
@@ -38,14 +38,14 @@ It helps users answer:
 KAGE should not become:
 
 - a coding agent
-- a terminal emulator
-- a live PTY controller
+- a general-purpose terminal emulator
+- a general-purpose live PTY controller
 - an IDE
 - a hosted session cloud
 - a transcript-sync service by default
 - a replacement for Claude Code, Codex, QoderCLI, Warp, Terminal, or iTerm
 
-KAGE can integrate with those tools, but it should not compete with their core execution surfaces.
+KAGE can integrate with those tools, but it should not compete with their core execution surfaces. The macOS app may embed a terminal only for explicit, session-scoped resume flows where the user is clearly continuing an existing Claude Code, Codex, or QoderCLI session from inside KAGE.
 
 ## Current Architecture
 
@@ -156,6 +156,7 @@ Responsibilities:
 - Persist watched directory, refresh cadence, notifications, and selected agent.
 - Call `kage` subprocess commands through `KageCLI`.
 - Show explicit action results and user-controlled launch/copy/reveal options.
+- Host an embedded PTY for explicit resume actions, using commands produced by the CLI contract.
 
 Rules:
 
@@ -163,6 +164,7 @@ Rules:
 - The app should not build bridge commands from Swift-only knowledge.
 - If the app needs new data, add it to CLI JSON first.
 - Live agent launch should remain an explicit user action.
+- Embedded terminal sessions should be tied to one selected session and should not become a general terminal tab system.
 
 ## Target Architecture
 
@@ -228,7 +230,7 @@ KAGE's wedge is local-first memory control across multiple agents.
 - Make side effects explicit and user-triggered.
 - Add preview-first workflows before destructive cleanup.
 - Add bounded transcript preview and large-file safety before deep desktop inspection.
-- Add terminal launch targets as integrations, not as a terminal replacement.
+- Add terminal launch targets and the embedded resume pane as integrations, not as a terminal replacement.
 - Use GitHub issues and release artifacts to make the roadmap public.
 
 ## Do Not
