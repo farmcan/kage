@@ -19,6 +19,8 @@ Homepage: <https://farmcan.github.io/kage/>
 
 Product strategy: [KAGE Product Strategy](docs/product-strategy-2026-05-28.md)
 
+Architecture: [KAGE Architecture Review](docs/architecture-review-2026-05-28.md)
+
 Growth plan: [KAGE Growth Plan](docs/growth-plan-2026-05-28.md)
 
 GitHub presence: [GitHub Presence Guide](docs/github-presence-guide.md)

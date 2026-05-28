@@ -32,5 +32,6 @@ open app/.build/release/KAGE.app
 ## Useful Documents
 
 - [Product strategy](docs/product-strategy-2026-05-28.md)
+- [Architecture review](docs/architecture-review-2026-05-28.md)
 - [Growth plan](docs/growth-plan-2026-05-28.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)

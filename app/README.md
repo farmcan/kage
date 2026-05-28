@@ -7,6 +7,7 @@ The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, 
 
 - `kage doctor --json`
 - `kage sessions --json`
+- `kage search --json`
 - `kage actions --json`
 - `kage run-action <id> --json`
 
@@ -57,6 +58,8 @@ KAGE CLI JSON
 - `Views` render state and trigger commands, but do not know transcript formats.
 
 Every CLI call sets `Process.currentDirectoryURL` from the watched directory. This is required because KAGE scopes sessions and actions by cwd.
+
+For the broader product boundary, see [KAGE Architecture Review](../docs/architecture-review-2026-05-28.md).
 
 ## UI References
 
