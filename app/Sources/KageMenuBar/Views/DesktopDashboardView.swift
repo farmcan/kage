@@ -13,6 +13,8 @@ struct DesktopDashboardView: View {
   @State private var searchTask: Task<Void, Never>?
   @State private var autoOpeningActionID: String?
   @State private var terminalSession: EmbeddedTerminalSession?
+  @State private var isDemoMode = false
+  @State private var demoSearchResponse: SearchResponse?
 
   var body: some View {
     NavigationSplitView {
@@ -38,7 +40,9 @@ struct DesktopDashboardView: View {
       }
     }
     .onAppear {
-      refresh()
+      if !isDemoMode {
+        refresh()
+      }
       ensureSelection()
     }
     .onChange(of: visibleSessions) { _, _ in
@@ -51,6 +55,19 @@ struct DesktopDashboardView: View {
       if isSearchActive {
         searchNow(searchText)
       }
+    }
+    .onChange(of: isDemoMode) { _, enabled in
+      demoSearchResponse = nil
+      terminalSession = nil
+      poller.clearActionResult()
+      poller.actionMessage = nil
+      if enabled {
+        appState.selectedAgent = "all"
+      } else {
+        selectedSessionID = nil
+        refresh()
+      }
+      ensureSelection()
     }
     .onDisappear {
       searchTask?.cancel()
@@ -82,7 +99,7 @@ struct DesktopDashboardView: View {
           }
         }
 
-        AgentTabBar(agents: poller.sessionsResponse?.agents ?? [])
+        AgentTabBar(agents: activeAgents)
 
         searchField
 
@@ -92,12 +109,23 @@ struct DesktopDashboardView: View {
             get: { appState.includeSubdirectories },
             set: { enabled in
               appState.includeSubdirectories = enabled
-              refresh()
+              if isDemoMode {
+                if isSearchActive {
+                  searchNow(searchText)
+                }
+                ensureSelection()
+              } else {
+                refresh()
+              }
             }
           )
         )
         .toggleStyle(.checkbox)
         .font(.caption)
+
+        if isDemoMode {
+          DemoModeSidebarBanner(onExit: stopDemoMode)
+        }
       }
       .padding(16)
 
@@ -128,10 +156,12 @@ struct DesktopDashboardView: View {
                       Label("Continue in \(agentLabel(session.agent))", systemImage: "play.fill")
                     }
                   }
-                  Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
-                  } label: {
-                    Label("Show Session File", systemImage: "doc")
+                  if !isDemoSession(session) {
+                    Button {
+                      NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
+                    } label: {
+                      Label("Show Session File", systemImage: "doc")
+                    }
                   }
                 }
                 .onTapGesture(count: 2) {
@@ -177,6 +207,7 @@ struct DesktopDashboardView: View {
         actionMessage: poller.actionMessage,
         primaryResumeAction: primaryResumeAction(for: session),
         terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
+        isDemoSession: isDemoSession(session),
         isOpening: autoOpeningActionID != nil,
         onContinue: runAndOpenAction,
         onRunAction: runAction,
@@ -186,11 +217,11 @@ struct DesktopDashboardView: View {
         }
       )
     } else {
-      ContentUnavailableView {
-        Label(emptyStateTitle, systemImage: "rectangle.stack")
-      } description: {
-        Text(emptyStateDescription)
-      } actions: {
+      DesktopEmptyStateView(
+        title: emptyStateTitle,
+        description: emptyStateDescription,
+        iconName: emptyStateIconName
+      ) {
         emptyStateActions
       }
     }
@@ -235,7 +266,11 @@ struct DesktopDashboardView: View {
         if !appState.includeSubdirectories {
           Button {
             appState.includeSubdirectories = true
-            refresh()
+            if isDemoMode {
+              ensureSelection()
+            } else {
+              refresh()
+            }
           } label: {
             Label("Include Subdirs", systemImage: "folder.badge.plus")
           }
@@ -246,6 +281,12 @@ struct DesktopDashboardView: View {
           refresh()
         } label: {
           Label("Change Directory", systemImage: "folder")
+        }
+
+        Button {
+          startDemoMode()
+        } label: {
+          Label("Explore Demo", systemImage: "play.rectangle")
         }
 
         Button {
@@ -290,13 +331,13 @@ struct DesktopDashboardView: View {
           .fill(Color.secondary.opacity(0.09))
       )
 
-      if let searchErrorMessage = poller.searchErrorMessage {
+      if !isDemoMode, let searchErrorMessage = poller.searchErrorMessage {
         Label(searchErrorMessage, systemImage: "exclamationmark.triangle")
           .font(.caption2)
           .foregroundStyle(.orange)
           .lineLimit(2)
       } else if isSearchActive {
-        Text("Searching transcript text in this project.")
+        Text(isDemoMode ? "Searching sanitized demo session text." : "Searching transcript text in this project.")
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
@@ -306,7 +347,7 @@ struct DesktopDashboardView: View {
   private var statusFooter: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Label("\(poller.totalSessions)", systemImage: "rectangle.stack")
+        Label("\(scopedSessions.count)", systemImage: "rectangle.stack")
         Spacer()
         if poller.isRefreshing {
           ProgressView()
@@ -325,6 +366,12 @@ struct DesktopDashboardView: View {
           .lineLimit(2)
       }
 
+      if isDemoMode {
+        Label("Demo Mode", systemImage: "play.rectangle")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
       if let doctor = poller.doctorResult {
         HStack(spacing: 6) {
           Image(systemName: doctor.ok ? "checkmark.circle" : "exclamationmark.triangle")
@@ -339,17 +386,46 @@ struct DesktopDashboardView: View {
   }
 
   private var allSessions: [AgentSession] {
+    if isDemoMode {
+      return DemoSessionCatalog.sessionsResponse.sessions
+    }
+    return realSessions
+  }
+
+  private var scopedSessions: [AgentSession] {
+    guard isDemoMode, !appState.includeSubdirectories else {
+      return allSessions
+    }
+    return allSessions.filter { $0.cwd == DemoSessionCatalog.defaultProjectPath }
+  }
+
+  private var realSessions: [AgentSession] {
     poller.sessionsResponse?.sessions ?? []
   }
 
+  private var activeAgents: [AgentGroup] {
+    if isDemoMode {
+      return agentGroups(for: scopedSessions)
+    }
+    return poller.sessionsResponse?.agents ?? []
+  }
+
+  private var activeActionsResponse: ActionsResponse? {
+    isDemoMode ? DemoSessionCatalog.actionsResponse : poller.actionsResponse
+  }
+
+  private var activeSearchResponse: SearchResponse? {
+    isDemoMode ? demoSearchResponse : poller.searchResponse
+  }
+
   private var visibleSessions: [AgentSession] {
-    if isSearchActive, let searchResponse = poller.searchResponse {
+    if isSearchActive, let searchResponse = activeSearchResponse {
       return searchResponse.results.map(\.agentSession)
     }
 
     let agentFiltered = appState.selectedAgent == "all"
-      ? allSessions
-      : allSessions.filter { $0.agent == appState.selectedAgent }
+      ? scopedSessions
+      : scopedSessions.filter { $0.agent == appState.selectedAgent }
 
     let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedSearch.isEmpty else {
@@ -388,7 +464,7 @@ struct DesktopDashboardView: View {
 
   private var searchMatches: [String: SearchMatch] {
     Dictionary(
-      uniqueKeysWithValues: poller.searchResponse?.results.compactMap { result in
+      uniqueKeysWithValues: activeSearchResponse?.results.compactMap { result in
         guard let match = result.match else {
           return nil
         }
@@ -399,7 +475,7 @@ struct DesktopDashboardView: View {
 
   private var actionsBySession: [String: [KageAction]] {
     Dictionary(
-      grouping: poller.actionsResponse?.actions.filter { $0.sessionId != nil } ?? [],
+      grouping: activeActionsResponse?.actions.filter { $0.sessionId != nil } ?? [],
       by: { action in action.sessionPath ?? "\(action.agent):\(action.sessionId ?? "")" }
     )
   }
@@ -412,6 +488,10 @@ struct DesktopDashboardView: View {
       return "No Sessions Found"
     }
     return "No Session Selected"
+  }
+
+  private var emptyStateIconName: String {
+    isSearchActive ? "magnifyingglass" : "rectangle.stack"
   }
 
   private var emptyStateDescription: String {
@@ -452,7 +532,18 @@ struct DesktopDashboardView: View {
     searchTask?.cancel()
     let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedQuery.isEmpty else {
+      demoSearchResponse = nil
       poller.clearSearch()
+      ensureSelection()
+      return
+    }
+
+    if isDemoMode {
+      demoSearchResponse = DemoSessionCatalog.searchResponse(
+        query: trimmedQuery,
+        selectedAgent: appState.selectedAgent,
+        includeSubdirectories: appState.includeSubdirectories
+      )
       ensureSelection()
       return
     }
@@ -469,6 +560,19 @@ struct DesktopDashboardView: View {
 
   private func searchNow(_ query: String) {
     searchTask?.cancel()
+    if isDemoMode {
+      let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+      demoSearchResponse = trimmedQuery.isEmpty
+        ? nil
+        : DemoSessionCatalog.searchResponse(
+          query: trimmedQuery,
+          selectedAgent: appState.selectedAgent,
+          includeSubdirectories: appState.includeSubdirectories
+        )
+      ensureSelection()
+      return
+    }
+
     Task {
       await poller.search(query: query, appState: appState)
       ensureSelection()
@@ -476,6 +580,11 @@ struct DesktopDashboardView: View {
   }
 
   private func refresh() {
+    if isDemoMode {
+      stopDemoMode()
+      return
+    }
+
     Task {
       await poller.refresh(appState: appState, notifications: notifications)
       if isSearchActive {
@@ -485,6 +594,11 @@ struct DesktopDashboardView: View {
   }
 
   private func runAction(_ action: KageAction) {
+    if DemoSessionCatalog.isDemoAction(action) {
+      presentDemoAction(action, openTerminal: false)
+      return
+    }
+
     Task {
       await poller.runAction(action, appState: appState, notifications: notifications)
       openReplayStoryIfNeeded(for: action)
@@ -493,6 +607,12 @@ struct DesktopDashboardView: View {
 
   private func runAndOpenAction(_ action: KageAction) {
     autoOpeningActionID = action.id
+    if DemoSessionCatalog.isDemoAction(action) {
+      presentDemoAction(action, openTerminal: true)
+      autoOpeningActionID = nil
+      return
+    }
+
     if action.type == "resume", let command = action.command {
       openTerminal(title: action.label, command: command, sessionPath: action.sessionPath)
       autoOpeningActionID = nil
@@ -514,6 +634,9 @@ struct DesktopDashboardView: View {
     guard let command = result.resumeCommand else {
       return
     }
+    let terminalCommand = DemoSessionCatalog.isDemoPath(result.sessionPath)
+      ? (DemoSessionCatalog.terminalCommand(for: result) ?? command)
+      : command
     let title: String
     if result.action?.type == "bridge" {
       title = "Continue bridged \(agentLabel(result.targetAgent)) session"
@@ -524,8 +647,9 @@ struct DesktopDashboardView: View {
     }
     openTerminal(
       title: title,
-      command: command,
-      sessionPath: result.sessionPath ?? result.outputPath ?? result.paths?.first
+      command: terminalCommand,
+      sessionPath: result.sessionPath ?? result.outputPath ?? result.paths?.first,
+      cwd: DemoSessionCatalog.isDemoPath(result.sessionPath) ? NSHomeDirectory() : nil
     )
   }
 
@@ -546,17 +670,62 @@ struct DesktopDashboardView: View {
     NSWorkspace.shared.open(url)
   }
 
-  private func openTerminal(title: String, command: String, sessionPath: String?) {
+  private func openTerminal(title: String, command: String, sessionPath: String?, cwd: String? = nil) {
     terminalSession = EmbeddedTerminalSession(
       title: title,
       command: command,
-      cwd: selectedSession?.cwd ?? appState.watchedDirectory,
+      cwd: cwd ?? selectedSession?.cwd ?? appState.watchedDirectory,
       sessionPath: sessionPath ?? selectedSession?.path ?? ""
     )
   }
 
+  private func startDemoMode() {
+    isDemoMode = true
+    searchText = ""
+    demoSearchResponse = nil
+    selectedSessionID = DemoSessionCatalog.sessionsResponse.sessions.first.map(sessionKey)
+  }
+
+  private func stopDemoMode() {
+    isDemoMode = false
+  }
+
+  private func presentDemoAction(_ action: KageAction, openTerminal shouldOpenTerminal: Bool) {
+    poller.actionMessage = action.type == "replay"
+      ? "Demo replay would create a local HTML story export from this session."
+      : nil
+    poller.actionResult = DemoSessionCatalog.result(for: action)
+    if shouldOpenTerminal {
+      openTerminal(
+        title: action.label,
+        command: DemoSessionCatalog.terminalCommand(for: action),
+        sessionPath: action.sessionPath,
+        cwd: NSHomeDirectory()
+      )
+    }
+  }
+
   private func primaryResumeAction(for session: AgentSession) -> KageAction? {
     actionsBySession[session.path]?.first { $0.type == "resume" }
+  }
+
+  private func isDemoSession(_ session: AgentSession) -> Bool {
+    DemoSessionCatalog.isDemoPath(session.path)
+  }
+
+  private func agentGroups(for sessions: [AgentSession]) -> [AgentGroup] {
+    let grouped = Dictionary(grouping: sessions, by: \.agent)
+    return ["codex", "claude", "qodercli"].compactMap { agent -> AgentGroup? in
+      guard let sessions = grouped[agent] else {
+        return nil
+      }
+      return AgentGroup(
+        agent: agent,
+        agentLabel: sessions.first?.agentLabel ?? agentLabel(agent),
+        root: "\(DemoSessionCatalog.root)/\(agent)",
+        sessions: sessions.sorted(by: isNewer)
+      )
+    }
   }
 
   private func sessionKey(_ session: AgentSession) -> String {
@@ -777,6 +946,96 @@ private struct AgentCountBadge: View {
   }
 }
 
+private struct DemoModeSidebarBanner: View {
+  let onExit: () -> Void
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "play.rectangle")
+        .foregroundStyle(.blue)
+        .padding(.top, 2)
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Demo Mode")
+          .font(.caption)
+          .fontWeight(.semibold)
+        Text("Sanitized sessions for exploring KAGE without private transcripts.")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      Spacer()
+
+      Button {
+        onExit()
+      } label: {
+        Image(systemName: "xmark.circle.fill")
+          .accessibilityLabel("Exit demo mode")
+      }
+      .buttonStyle(.plain)
+      .foregroundStyle(.secondary)
+    }
+    .padding(10)
+    .background(
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.blue.opacity(0.08))
+    )
+  }
+}
+
+private struct DemoModeNotice: View {
+  var body: some View {
+    HStack(alignment: .center, spacing: 10) {
+      Label("Demo session", systemImage: "play.rectangle")
+        .font(.headline)
+        .foregroundStyle(.blue)
+      Text("Actions are previews only; KAGE will not read or write local transcript files.")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      Spacer()
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.blue.opacity(0.08))
+    )
+  }
+}
+
+private struct DesktopEmptyStateView<Actions: View>: View {
+  let title: String
+  let description: String
+  let iconName: String
+  @ViewBuilder let actions: Actions
+
+  var body: some View {
+    VStack(spacing: 16) {
+      Image(systemName: iconName)
+        .font(.system(size: 32, weight: .regular))
+        .foregroundStyle(.secondary)
+
+      VStack(spacing: 8) {
+        Text(title)
+          .font(.title2)
+          .fontWeight(.semibold)
+        Text(description)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: 560)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      actions
+        .padding(.top, 2)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(32)
+    .background(Color(nsColor: .textBackgroundColor))
+  }
+}
+
 private func agentTint(_ agent: String?) -> Color {
   switch agent {
   case "claude":
@@ -813,6 +1072,7 @@ private struct DesktopSessionDetailView: View {
   let actionMessage: String?
   let primaryResumeAction: KageAction?
   let terminalSession: EmbeddedTerminalSession?
+  let isDemoSession: Bool
   let isOpening: Bool
   let onContinue: (KageAction) -> Void
   let onRunAction: (KageAction) -> Void
@@ -822,6 +1082,10 @@ private struct DesktopSessionDetailView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       header
+
+      if isDemoSession {
+        DemoModeNotice()
+      }
 
       if let actionResult, shouldShowResultCard(actionResult) {
         DesktopActionResultBanner(
@@ -942,6 +1206,7 @@ private struct DesktopSessionDetailView: View {
       DesktopTerminalReadyPanel(
         session: session,
         action: primaryResumeAction,
+        isDemoMode: isDemoSession,
         onContinue: onContinue
       )
     }
@@ -1137,6 +1402,7 @@ private struct DesktopSessionDetailView: View {
 private struct DesktopTerminalReadyPanel: View {
   let session: AgentSession
   let action: KageAction
+  let isDemoMode: Bool
   let onContinue: (KageAction) -> Void
 
   var body: some View {
@@ -1155,7 +1421,9 @@ private struct DesktopTerminalReadyPanel: View {
           Text("Ready to continue")
             .font(.headline)
             .foregroundStyle(.white)
-          Text("KAGE will run this \(session.agentLabel) session inside the embedded terminal.")
+          Text(isDemoMode
+            ? "KAGE will preview this \(session.agentLabel) workflow without touching local transcripts."
+            : "KAGE will run this \(session.agentLabel) session inside the embedded terminal.")
             .font(.callout)
             .foregroundStyle(.white.opacity(0.66))
         }
@@ -1165,7 +1433,7 @@ private struct DesktopTerminalReadyPanel: View {
         Button {
           onContinue(action)
         } label: {
-          Label("Start", systemImage: "play.fill")
+          Label(isDemoMode ? "Preview" : "Start", systemImage: "play.fill")
         }
         .buttonStyle(.borderedProminent)
       }
@@ -1179,7 +1447,7 @@ private struct DesktopTerminalReadyPanel: View {
             .truncationMode(.middle)
             .textSelection(.enabled)
 
-          Text("Terminal output will appear here.")
+          Text(isDemoMode ? "Demo output will appear here." : "Terminal output will appear here.")
             .font(.callout.monospaced())
             .foregroundStyle(.white.opacity(0.45))
         }
@@ -1272,6 +1540,16 @@ private struct DesktopActionResultBanner: View {
   }
 
   private var title: String {
+    if DemoSessionCatalog.isDemoPath(result.sessionPath) {
+      if result.action?.type == "bridge" {
+        return "Demo preview: bridge to \(agentLabel(result.targetAgent))"
+      }
+      if result.action?.type == "fork" {
+        return "Demo preview: fork \(agentLabel(result.targetAgent ?? result.sourceAgent))"
+      }
+      return "Demo preview ready"
+    }
+
     if result.action?.type == "bridge" {
       return "Created \(agentLabel(result.targetAgent)) session"
     }

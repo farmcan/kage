@@ -34,6 +34,8 @@ The main window opens to a session workspace with a sidebar, search, agent
 filters, session details, and per-session continue / fork / bridge / replay story actions. The
 menu bar item remains available for lightweight status checks and quick opens.
 
+If the selected directory has no sessions yet, click `Explore Demo` in the empty state. Demo mode uses built-in sanitized sessions and safe preview actions, so it does not read, write, or upload private transcripts.
+
 Package a local DMG:
 
 ```bash

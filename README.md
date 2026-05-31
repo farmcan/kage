@@ -49,7 +49,7 @@ Latest release: [KAGE v0.1.5](https://github.com/farmcan/kage/releases/tag/v0.1.
 
 ## Try It In 60 Seconds
 
-Before trying it, make sure you already have at least one Claude Code, Codex, or QoderCLI session on this machine. KAGE is most useful after an agent has created local session history.
+Before trying it, KAGE is most useful if you already have at least one Claude Code, Codex, or QoderCLI session on this machine. If you do not, open the desktop app and click `Explore Demo` to inspect sanitized local sample sessions first.
 
 Download the macOS desktop app:
 

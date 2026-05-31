@@ -6,6 +6,20 @@ public struct SessionsResponse: Decodable, Sendable {
   public let sessions: [AgentSession]
   public let agents: [AgentGroup]
   public let errors: [AgentError]
+
+  public init(
+    mode: String,
+    cwd: String,
+    sessions: [AgentSession],
+    agents: [AgentGroup],
+    errors: [AgentError]
+  ) {
+    self.mode = mode
+    self.cwd = cwd
+    self.sessions = sessions
+    self.agents = agents
+    self.errors = errors
+  }
 }
 
 public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
@@ -56,6 +70,13 @@ public struct AgentGroup: Decodable, Identifiable, Sendable {
   public let root: String
   public let sessions: [AgentSession]
 
+  public init(agent: String, agentLabel: String, root: String, sessions: [AgentSession]) {
+    self.agent = agent
+    self.agentLabel = agentLabel
+    self.root = root
+    self.sessions = sessions
+  }
+
   public var id: String {
     agent
   }
@@ -65,6 +86,12 @@ public struct AgentError: Decodable, Identifiable, Sendable {
   public let agent: String
   public let agentLabel: String?
   public let error: String
+
+  public init(agent: String, agentLabel: String?, error: String) {
+    self.agent = agent
+    self.agentLabel = agentLabel
+    self.error = error
+  }
 
   public var id: String {
     "\(agent):\(error)"
@@ -111,6 +138,13 @@ public struct ActionsResponse: Decodable, Sendable {
   public let cwd: String
   public let actions: [KageAction]
   public let errors: [AgentError]
+
+  public init(mode: String, cwd: String, actions: [KageAction], errors: [AgentError]) {
+    self.mode = mode
+    self.cwd = cwd
+    self.actions = actions
+    self.errors = errors
+  }
 }
 
 public struct SearchResponse: Decodable, Sendable {
@@ -119,6 +153,20 @@ public struct SearchResponse: Decodable, Sendable {
   public let filters: SearchFilters
   public let results: [SearchSessionResult]
   public let agents: [SearchAgentSummary]
+
+  public init(
+    mode: String,
+    query: String?,
+    filters: SearchFilters,
+    results: [SearchSessionResult],
+    agents: [SearchAgentSummary]
+  ) {
+    self.mode = mode
+    self.query = query
+    self.filters = filters
+    self.results = results
+    self.agents = agents
+  }
 }
 
 public struct SearchFilters: Decodable, Sendable {
@@ -128,6 +176,15 @@ public struct SearchFilters: Decodable, Sendable {
   public let project: String?
   public let includeSubdirs: Bool
   public let limit: Int
+
+  public init(agent: String?, since: String?, until: String?, project: String?, includeSubdirs: Bool, limit: Int) {
+    self.agent = agent
+    self.since = since
+    self.until = until
+    self.project = project
+    self.includeSubdirs = includeSubdirs
+    self.limit = limit
+  }
 }
 
 public struct SearchAgentSummary: Decodable, Identifiable, Sendable {
@@ -135,6 +192,13 @@ public struct SearchAgentSummary: Decodable, Identifiable, Sendable {
   public let root: String
   public let resultCount: Int
   public let error: String?
+
+  public init(agent: String, root: String, resultCount: Int, error: String?) {
+    self.agent = agent
+    self.root = root
+    self.resultCount = resultCount
+    self.error = error
+  }
 
   public var id: String {
     agent
@@ -152,6 +216,30 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
   public let path: String
   public let recentUserMessages: [String]
   public let match: SearchMatch?
+
+  public init(
+    agent: String,
+    agentLabel: String,
+    sessionId: String,
+    title: String,
+    shortTitle: String?,
+    updatedAt: String?,
+    cwd: String,
+    path: String,
+    recentUserMessages: [String],
+    match: SearchMatch?
+  ) {
+    self.agent = agent
+    self.agentLabel = agentLabel
+    self.sessionId = sessionId
+    self.title = title
+    self.shortTitle = shortTitle
+    self.updatedAt = updatedAt
+    self.cwd = cwd
+    self.path = path
+    self.recentUserMessages = recentUserMessages
+    self.match = match
+  }
 
   public var displayTitle: String {
     shortTitle ?? title
@@ -179,6 +267,11 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
 public struct SearchMatch: Decodable, Hashable, Sendable {
   public let field: String
   public let text: String
+
+  public init(field: String, text: String) {
+    self.field = field
+    self.text = text
+  }
 }
 
 public struct KageAction: Decodable, Identifiable, Hashable, Sendable {
@@ -193,6 +286,32 @@ public struct KageAction: Decodable, Identifiable, Hashable, Sendable {
   public let routeAlias: String?
   public let cliArgs: [String]?
   public let isLatest: Bool?
+
+  public init(
+    id: String,
+    type: String,
+    label: String,
+    agent: String,
+    targetAgent: String? = nil,
+    sessionId: String? = nil,
+    sessionPath: String? = nil,
+    command: String? = nil,
+    routeAlias: String? = nil,
+    cliArgs: [String]? = nil,
+    isLatest: Bool? = nil
+  ) {
+    self.id = id
+    self.type = type
+    self.label = label
+    self.agent = agent
+    self.targetAgent = targetAgent
+    self.sessionId = sessionId
+    self.sessionPath = sessionPath
+    self.command = command
+    self.routeAlias = routeAlias
+    self.cliArgs = cliArgs
+    self.isLatest = isLatest
+  }
 }
 
 public struct RunActionResponse: Decodable, Sendable {
@@ -210,4 +329,36 @@ public struct RunActionResponse: Decodable, Sendable {
   public let paths: [String]?
   public let stdout: String?
   public let stderr: String?
+
+  public init(
+    mode: String? = nil,
+    actionId: String? = nil,
+    ok: Bool? = nil,
+    action: KageAction? = nil,
+    sourceAgent: String? = nil,
+    targetAgent: String? = nil,
+    sessionId: String? = nil,
+    sessionPath: String? = nil,
+    resumeCommand: String? = nil,
+    outputPath: String? = nil,
+    sidecarPath: String? = nil,
+    paths: [String]? = nil,
+    stdout: String? = nil,
+    stderr: String? = nil
+  ) {
+    self.mode = mode
+    self.actionId = actionId
+    self.ok = ok
+    self.action = action
+    self.sourceAgent = sourceAgent
+    self.targetAgent = targetAgent
+    self.sessionId = sessionId
+    self.sessionPath = sessionPath
+    self.resumeCommand = resumeCommand
+    self.outputPath = outputPath
+    self.sidecarPath = sidecarPath
+    self.paths = paths
+    self.stdout = stdout
+    self.stderr = stderr
+  }
 }
