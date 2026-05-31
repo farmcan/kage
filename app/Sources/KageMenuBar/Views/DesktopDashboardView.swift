@@ -17,7 +17,7 @@ struct DesktopDashboardView: View {
   var body: some View {
     NavigationSplitView {
       sidebar
-        .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 380)
+        .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
     } detail: {
       detailPane
     }
@@ -102,6 +102,17 @@ struct DesktopDashboardView: View {
       .padding(16)
 
       Divider()
+
+      HStack {
+        Text("Projects")
+          .font(.headline)
+        Spacer()
+        Text("\(sessionGroups.count)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
 
       List(selection: $selectedSessionID) {
         ForEach(sessionGroups) { group in
@@ -454,11 +465,9 @@ private struct DesktopSessionListRow: View {
   let match: SearchMatch?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: 8) {
       HStack {
-        Label(session.agentLabel, systemImage: agentIcon)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        AgentBadge(agent: session.agent, label: session.agentLabel, size: .small)
         Spacer()
         Text(relativeUpdatedAt)
           .font(.caption2)
@@ -483,20 +492,7 @@ private struct DesktopSessionListRow: View {
           .lineLimit(2)
       }
     }
-    .padding(.vertical, 5)
-  }
-
-  private var agentIcon: String {
-    switch session.agent {
-    case "claude":
-      return "sparkles"
-    case "codex":
-      return "terminal"
-    case "qodercli":
-      return "q.square"
-    default:
-      return "cpu"
-    }
+    .padding(.vertical, 8)
   }
 
   private var relativeUpdatedAt: String {
@@ -533,13 +529,26 @@ private struct DirectorySessionGroup: Identifiable {
   var lastUpdated: Date {
     sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
   }
+
+  var agentCounts: [(agent: String, label: String, count: Int)] {
+    let grouped = Dictionary(grouping: sessions, by: \.agent)
+    return grouped.map { agent, sessions in
+      (agent: agent, label: sessions.first?.agentLabel ?? agent, count: sessions.count)
+    }
+    .sorted { lhs, rhs in
+      if lhs.count != rhs.count {
+        return lhs.count > rhs.count
+      }
+      return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+    }
+  }
 }
 
 private struct DirectoryGroupHeader: View {
   let group: DirectorySessionGroup
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 2) {
+    VStack(alignment: .leading, spacing: 7) {
       HStack(spacing: 6) {
         Image(systemName: "folder")
         Text(group.displayName)
@@ -553,9 +562,15 @@ private struct DirectoryGroupHeader: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
+
+      HStack(spacing: 5) {
+        ForEach(group.agentCounts, id: \.agent) { item in
+          AgentCountBadge(agent: item.agent, label: item.label, count: item.count)
+        }
+      }
     }
     .textCase(nil)
-    .padding(.vertical, 3)
+    .padding(.vertical, 6)
   }
 }
 
@@ -581,6 +596,94 @@ private func parseSessionDate(_ value: String?) -> Date? {
 
   formatter.formatOptions = [.withInternetDateTime]
   return formatter.date(from: value)
+}
+
+private enum AgentBadgeSize {
+  case small
+  case regular
+}
+
+private struct AgentBadge: View {
+  let agent: String
+  let label: String
+  var size: AgentBadgeSize = .regular
+
+  var body: some View {
+    HStack(spacing: size == .small ? 4 : 6) {
+      Image(systemName: agentIconName(agent))
+      Text(label)
+        .lineLimit(1)
+    }
+    .font(size == .small ? .caption2 : .caption)
+    .fontWeight(.semibold)
+    .foregroundStyle(agentTint(agent))
+    .padding(.horizontal, size == .small ? 7 : 9)
+    .padding(.vertical, size == .small ? 3 : 5)
+    .background(
+      Capsule()
+        .fill(agentTint(agent).opacity(0.12))
+    )
+  }
+}
+
+private struct AgentCountBadge: View {
+  let agent: String
+  let label: String
+  let count: Int
+
+  var body: some View {
+    HStack(spacing: 4) {
+      Image(systemName: agentIconName(agent))
+      Text(shortAgentLabel(label))
+      Text("\(count)")
+        .foregroundStyle(.secondary)
+    }
+    .font(.caption2)
+    .fontWeight(.medium)
+    .foregroundStyle(agentTint(agent))
+    .padding(.horizontal, 6)
+    .padding(.vertical, 3)
+    .background(
+      Capsule()
+        .fill(agentTint(agent).opacity(0.10))
+    )
+  }
+
+  private func shortAgentLabel(_ label: String) -> String {
+    if label.localizedCaseInsensitiveContains("claude") {
+      return "Claude"
+    }
+    if label.localizedCaseInsensitiveContains("qoder") {
+      return "Qoder"
+    }
+    return label
+  }
+}
+
+private func agentTint(_ agent: String?) -> Color {
+  switch agent {
+  case "claude":
+    return Color(red: 0.55, green: 0.32, blue: 0.83)
+  case "codex":
+    return Color(red: 0.10, green: 0.47, blue: 0.36)
+  case "qodercli":
+    return Color(red: 0.13, green: 0.36, blue: 0.74)
+  default:
+    return .secondary
+  }
+}
+
+private func agentIconName(_ agent: String?) -> String {
+  switch agent {
+  case "claude":
+    return "sparkles"
+  case "codex":
+    return "terminal"
+  case "qodercli":
+    return "q.square"
+  default:
+    return "cpu"
+  }
 }
 
 private struct DesktopSessionDetailView: View {
@@ -630,17 +733,21 @@ private struct DesktopSessionDetailView: View {
       HStack(alignment: .top, spacing: 12) {
         Image(systemName: agentIcon)
           .font(.system(size: 30))
-          .foregroundStyle(.secondary)
-          .frame(width: 44, height: 44)
+          .foregroundStyle(agentTint(session.agent))
+          .frame(width: 52, height: 52)
           .background(
             RoundedRectangle(cornerRadius: 8)
-              .fill(Color.secondary.opacity(0.08))
+              .fill(agentTint(session.agent).opacity(0.11))
           )
 
-        VStack(alignment: .leading, spacing: 5) {
-          Text(session.agentLabel)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 7) {
+          HStack(spacing: 8) {
+            AgentBadge(agent: session.agent, label: session.agentLabel)
+            Label(projectName, systemImage: "folder")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
           Text(session.displayTitle)
             .font(.title2)
             .fontWeight(.semibold)
@@ -651,12 +758,21 @@ private struct DesktopSessionDetailView: View {
         Spacer()
       }
 
-      Text(session.cwd)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .lineLimit(2)
-        .truncationMode(.middle)
-        .textSelection(.enabled)
+      HStack(spacing: 8) {
+        Text(session.cwd)
+          .font(.callout.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+        Spacer()
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 7)
+      .background(
+        RoundedRectangle(cornerRadius: 6)
+          .fill(Color.secondary.opacity(0.07))
+      )
 
       if let primaryResumeAction {
         Button {
@@ -718,7 +834,7 @@ private struct DesktopSessionDetailView: View {
         }
         EmbeddedTerminalView(session: terminalSession)
           .id(terminalSession.id)
-          .frame(minHeight: 360)
+          .frame(height: 620)
           .clipShape(RoundedRectangle(cornerRadius: 8))
           .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -848,16 +964,13 @@ private struct DesktopSessionDetailView: View {
   }
 
   private var agentIcon: String {
-    switch session.agent {
-    case "claude":
-      return "sparkles"
-    case "codex":
-      return "terminal"
-    case "qodercli":
-      return "q.square"
-    default:
-      return "cpu"
-    }
+    agentIconName(session.agent)
+  }
+
+  private var projectName: String {
+    URL(fileURLWithPath: session.cwd).lastPathComponent.isEmpty
+      ? session.cwd
+      : URL(fileURLWithPath: session.cwd).lastPathComponent
   }
 
   private func shouldShowResultCard(_ result: RunActionResponse) -> Bool {
@@ -911,8 +1024,12 @@ private struct DesktopTerminalReadyPanel: View {
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: "terminal")
           .font(.title3)
-          .foregroundStyle(.secondary)
-          .frame(width: 30, height: 30)
+          .foregroundStyle(agentTint(session.agent))
+          .frame(width: 38, height: 38)
+          .background(
+            RoundedRectangle(cornerRadius: 8)
+              .fill(agentTint(session.agent).opacity(0.12))
+          )
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Ready to continue")
@@ -945,11 +1062,11 @@ private struct DesktopTerminalReadyPanel: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 8)
-        .fill(Color.secondary.opacity(0.07))
+        .fill(agentTint(session.agent).opacity(0.06))
     )
     .overlay(
       RoundedRectangle(cornerRadius: 8)
-        .stroke(Color.secondary.opacity(0.14))
+        .stroke(agentTint(session.agent).opacity(0.16))
     )
   }
 }

@@ -84,13 +84,13 @@ final class KageWindowPresenter {
       .environmentObject(model.appState)
       .environmentObject(model.poller)
       .environmentObject(model.notifications)
-      .frame(minWidth: 980, minHeight: 640)
+      .frame(minWidth: 1240, minHeight: 760)
       .task {
         model.poller.start(appState: model.appState, notifications: model.notifications)
       }
 
     let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
+      contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900),
       styleMask: [.titled, .closable, .miniaturizable, .resizable],
       backing: .buffered,
       defer: false
