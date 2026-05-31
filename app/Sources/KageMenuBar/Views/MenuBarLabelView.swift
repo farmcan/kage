@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarLabelView: View {
@@ -8,20 +9,53 @@ struct MenuBarLabelView: View {
       Label {
         Text("\(poller.totalSessions)")
       } icon: {
-        Image(systemName: symbolName)
+        statusIcon
       }
     } else {
-      Image(systemName: symbolName)
+      statusIcon
     }
   }
 
-  private var symbolName: String {
+  @ViewBuilder
+  private var statusIcon: some View {
+    if let symbolName {
+      Image(systemName: symbolName)
+    } else {
+      KageMenuBarIconView()
+    }
+  }
+
+  private var symbolName: String? {
     if poller.errorMessage != nil {
       return "exclamationmark.triangle"
     }
     if poller.doctorResult?.ok == false {
       return "bolt.slash"
     }
-    return "square.stack.3d.up"
+    return nil
   }
+}
+
+private struct KageMenuBarIconView: View {
+  var body: some View {
+    if let image = Self.templateImage {
+      Image(nsImage: image)
+        .renderingMode(.template)
+    } else {
+      Image(systemName: "square.stack.3d.up")
+    }
+  }
+
+  private static let templateImage: NSImage? = {
+    guard
+      let url = Bundle.main.url(forResource: "MenuBarIconTemplate", withExtension: "png"),
+      let image = NSImage(contentsOf: url)
+    else {
+      return nil
+    }
+
+    image.isTemplate = true
+    image.size = NSSize(width: 18, height: 18)
+    return image
+  }()
 }

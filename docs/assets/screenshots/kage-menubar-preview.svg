@@ -4,8 +4,10 @@
   <text x="22" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#2a2a2a">Finder</text>
   <text x="790" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#2a2a2a">Sun 5:31 PM</text>
   <rect x="704" y="7" width="68" height="26" rx="13" fill="#e6e3dc"/>
-  <path d="M722 14h14v14h-14z" stroke="#2f2f2f" stroke-width="1.7" fill="none"/>
-  <path d="M728 11h14v14h-14z" stroke="#2f2f2f" stroke-width="1.7" fill="none"/>
+  <g transform="translate(713 9) scale(0.34)">
+    <path fill="#2f2f2f" fill-rule="evenodd" d="M19 10h26c5 0 9 4 9 9v26c0 5-4 9-9 9H19c-5 0-9-4-9-9V19c0-5 4-9 9-9Zm2 8c-2 0-3 1-3 3v22c0 2 1 3 3 3h22c2 0 3-1 3-3V21c0-2-1-3-3-3H21Zm4 10c-2-2-2-5 0-7 2-1 4-1 6 0l10 9c1 1 2 3 2 5s-1 4-2 5L31 49c-2 1-4 1-6 0-2-2-2-5 0-7l7-7-7-7Z"/>
+    <rect x="35" y="42" width="13" height="6" rx="3" fill="#2f2f2f"/>
+  </g>
   <text x="748" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#2a2a2a">5</text>
 
   <path d="M738 40l-12 16h24l-12-16z" fill="#fbfaf7"/>
@@ -45,7 +47,7 @@
 
   <line x1="548" y1="526" x2="902" y2="526" stroke="#dedbd2"/>
   <text x="548" y="552" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#77736c">~/wrksp/demo-app</text>
-  <text x="828" y="552" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#2e6f5c">KAGE 0.1.0</text>
+  <text x="828" y="552" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#2e6f5c">KAGE 0.1.4</text>
 
   <text x="70" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="38" font-weight="800" fill="#252525">Menu bar control</text>
   <text x="70" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#5d5a55">KAGE stays close in the macOS status bar.</text>

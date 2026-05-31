@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.4 adds a real macOS app icon, a KAGE menu bar template icon, replay story open controls, and clearer empty search recovery actions.
+- KAGE v0.1.4 增加正式 macOS App 图标、KAGE 状态栏 template 图标、replay story 打开控件，以及更清楚的搜索空状态恢复操作。
+
 - KAGE v0.1.3 ignores Claude `subagents/` transcript files during session discovery so it does not generate unusable resume actions for sub-agent folders.
 - KAGE v0.1.3 在 session 发现阶段忽略 Claude `subagents/` transcript 文件，避免为子代理目录生成无法恢复的 resume 操作。
 

@@ -11,6 +11,8 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 CLI_BUNDLE_DIR="$RESOURCES_DIR/kage-cli"
 CLI_LAUNCHER="$RESOURCES_DIR/kage"
+ICON_NAME="AppIcon"
+RESOURCE_SOURCE_DIR="$SCRIPT_DIR/Resources"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PACKAGE_VERSION="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$REPO_ROOT/package.json" | head -n 1)"
 VERSION="${KAGE_APP_VERSION:-$PACKAGE_VERSION}"
@@ -21,6 +23,9 @@ swift build -c release
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$CLI_BUNDLE_DIR"
 cp "$BUILD_DIR/$EXECUTABLE_NAME" "$MACOS_DIR/$EXECUTABLE_NAME"
+if [[ -d "$RESOURCE_SOURCE_DIR" ]]; then
+  find "$RESOURCE_SOURCE_DIR" -maxdepth 1 -type f -exec cp {} "$RESOURCES_DIR/" \;
+fi
 cp -R "$REPO_ROOT/src" "$CLI_BUNDLE_DIR/src"
 cp "$REPO_ROOT/package.json" "$CLI_BUNDLE_DIR/package.json"
 cp "$REPO_ROOT/README.md" "$CLI_BUNDLE_DIR/README.md"
@@ -45,6 +50,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>kage-menubar</string>
   <key>CFBundleIdentifier</key>
   <string>dev.farmcan.kage.menubar</string>
+  <key>CFBundleIconFile</key>
+  <string>$ICON_NAME</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
