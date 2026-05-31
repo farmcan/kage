@@ -2,8 +2,8 @@
 
 ## Unreleased / 未发布
 
-- Desktop adds an opt-in demo mode with sanitized Codex, Claude Code, and QoderCLI sessions so first-time users can explore KAGE before they have local agent history.
-- 桌面端增加显式开启的 demo mode，内置脱敏的 Codex、Claude Code 和 QoderCLI sessions，让首次用户在没有本地 agent 历史时也能先体验 KAGE。
+- KAGE v0.1.6 adds an opt-in desktop demo mode with sanitized Codex, Claude Code, and QoderCLI sessions so first-time users can explore KAGE before they have local agent history.
+- KAGE v0.1.6 增加显式开启的桌面 demo mode，内置脱敏的 Codex、Claude Code 和 QoderCLI sessions，让首次用户在没有本地 agent 历史时也能先体验 KAGE。
 
 - KAGE v0.1.5 adds a launch-ready demo flow asset and clearer first-run empty states for users who have not created matching local agent sessions yet.
 - KAGE v0.1.5 增加可用于发布传播的 demo flow 视觉资产，并优化首次使用时没有匹配本地 agent session 的空状态。

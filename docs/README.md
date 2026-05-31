@@ -11,6 +11,7 @@ This directory keeps current product, growth, release, and future architecture d
 - [GitHub presence guide](github-presence-guide.md)
 - [Five-round user churn audit](user-churn-audit-2026-05-31.md)
 - [Release and launch checklist](release-launch-checklist.md)
+- [v0.1.6 release notes](release-notes/v0.1.6.md)
 - [v0.1.5 release notes](release-notes/v0.1.5.md)
 - [v0.1.4 release notes](release-notes/v0.1.4.md)
 - [v0.1.3 release notes](release-notes/v0.1.3.md)
