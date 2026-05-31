@@ -47,7 +47,7 @@ Experimental native macOS desktop app source lives in [app](app/). It includes a
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.2/KAGE-0.1.2.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.3/KAGE-0.1.3.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -154,10 +154,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.2 DMG from GitHub Releases:
+Download the v0.1.3 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.2/KAGE-0.1.2.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.3/KAGE-0.1.3.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
