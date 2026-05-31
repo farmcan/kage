@@ -1,6 +1,6 @@
 {
   "name": "kage",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Local-first desktop and CLI session manager for Claude Code, Codex, and QoderCLI.",
   "type": "module",
   "main": "./src/index.js",

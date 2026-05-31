@@ -2,8 +2,8 @@
 
 ## Unreleased / 未发布
 
-- Added a launch-ready demo flow asset and clearer first-run empty states for users who have not created matching local agent sessions yet.
-- 增加可用于发布传播的 demo flow 视觉资产，并优化首次使用时没有匹配本地 agent session 的空状态。
+- KAGE v0.1.5 adds a launch-ready demo flow asset and clearer first-run empty states for users who have not created matching local agent sessions yet.
+- KAGE v0.1.5 增加可用于发布传播的 demo flow 视觉资产，并优化首次使用时没有匹配本地 agent session 的空状态。
 
 - Added `package-lock.json` so GitHub Actions npm caching has the lockfile that `actions/setup-node` expects.
 - 增加 `package-lock.json`，让 GitHub Actions 的 npm cache 配置能找到 `actions/setup-node` 所需的 lockfile。
