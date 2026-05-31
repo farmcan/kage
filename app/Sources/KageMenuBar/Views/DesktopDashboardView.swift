@@ -14,6 +14,8 @@ struct DesktopDashboardView: View {
   @State private var autoOpeningActionID: String?
   @State private var terminalSession: EmbeddedTerminalSession?
   @State private var isDemoMode = false
+  @State private var demoSelectedAgent = "all"
+  @State private var demoIncludeSubdirectories = false
   @State private var demoSearchResponse: SearchResponse?
 
   var body: some View {
@@ -51,7 +53,7 @@ struct DesktopDashboardView: View {
     .onChange(of: searchText) { _, newValue in
       scheduleSearch(newValue)
     }
-    .onChange(of: appState.selectedAgent) { _, _ in
+    .onChange(of: activeSelectedAgent) { _, _ in
       if isSearchActive {
         searchNow(searchText)
       }
@@ -62,7 +64,8 @@ struct DesktopDashboardView: View {
       poller.clearActionResult()
       poller.actionMessage = nil
       if enabled {
-        appState.selectedAgent = "all"
+        demoSelectedAgent = "all"
+        demoIncludeSubdirectories = false
       } else {
         selectedSessionID = nil
         refresh()
@@ -99,26 +102,13 @@ struct DesktopDashboardView: View {
           }
         }
 
-        AgentTabBar(agents: activeAgents)
+        AgentTabBar(agents: activeAgents, selection: selectedAgentBinding)
 
         searchField
 
         Toggle(
           "Include subdirectories",
-          isOn: Binding(
-            get: { appState.includeSubdirectories },
-            set: { enabled in
-              appState.includeSubdirectories = enabled
-              if isDemoMode {
-                if isSearchActive {
-                  searchNow(searchText)
-                }
-                ensureSelection()
-              } else {
-                refresh()
-              }
-            }
-          )
+          isOn: includeSubdirectoriesBinding
         )
         .toggleStyle(.checkbox)
         .font(.caption)
@@ -203,7 +193,7 @@ struct DesktopDashboardView: View {
         session: session,
         match: searchMatches[session.path],
         actions: actionsBySession[session.path] ?? [],
-        actionResult: poller.actionResult,
+        actionResult: actionResult(for: session),
         actionMessage: poller.actionMessage,
         primaryResumeAction: primaryResumeAction(for: session),
         terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
@@ -231,9 +221,9 @@ struct DesktopDashboardView: View {
   private var emptyStateActions: some View {
     if isSearchActive {
       HStack(spacing: 10) {
-        if appState.selectedAgent != "all" {
+        if activeSelectedAgent != "all" {
           Button {
-            appState.selectedAgent = "all"
+            selectedAgentBinding.wrappedValue = "all"
             searchNow(searchText)
           } label: {
             Label("Try All Agents", systemImage: "person.3")
@@ -263,14 +253,9 @@ struct DesktopDashboardView: View {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
 
-        if !appState.includeSubdirectories {
+        if !activeIncludeSubdirectories {
           Button {
-            appState.includeSubdirectories = true
-            if isDemoMode {
-              ensureSelection()
-            } else {
-              refresh()
-            }
+            includeSubdirectoriesBinding.wrappedValue = true
           } label: {
             Label("Include Subdirs", systemImage: "folder.badge.plus")
           }
@@ -359,7 +344,7 @@ struct DesktopDashboardView: View {
       .font(.caption)
       .foregroundStyle(.secondary)
 
-      if let errorMessage = poller.errorMessage {
+      if !isDemoMode, let errorMessage = poller.errorMessage {
         Label(errorMessage, systemImage: "exclamationmark.triangle")
           .font(.caption)
           .foregroundStyle(.orange)
@@ -393,7 +378,7 @@ struct DesktopDashboardView: View {
   }
 
   private var scopedSessions: [AgentSession] {
-    guard isDemoMode, !appState.includeSubdirectories else {
+    guard isDemoMode, !activeIncludeSubdirectories else {
       return allSessions
     }
     return allSessions.filter { $0.cwd == DemoSessionCatalog.defaultProjectPath }
@@ -418,14 +403,58 @@ struct DesktopDashboardView: View {
     isDemoMode ? demoSearchResponse : poller.searchResponse
   }
 
+  private var activeSelectedAgent: String {
+    isDemoMode ? demoSelectedAgent : appState.selectedAgent
+  }
+
+  private var activeIncludeSubdirectories: Bool {
+    isDemoMode ? demoIncludeSubdirectories : appState.includeSubdirectories
+  }
+
+  private var selectedAgentBinding: Binding<String> {
+    Binding(
+      get: {
+        activeSelectedAgent
+      },
+      set: { value in
+        if isDemoMode {
+          demoSelectedAgent = value
+        } else {
+          appState.selectedAgent = value
+        }
+      }
+    )
+  }
+
+  private var includeSubdirectoriesBinding: Binding<Bool> {
+    Binding(
+      get: {
+        activeIncludeSubdirectories
+      },
+      set: { enabled in
+        if isDemoMode {
+          demoIncludeSubdirectories = enabled
+          ensureDemoAgentIsVisible()
+          if isSearchActive {
+            searchNow(searchText)
+          }
+          ensureSelection()
+        } else {
+          appState.includeSubdirectories = enabled
+          refresh()
+        }
+      }
+    )
+  }
+
   private var visibleSessions: [AgentSession] {
     if isSearchActive, let searchResponse = activeSearchResponse {
       return searchResponse.results.map(\.agentSession)
     }
 
-    let agentFiltered = appState.selectedAgent == "all"
+    let agentFiltered = activeSelectedAgent == "all"
       ? scopedSessions
-      : scopedSessions.filter { $0.agent == appState.selectedAgent }
+      : scopedSessions.filter { $0.agent == activeSelectedAgent }
 
     let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedSearch.isEmpty else {
@@ -507,11 +536,16 @@ struct DesktopDashboardView: View {
   }
 
   private var activeAgentScopeLabel: String {
-    appState.selectedAgent == "all" ? "AI coding" : agentLabel(appState.selectedAgent)
+    activeSelectedAgent == "all" ? "AI coding" : agentLabel(activeSelectedAgent)
   }
 
   private var directoryScopeLabel: String {
-    appState.includeSubdirectories
+    if isDemoMode {
+      return activeIncludeSubdirectories
+        ? "\(DemoSessionCatalog.displayRoot) and subdirectories"
+        : DemoSessionCatalog.defaultProjectPath
+    }
+    return activeIncludeSubdirectories
       ? "\(appState.watchedDirectory) and subdirectories"
       : appState.watchedDirectory
   }
@@ -541,8 +575,8 @@ struct DesktopDashboardView: View {
     if isDemoMode {
       demoSearchResponse = DemoSessionCatalog.searchResponse(
         query: trimmedQuery,
-        selectedAgent: appState.selectedAgent,
-        includeSubdirectories: appState.includeSubdirectories
+        selectedAgent: activeSelectedAgent,
+        includeSubdirectories: activeIncludeSubdirectories
       )
       ensureSelection()
       return
@@ -566,8 +600,8 @@ struct DesktopDashboardView: View {
         ? nil
         : DemoSessionCatalog.searchResponse(
           query: trimmedQuery,
-          selectedAgent: appState.selectedAgent,
-          includeSubdirectories: appState.includeSubdirectories
+          selectedAgent: activeSelectedAgent,
+          includeSubdirectories: activeIncludeSubdirectories
         )
       ensureSelection()
       return
@@ -690,6 +724,16 @@ struct DesktopDashboardView: View {
     isDemoMode = false
   }
 
+  private func ensureDemoAgentIsVisible() {
+    guard isDemoMode, demoSelectedAgent != "all" else {
+      return
+    }
+    let visibleAgents = Set(scopedSessions.map(\.agent))
+    if !visibleAgents.contains(demoSelectedAgent) {
+      demoSelectedAgent = "all"
+    }
+  }
+
   private func presentDemoAction(_ action: KageAction, openTerminal shouldOpenTerminal: Bool) {
     poller.actionMessage = action.type == "replay"
       ? "Demo replay would create a local HTML story export from this session."
@@ -707,6 +751,16 @@ struct DesktopDashboardView: View {
 
   private func primaryResumeAction(for session: AgentSession) -> KageAction? {
     actionsBySession[session.path]?.first { $0.type == "resume" }
+  }
+
+  private func actionResult(for session: AgentSession) -> RunActionResponse? {
+    guard let result = poller.actionResult else {
+      return nil
+    }
+    guard let resultSessionPath = result.sessionPath else {
+      return result
+    }
+    return resultSessionPath == session.path ? result : nil
   }
 
   private func isDemoSession(_ session: AgentSession) -> Bool {
