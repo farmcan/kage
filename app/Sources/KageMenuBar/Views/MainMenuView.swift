@@ -176,13 +176,26 @@ struct MainMenuView: View {
   private func runAction(_ action: KageAction) {
     Task {
       await poller.runAction(action, appState: appState, notifications: notifications)
+      openReplayStoryIfNeeded(for: action)
     }
+  }
+
+  private func openReplayStoryIfNeeded(for action: KageAction) {
+    guard action.type == "replay" else {
+      return
+    }
+    guard let path = poller.actionResult?.outputPath ?? poller.actionResult?.paths?.first else {
+      return
+    }
+    NSWorkspace.shared.open(URL(fileURLWithPath: path))
   }
 
   private func actionIcon(_ action: KageAction) -> String {
     switch action.type {
     case "resume":
       return "play.circle"
+    case "fork":
+      return "square.on.square"
     case "bridge":
       return "arrow.left.arrow.right"
     case "replay":
@@ -300,6 +313,12 @@ private struct ActionResultCard: View {
   private var title: String {
     if result.action?.type == "bridge" {
       return "Created \(agentLabel(result.targetAgent)) session"
+    }
+    if result.action?.type == "fork" {
+      return "Created forked \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    }
+    if result.action?.type == "replay" {
+      return "Created replay story"
     }
     if result.action?.type == "resume" {
       return "Ready to resume \(agentLabel(result.targetAgent ?? result.sourceAgent))"

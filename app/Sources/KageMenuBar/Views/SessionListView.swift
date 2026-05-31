@@ -131,8 +131,10 @@ private struct SessionRowView: View {
     switch action.type {
     case "resume":
       return "Resume Session"
+    case "fork":
+      return "Fork as New Session"
     case "replay":
-      return "Replay Session"
+      return "Open Replay Story"
     case "bridge":
       return "Bridge to \(agentLabel(action.targetAgent))"
     default:
@@ -144,6 +146,8 @@ private struct SessionRowView: View {
     switch action.type {
     case "resume":
       return "play.circle"
+    case "fork":
+      return "square.on.square"
     case "bridge":
       return "arrow.left.arrow.right"
     case "replay":

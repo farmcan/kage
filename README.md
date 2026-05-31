@@ -6,7 +6,7 @@
 
 KAGE is a local-first desktop and CLI session manager for AI coding agents.
 
-It finds, searches, forks, replays, and moves coding sessions across `Claude Code`, `Codex`, and `QoderCLI` without asking you to copy-paste transcript context by hand.
+It finds, searches, forks, opens replay stories, and moves coding sessions across `Claude Code`, `Codex`, and `QoderCLI` without asking you to copy-paste transcript context by hand.
 
 > Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
 
@@ -14,6 +14,13 @@ KAGE treats coding-agent sessions as local project assets. It reads sessions for
 
 The CLI command is `kage`.
 The name comes from the "shadow clone" idea: a useful coding agent should be able to fork its current working context into parallel branches instead of forcing every task through one linear loop.
+
+Action language in KAGE is intentionally narrow:
+
+- `Continue` resumes the original session in its native agent.
+- `Fork` creates a new same-agent session from the selected context, so you can branch the work without mutating the original session.
+- `Bridge` converts the session into another agent's native resume format.
+- `Replay story` creates a local, read-only HTML review of what happened in the transcript. It is not a fork.
 
 Homepage: <https://farmcan.github.io/kage/>
 
@@ -40,7 +47,7 @@ Experimental native macOS desktop app source lives in [app](app/). It includes a
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.1/KAGE-0.1.1.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.2/KAGE-0.1.2.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -147,10 +154,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.1 DMG from GitHub Releases:
+Download the v0.1.2 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.1/KAGE-0.1.1.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.2/KAGE-0.1.2.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.

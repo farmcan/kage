@@ -1065,6 +1065,7 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(resumeAction.command, "claude --resume claude-action");
   assert.equal(resumeAction.isLatest, true);
   assert.ok(payload.actions.find((action) => action.id === "resume:claude:claude-older"));
+  assert.ok(payload.actions.find((action) => action.id === "fork:c2c:claude-action"));
   assert.ok(payload.actions.find((action) => action.id === "bridge:c2x:claude-action"));
   assert.ok(payload.actions.find((action) => action.id === "bridge:c2q:claude-action"));
   assert.equal(payload.actions.find((action) => action.id === "bridge:c2x:claude-older").isLatest, false);
@@ -1096,6 +1097,20 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.match(bridgePayload.outputPath, /rollout-claude-action\.jsonl$/);
   assert.ok(Array.isArray(bridgePayload.paths));
   assert.equal(bridgePayload.result.resumeCommand, "codex resume claude-action");
+
+  const forkAction = payload.actions.find((action) => action.id === "fork:c2c:claude-action");
+  const forkResult = await spawnCli(["run-action", forkAction.id, "--agent", "claude", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const forkPayload = JSON.parse(forkResult.stdout);
+
+  assert.equal(forkResult.code, 0);
+  assert.equal(forkPayload.mode, "run-action");
+  assert.equal(forkPayload.action.type, "fork");
+  assert.equal(forkPayload.targetAgent, "claude");
+  assert.match(forkPayload.resumeCommand, /^claude --resume [0-9a-f-]{36}$/u);
+  assert.match(forkPayload.outputPath, /\.claude\/projects\/.*\/[0-9a-f-]{36}\.jsonl$/u);
 });
 
 test("cli shows the selected session card when only one match exists", async () => {

@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Desktop v0.1.2 makes Fork a first-class action and renames Replay to Replay story so it is clear that replay is read-only review, not session branching.
+- Desktop v0.1.2 将 Fork 提升为独立操作，并把 Replay 改成 Replay story，明确 replay 是只读回放，不是 session 分身。
+
 - Desktop v0.1.1 expands the KAGE workspace, makes the terminal the primary surface, and moves Bridge / Replay into an Actions menu.
 - Desktop v0.1.1 放大 KAGE 工作区，让 terminal 成为主界面，并把 Bridge / Replay 收进 Actions 菜单。
 

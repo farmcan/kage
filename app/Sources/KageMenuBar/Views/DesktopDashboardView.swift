@@ -393,6 +393,7 @@ struct DesktopDashboardView: View {
   private func runAction(_ action: KageAction) {
     Task {
       await poller.runAction(action, appState: appState, notifications: notifications)
+      openReplayStoryIfNeeded(for: action)
     }
   }
 
@@ -419,14 +420,29 @@ struct DesktopDashboardView: View {
     guard let command = result.resumeCommand else {
       return
     }
-    let title = result.action?.type == "bridge"
-      ? "Continue bridged \(agentLabel(result.targetAgent)) session"
-      : "Continue \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    let title: String
+    if result.action?.type == "bridge" {
+      title = "Continue bridged \(agentLabel(result.targetAgent)) session"
+    } else if result.action?.type == "fork" {
+      title = "Continue forked \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    } else {
+      title = "Continue \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    }
     openTerminal(
       title: title,
       command: command,
       sessionPath: result.sessionPath ?? result.outputPath ?? result.paths?.first
     )
+  }
+
+  private func openReplayStoryIfNeeded(for action: KageAction) {
+    guard action.type == "replay" else {
+      return
+    }
+    guard let path = poller.actionResult?.outputPath ?? poller.actionResult?.paths?.first else {
+      return
+    }
+    NSWorkspace.shared.open(URL(fileURLWithPath: path))
   }
 
   private func openTerminal(title: String, command: String, sessionPath: String?) {
@@ -976,11 +992,14 @@ private struct DesktopSessionDetailView: View {
   }
 
   private func actionLabel(_ action: KageAction) -> String {
+    if action.type == "fork" {
+      return "Fork as new session"
+    }
     if action.type == "bridge" {
       return "Bridge to \(agentLabel(action.targetAgent))"
     }
     if action.type == "replay" {
-      return "Replay session"
+      return "Open replay story"
     }
     return action.label
   }
@@ -989,6 +1008,8 @@ private struct DesktopSessionDetailView: View {
     switch action.type {
     case "resume":
       return "play.circle"
+    case "fork":
+      return "square.on.square"
     case "bridge":
       return "arrow.left.arrow.right"
     case "replay":
@@ -1144,6 +1165,12 @@ private struct DesktopActionResultBanner: View {
   private var title: String {
     if result.action?.type == "bridge" {
       return "Created \(agentLabel(result.targetAgent)) session"
+    }
+    if result.action?.type == "fork" {
+      return "Created forked \(agentLabel(result.targetAgent ?? result.sourceAgent)) session"
+    }
+    if result.action?.type == "replay" {
+      return "Created replay story"
     }
     if result.action?.type == "resume" {
       return "Ready to resume \(agentLabel(result.targetAgent ?? result.sourceAgent))"

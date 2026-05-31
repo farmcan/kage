@@ -1177,13 +1177,29 @@ function buildActionList(inventory) {
         isLatest,
       });
 
+      const forkAlias = routeAliasBetweenAgents(session.agent, session.agent);
+      actions.push({
+        id: `fork:${forkAlias}:${session.sessionId}`,
+        type: "fork",
+        label: isLatest
+          ? `Fork latest ${formatSessionLabel(session.agent)} session into a new session`
+          : `Fork ${formatSessionLabel(session.agent)} session into a new session: ${sessionTitle}`,
+        agent: session.agent,
+        targetAgent: session.agent,
+        sessionId: session.sessionId,
+        sessionPath: session.path,
+        routeAlias: forkAlias,
+        cliArgs: [forkAlias, "--session", session.path],
+        isLatest,
+      });
+
       const replayAlias = routeAliasForAgent(session.agent, "v");
       actions.push({
         id: `replay:${replayAlias}:${session.sessionId}`,
         type: "replay",
         label: isLatest
-          ? `Replay latest ${formatSessionLabel(session.agent)} session`
-          : `Replay ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
+          ? `Open replay story for latest ${formatSessionLabel(session.agent)} session`
+          : `Open replay story for ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
         agent: session.agent,
         sessionId: session.sessionId,
         sessionPath: session.path,

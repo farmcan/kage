@@ -99,6 +99,18 @@ do {
           "isLatest": true
         },
         {
+          "id": "fork:x2x:session-1",
+          "type": "fork",
+          "label": "Fork latest Codex session into a new session",
+          "agent": "codex",
+          "targetAgent": "codex",
+          "sessionId": "session-1",
+          "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
+          "routeAlias": "x2x",
+          "cliArgs": ["x2x", "--session", "/Users/test/.codex/sessions/session-1.jsonl"],
+          "isLatest": true
+        },
+        {
           "id": "bridge:x2c:session-1",
           "type": "bridge",
           "label": "Bridge latest Codex session to Claude Code",
@@ -115,9 +127,10 @@ do {
     }
     """
   )
-  try require(actions.actions.count == 2, "actions should decode")
+  try require(actions.actions.count == 3, "actions should decode")
   try require(actions.actions[0].command == "codex resume session-1", "resume command should decode")
-  try require(actions.actions[1].targetAgent == "claude", "bridge target should decode")
+  try require(actions.actions[1].targetAgent == "codex", "fork target should decode")
+  try require(actions.actions[2].targetAgent == "claude", "bridge target should decode")
   try require(actions.actions[0].isLatest == true, "latest marker should decode")
 
   let search = try decode(
