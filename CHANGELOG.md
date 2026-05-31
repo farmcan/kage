@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Added `package-lock.json` so GitHub Actions npm caching has the lockfile that `actions/setup-node` expects.
+- 增加 `package-lock.json`，让 GitHub Actions 的 npm cache 配置能找到 `actions/setup-node` 所需的 lockfile。
+
 - Refined the GitHub landing path with a five-round user churn audit, clearer README fit checks, and stronger homepage install/star CTAs.
 - 通过五轮用户流失审计、README 适用性判断，以及更明确的主页安装/Star 入口，优化 GitHub 转化路径。
 
