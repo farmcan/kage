@@ -92,11 +92,11 @@ What to maintain:
 
 ## Priority Fixes
 
-1. Signed and notarized DMG.
-2. Real demo GIF: open app, search transcript, select session, bridge, show resume command.
+1. Signed and notarized DMG. Tracked in [#34](https://github.com/farmcan/kage/issues/34).
+2. Real demo GIF: open app, search transcript, select session, bridge, show resume command. A static demo flow asset now exists at `docs/assets/screenshots/kage-demo-flow.svg`; the next step is a recorded GIF from the real app, tracked in [#36](https://github.com/farmcan/kage/issues/36).
 3. README first-screen conversion: product promise, screenshot, fast install, local-first trust.
 4. Homepage CTAs: direct DMG download, GitHub star, CLI install.
-5. First-run empty state and sample workflow for users who have not created agent sessions yet.
+5. First-run empty state and sample workflow for users who have not created agent sessions yet. The desktop empty state now explains the no-session case and offers refresh, include-subdirs, directory selection, and getting-started actions; sanitized demo sessions are tracked in [#37](https://github.com/farmcan/kage/issues/37).
 
 ## Maintenance Rhythm
 

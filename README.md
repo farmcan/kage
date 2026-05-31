@@ -41,6 +41,8 @@ Latest release: [KAGE v0.1.4](https://github.com/farmcan/kage/releases/tag/v0.1.
 
 ## Screenshots
 
+![KAGE search to bridge flow](docs/assets/screenshots/kage-demo-flow.svg)
+
 ![KAGE desktop preview](docs/assets/screenshots/kage-desktop-preview.svg)
 
 ![KAGE menu bar preview](docs/assets/screenshots/kage-menubar-preview.svg)

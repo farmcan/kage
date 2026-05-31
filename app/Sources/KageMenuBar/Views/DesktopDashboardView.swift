@@ -224,6 +224,37 @@ struct DesktopDashboardView: View {
         }
       }
       .controlSize(.large)
+    } else if visibleSessions.isEmpty {
+      HStack(spacing: 10) {
+        Button {
+          refresh()
+        } label: {
+          Label("Refresh", systemImage: "arrow.clockwise")
+        }
+
+        if !appState.includeSubdirectories {
+          Button {
+            appState.includeSubdirectories = true
+            refresh()
+          } label: {
+            Label("Include Subdirs", systemImage: "folder.badge.plus")
+          }
+        }
+
+        Button {
+          appState.chooseWatchedDirectory()
+          refresh()
+        } label: {
+          Label("Change Directory", systemImage: "folder")
+        }
+
+        Button {
+          openGettingStarted()
+        } label: {
+          Label("Getting Started", systemImage: "questionmark.circle")
+        }
+      }
+      .controlSize(.large)
     }
   }
 
@@ -377,6 +408,9 @@ struct DesktopDashboardView: View {
     if isSearchActive {
       return "No Search Results"
     }
+    if visibleSessions.isEmpty {
+      return "No Sessions Found"
+    }
     return "No Session Selected"
   }
 
@@ -386,7 +420,7 @@ struct DesktopDashboardView: View {
     }
 
     if visibleSessions.isEmpty {
-      return "No \(activeAgentScopeLabel) sessions found in \(directoryScopeLabel)."
+      return "No \(activeAgentScopeLabel) sessions found in \(directoryScopeLabel). Start or resume Codex, Claude Code, or QoderCLI in this project, enable subdirectories, or choose another directory."
     }
 
     return "Choose a session from the sidebar."
@@ -503,6 +537,13 @@ struct DesktopDashboardView: View {
       return
     }
     FileLauncher.open(path: path)
+  }
+
+  private func openGettingStarted() {
+    guard let url = URL(string: "https://github.com/farmcan/kage#try-it-in-60-seconds") else {
+      return
+    }
+    NSWorkspace.shared.open(url)
   }
 
   private func openTerminal(title: String, command: String, sessionPath: String?) {

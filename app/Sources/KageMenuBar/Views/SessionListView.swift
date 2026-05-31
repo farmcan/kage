@@ -11,10 +11,11 @@ struct SessionListView: View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 8) {
         if sessions.isEmpty {
-          Text("No sessions for this directory.")
+          Text("No sessions for this directory yet.\nOpen KAGE to choose another project, enable subdirectories, or run an agent in this folder.")
             .font(.callout)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 24)
         } else {
           ForEach(sessions) { session in
