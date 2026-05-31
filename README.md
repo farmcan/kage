@@ -29,7 +29,11 @@ Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.
 
 Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
 
+## Screenshots
+
 ![KAGE desktop preview](docs/assets/screenshots/kage-desktop-preview.svg)
+
+![KAGE menu bar preview](docs/assets/screenshots/kage-menubar-preview.svg)
 
 ## Try It In 60 Seconds
 
