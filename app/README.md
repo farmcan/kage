@@ -13,6 +13,14 @@ The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, 
 
 ## Build
 
+Download the latest unsigned DMG:
+
+```text
+https://github.com/farmcan/kage/releases/download/v0.1.0/KAGE-0.1.0.dmg
+```
+
+If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
+
 From the repository root:
 
 ```bash

@@ -33,6 +33,14 @@ Experimental native macOS desktop app source lives in [app](app/). It includes a
 
 ## Try It In 60 Seconds
 
+Download the macOS desktop app:
+
+```text
+https://github.com/farmcan/kage/releases/download/v0.1.0/KAGE-0.1.0.dmg
+```
+
+The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
+
 Install the CLI:
 
 ```bash
@@ -53,7 +61,7 @@ Bridge a useful session:
 kage c2x
 ```
 
-Build and open the experimental macOS desktop app from a local checkout:
+Build and open the macOS desktop app from a local checkout:
 
 ```bash
 swift build --package-path app
@@ -133,6 +141,18 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ## Install
 
+### macOS Desktop App
+
+Download the v0.1.0 DMG from GitHub Releases:
+
+```text
+https://github.com/farmcan/kage/releases/download/v0.1.0/KAGE-0.1.0.dmg
+```
+
+The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
+
+### CLI
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash
 ```
@@ -146,7 +166,7 @@ kage update
 
 To upgrade a previous install from this script, run the same install command again. The installer removes the old `agent-session-bridge` global package if it is present, then reinstalls KAGE from the latest `main` tarball.
 
-For local development:
+### Local Development
 
 ```bash
 npm install
