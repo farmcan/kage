@@ -9,6 +9,7 @@ This directory keeps current product, growth, release, and future architecture d
 - [Desktop release plan](desktop-release-plan-2026-05-29.md)
 - [Growth plan](growth-plan-2026-05-28.md)
 - [GitHub presence guide](github-presence-guide.md)
+- [Five-round user churn audit](user-churn-audit-2026-05-31.md)
 - [Release and launch checklist](release-launch-checklist.md)
 - [v0.1.4 release notes](release-notes/v0.1.4.md)
 - [v0.1.3 release notes](release-notes/v0.1.3.md)

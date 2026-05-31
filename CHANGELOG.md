@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Refined the GitHub landing path with a five-round user churn audit, clearer README fit checks, and stronger homepage install/star CTAs.
+- 通过五轮用户流失审计、README 适用性判断，以及更明确的主页安装/Star 入口，优化 GitHub 转化路径。
+
 - KAGE v0.1.4 adds a real macOS app icon, a KAGE menu bar template icon, replay story open controls, and clearer empty search recovery actions.
 - KAGE v0.1.4 增加正式 macOS App 图标、KAGE 状态栏 template 图标、replay story 打开控件，以及更清楚的搜索空状态恢复操作。
 

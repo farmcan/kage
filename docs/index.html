@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="KAGE is a local-first desktop and CLI session manager for Claude Code, Codex, and QoderCLI."
+      content="Find, resume, fork, replay, and bridge local AI coding sessions across Claude Code, Codex, and QoderCLI."
     >
     <title>KAGE - AI Coding Session Manager</title>
     <style>
@@ -157,6 +157,23 @@
         margin-top: 34px;
       }
 
+      .hero-proof {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .hero-proof span {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: var(--white);
+      }
+
       .secondary {
         background: transparent;
         color: var(--ink);
@@ -241,6 +258,46 @@
         padding: 76px 0;
       }
 
+      .product-proof {
+        padding-bottom: 76px;
+      }
+
+      .product-proof img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 24px 56px rgba(17, 20, 24, 0.14);
+      }
+
+      .fit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .fit {
+        border-top: 4px solid var(--leaf);
+        background: var(--white);
+        padding: 24px;
+      }
+
+      .fit:nth-child(2) {
+        border-color: var(--red);
+      }
+
+      .fit h2 {
+        margin: 0 0 14px;
+        font-size: 22px;
+      }
+
+      .fit ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
       .matrix {
         display: grid;
         grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1.15fr);
@@ -320,6 +377,7 @@
 
         .hero,
         .matrix,
+        .fit-grid,
         .panel-row,
         .roadmap {
           grid-template-columns: 1fr;
@@ -355,6 +413,7 @@
           <a href="#workflows">Workflows</a>
           <a href="#matrix">Routes</a>
           <a href="#roadmap">Roadmap</a>
+          <a href="https://github.com/farmcan/kage/releases/download/v0.1.4/KAGE-0.1.4.dmg">Download</a>
           <a href="https://github.com/farmcan/kage/releases">Releases</a>
           <a href="https://github.com/farmcan/kage">GitHub</a>
         </div>
@@ -368,12 +427,19 @@
           <h1>KAGE</h1>
           <p class="hero-copy">
             A macOS desktop app and CLI for finding, searching, forking, opening replay stories, and moving
-            local coding-agent sessions across Claude Code, Codex, and QoderCLI.
+            local coding-agent sessions across Claude Code, Codex, and QoderCLI without uploading transcript content.
           </p>
           <div class="actions">
-            <a class="button" href="https://github.com/farmcan/kage#install">Install CLI</a>
+            <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.4/KAGE-0.1.4.dmg">Download DMG</a>
+            <a class="button secondary" href="https://github.com/farmcan/kage">Star on GitHub</a>
+            <a class="button secondary" href="https://github.com/farmcan/kage#install">Install CLI</a>
             <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
-            <a class="button secondary" href="https://github.com/farmcan/kage">View on GitHub</a>
+          </div>
+          <div class="hero-proof" aria-label="Product proof">
+            <span>Local-first</span>
+            <span>Desktop + CLI</span>
+            <span>Claude Code / Codex / QoderCLI</span>
+            <span>Latest: v0.1.4</span>
           </div>
         </div>
         <div class="terminal" aria-label="KAGE terminal demo">
@@ -398,6 +464,10 @@ $ kage x2v
         </div>
       </section>
 
+      <section class="shell product-proof" aria-label="KAGE desktop preview">
+        <img src="./assets/screenshots/kage-desktop-preview.svg" alt="KAGE desktop workspace with project sessions, agent filters, and an embedded terminal">
+      </section>
+
       <section id="workflows" class="shell panel-row" aria-label="Core workflows">
         <article class="panel">
           <h2>Desktop Workspace</h2>
@@ -415,6 +485,27 @@ $ kage x2v
           <h2>Replay Work</h2>
           <p>Turn a transcript into a local story view so a session can be reviewed instead of guessed.</p>
         </article>
+      </section>
+
+      <section class="section" aria-label="Fit check">
+        <div class="shell fit-grid">
+          <article class="fit">
+            <h2>Use KAGE if</h2>
+            <ul>
+              <li>You use more than one AI coding agent.</li>
+              <li>You need to find old local sessions by project or transcript text.</li>
+              <li>You want to fork, bridge, or replay sessions without copy-pasting transcripts.</li>
+            </ul>
+          </article>
+          <article class="fit">
+            <h2>Skip it for now if</h2>
+            <ul>
+              <li>You only use one agent and never revisit old sessions.</li>
+              <li>You need a signed and notarized macOS installer today.</li>
+              <li>You expect hosted sync, team sharing, or mobile control today.</li>
+            </ul>
+          </article>
+        </div>
       </section>
 
       <section id="matrix" class="section">
@@ -449,6 +540,34 @@ $ kage x2v
               <tr>
                 <td><code>kage q2v</code></td>
                 <td>Replay a QoderCLI session as a local HTML story.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell matrix">
+          <div>
+            <h2>Not another agent or terminal</h2>
+            <p>
+              Codex, Claude Code, QoderCLI, Warp, and Terminal still run the work. KAGE manages the local
+              session layer around them: discovery, search, continue, fork, bridge, replay, and cleanup.
+            </p>
+          </div>
+          <table>
+            <tbody>
+              <tr>
+                <td>Native resume</td>
+                <td>Best for one agent's own sessions. KAGE adds cross-agent search and bridge workflows.</td>
+              </tr>
+              <tr>
+                <td>Warp / Terminal</td>
+                <td>Best for running shells. KAGE keeps the memory map of what happened across agents.</td>
+              </tr>
+              <tr>
+                <td>Cloud tools</td>
+                <td>Best for hosted team search. KAGE keeps transcript content local by default.</td>
               </tr>
             </tbody>
           </table>

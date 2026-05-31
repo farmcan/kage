@@ -18,13 +18,21 @@ The README should convert a first-time visitor in this order:
 
 1. One-line category: local-first desktop and CLI session manager.
 2. Pain line: useful agent memory is scattered across local transcripts.
-3. Proof: screenshot or GIF of desktop search and bridge flow.
-4. Fast path: install, doctor, sessions, search, bridge.
-5. Product boundary: local-first, not a terminal or coding agent.
-6. Support matrix: Claude Code, Codex, QoderCLI routes.
-7. Contribution path: issue templates, contributing guide, current docs.
+3. Fit check: who should use KAGE and who should skip it for now.
+4. Proof: screenshot or GIF of desktop search and bridge flow.
+5. Fast path: install, doctor, sessions, search, bridge.
+6. Product boundary: local-first, not a terminal or coding agent.
+7. Support matrix: Claude Code, Codex, QoderCLI routes.
+8. Contribution path: issue templates, contributing guide, current docs.
 
 Keep the top third short. Move deep route tables and implementation details below the quick-start path.
+
+The README should also include a plain comparison against nearby alternatives:
+
+- native Codex / Claude resume pickers
+- Warp or a normal terminal
+- raw transcript scripts
+- hosted knowledge tools
 
 ## GitHub Pages Homepage
 
@@ -99,3 +107,15 @@ After each launch:
 - convert repeated questions into README FAQ entries
 - turn repeated feature requests into labeled issues
 - update the growth plan only when the positioning changes
+
+## Churn Audit
+
+Run a five-round churn audit before public launches:
+
+1. First 10 seconds: can a stranger describe what KAGE does?
+2. Fit check: can they tell whether KAGE is for them?
+3. Install friction: do unsigned app, prerequisites, or empty state risks block them?
+4. First success: is the search -> bridge -> resume workflow obvious?
+5. Star decision: is there enough proof that the project is alive and worth remembering?
+
+Current audit: [Five-round user churn audit](user-churn-audit-2026-05-31.md).

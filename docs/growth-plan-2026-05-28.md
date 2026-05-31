@@ -23,6 +23,8 @@ Stars usually follow a simple chain:
 
 KAGE currently has real technical value, but it needs stronger packaging around that chain.
 
+Current funnel audit: [Five-round user churn audit](user-churn-audit-2026-05-31.md).
+
 ## Audience
 
 Primary audience:
@@ -118,12 +120,15 @@ Do not lead with implementation internals. Lead with the problem:
 
 - README hero screenshot/GIF.
 - "Try it in 60 seconds."
+- "Use KAGE if" and "Skip it for now if" fit checks.
+- Clear comparison against native resume, Warp/Terminal, raw scripts, and cloud tools.
 - Product strategy linked from README.
 - Release checklist and issue templates.
 
 ### Stage 2: Make It Trustworthy
 
 - Unsigned DMG release.
+- Signed and notarized DMG.
 - Clear local-first privacy statement.
 - Transcript search in desktop.
 - Large-session safety states.

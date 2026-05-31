@@ -4,13 +4,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-desktop_app-black.svg)](app/)
 
-KAGE is a local-first desktop and CLI session manager for AI coding agents.
-
-It finds, searches, forks, opens replay stories, and moves coding sessions across `Claude Code`, `Codex`, and `QoderCLI` without asking you to copy-paste transcript context by hand.
+KAGE finds, resumes, forks, replays, and bridges local AI coding sessions across `Claude Code`, `Codex`, and `QoderCLI`.
 
 > Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
 
-KAGE treats coding-agent sessions as local project assets. It reads sessions for the current working directory, normalizes them into one internal model, and can export, preview, replay, or resume them in another agent's native format. The macOS app is a thin native desktop shell over the same JSON CLI contract, so transcript parsing and route logic stay in one place.
+KAGE treats coding-agent sessions as local project assets. It gives you a macOS desktop workspace and a CLI for finding the session where useful work happened, continuing it, branching it, or moving it into another agent's native resume format.
+
+It does not upload transcript content, run its own coding model, or try to replace your terminal. The app is a thin native shell over the same JSON CLI contract, so transcript parsing and route logic stay in one place.
 
 The CLI command is `kage`.
 The name comes from the "shadow clone" idea: a useful coding agent should be able to fork its current working context into parallel branches instead of forcing every task through one linear loop.
@@ -24,17 +24,20 @@ Action language in KAGE is intentionally narrow:
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Product strategy: [KAGE Product Strategy](docs/product-strategy-2026-05-28.md)
+Latest release: [KAGE v0.1.4](https://github.com/farmcan/kage/releases/tag/v0.1.4)
 
-Architecture: [KAGE Architecture Review](docs/architecture-review-2026-05-28.md)
+## Use KAGE If
 
-Growth plan: [KAGE Growth Plan](docs/growth-plan-2026-05-28.md)
+- You use more than one AI coding agent and want context to move with you.
+- You remember a useful plan, bug, or implementation detail, but not which local session contains it.
+- You want transcript search, replay, and cleanup without sending everything to a hosted service.
+- You want a desktop workspace for agent memory, plus scriptable CLI actions for automation.
 
-GitHub presence: [GitHub Presence Guide](docs/github-presence-guide.md)
+## Skip It For Now If
 
-Release checklist: [Release And Launch Checklist](docs/release-launch-checklist.md)
-
-Experimental native macOS desktop app source lives in [app](app/). It includes a main session workspace plus a compact menu bar surface for quick status and actions.
+- You only use one coding agent and never revisit old sessions.
+- You need a signed and notarized macOS installer today. The current DMG is unsigned while [#34](https://github.com/farmcan/kage/issues/34) is open.
+- You expect cloud sync, team sharing, or a mobile companion today. Those are future directions, not shipped product.
 
 ## Screenshots
 
@@ -43,6 +46,8 @@ Experimental native macOS desktop app source lives in [app](app/). It includes a
 ![KAGE menu bar preview](docs/assets/screenshots/kage-menubar-preview.svg)
 
 ## Try It In 60 Seconds
+
+Before trying it, make sure you already have at least one Claude Code, Codex, or QoderCLI session on this machine. KAGE is most useful after an agent has created local session history.
 
 Download the macOS desktop app:
 
@@ -63,6 +68,7 @@ Check what KAGE can see:
 ```bash
 kage doctor
 kage sessions
+kage sessions --include-subdirs
 kage search "auth"
 ```
 
@@ -79,6 +85,15 @@ swift build --package-path app
 (cd app && ./bundle.sh)
 open app/.build/release/KAGE.app
 ```
+
+## How It Differs
+
+| Tool | Best At | Where KAGE Fits |
+|---|---|---|
+| Codex / Claude native resume | Continuing one agent's own sessions | Search, fork, replay, and bridge sessions across multiple agent stores. |
+| Warp or a normal terminal | Running commands and interactive shells | KAGE is the session memory layer; it can launch agents, but it is not trying to be your terminal. |
+| Raw transcript scripts | One-off parsing or export jobs | KAGE keeps a stable CLI JSON contract and a desktop app over the same behavior. |
+| Cloud knowledge tools | Team sync and hosted search | KAGE keeps transcript content local by default. |
 
 ## Why It Exists
 
@@ -538,6 +553,15 @@ The export pipeline can trim or branch a conversation before writing it:
 - `--split-recent N`: keep only the most recent `N` real user turns and everything after them
 - `--fork "..."`: append one new user message before export
 - `--fork-file path.txt`: read that message from a file
+
+## Project Docs
+
+- [Product strategy](docs/product-strategy-2026-05-28.md)
+- [Architecture review](docs/architecture-review-2026-05-28.md)
+- [Growth plan](docs/growth-plan-2026-05-28.md)
+- [GitHub presence guide](docs/github-presence-guide.md)
+- [Five-round user churn audit](docs/user-churn-audit-2026-05-31.md)
+- [Release and launch checklist](docs/release-launch-checklist.md)
 
 ## Current Scope
 
