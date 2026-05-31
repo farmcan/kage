@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Ignore Claude `subagents/` transcript files during session discovery so KAGE does not generate unusable resume actions for sub-agent folders.
+- 在 session 发现阶段忽略 Claude `subagents/` transcript 文件，避免为子代理目录生成无法恢复的 resume 操作。
+
 - Desktop v0.1.2 makes Fork a first-class action and renames Replay to Replay story so it is clear that replay is read-only review, not session branching.
 - Desktop v0.1.2 将 Fork 提升为独立操作，并把 Replay 改成 Replay story，明确 replay 是只读回放，不是 session 分身。
 

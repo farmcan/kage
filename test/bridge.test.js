@@ -1040,7 +1040,9 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   const fakeHome = await makeTempDir("actions-home");
   const currentDir = await makeTempDir("actions-workspace");
   const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
+  const subagentDir = path.join(claudeProject, "sub-parent-session", "subagents");
   await fs.mkdir(claudeProject, { recursive: true });
+  await fs.mkdir(subagentDir, { recursive: true });
   await fs.writeFile(
     path.join(claudeProject, "claude-older.jsonl"),
     `{"type":"user","message":{"role":"user","content":"older bridge candidate"},"timestamp":"2026-05-20T09:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-older"}\n`,
@@ -1049,6 +1051,11 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   await fs.writeFile(
     path.join(claudeProject, "zz-claude-action.jsonl"),
     `{"type":"user","message":{"role":"user","content":"ship the app contract"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-action"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(subagentDir, "agent-a84b9e0573383693e.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"subagent should not resume"},"timestamp":"2026-05-20T11:00:00.000Z","cwd":"${currentDir}","sessionId":"sub-parent-session"}\n`,
     "utf8",
   );
 
@@ -1068,6 +1075,8 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.ok(payload.actions.find((action) => action.id === "fork:c2c:claude-action"));
   assert.ok(payload.actions.find((action) => action.id === "bridge:c2x:claude-action"));
   assert.ok(payload.actions.find((action) => action.id === "bridge:c2q:claude-action"));
+  assert.ok(!payload.actions.find((action) => action.sessionPath?.includes("/subagents/")));
+  assert.ok(!payload.actions.find((action) => action.id === "resume:claude:sub-parent-session"));
   assert.equal(payload.actions.find((action) => action.id === "bridge:c2x:claude-older").isLatest, false);
 
   const runResult = await spawnCli(["run-action", resumeAction.id, "--agent", "claude", "--json"], {

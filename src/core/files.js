@@ -7,6 +7,9 @@ export async function walk(dir) {
     entries.map(async (entry) => {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name === "subagents") {
+          return [];
+        }
         return walk(fullPath);
       }
       return entry.name.endsWith(".jsonl") ? [fullPath] : [];
