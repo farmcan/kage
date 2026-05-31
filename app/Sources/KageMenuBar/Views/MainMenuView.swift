@@ -187,7 +187,7 @@ struct MainMenuView: View {
     guard let path = poller.actionResult?.outputPath ?? poller.actionResult?.paths?.first else {
       return
     }
-    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    FileLauncher.open(path: path)
   }
 
   private func actionIcon(_ action: KageAction) -> String {
@@ -293,9 +293,18 @@ private struct ActionResultCard: View {
           .controlSize(.small)
         }
 
+        if let filePath = replayPath {
+          Button {
+            FileLauncher.open(path: filePath)
+          } label: {
+            Label("Open", systemImage: "arrow.up.right.square")
+          }
+          .controlSize(.small)
+        }
+
         if let filePath = revealPath {
           Button {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
+            FileLauncher.reveal(path: filePath)
           } label: {
             Label("Show", systemImage: "folder")
           }
@@ -328,6 +337,10 @@ private struct ActionResultCard: View {
 
   private var revealPath: String? {
     result.outputPath ?? result.paths?.first
+  }
+
+  private var replayPath: String? {
+    result.action?.type == "replay" ? revealPath : nil
   }
 
   private func copyResumeCommand() {

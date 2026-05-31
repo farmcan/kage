@@ -186,11 +186,44 @@ struct DesktopDashboardView: View {
         }
       )
     } else {
-      ContentUnavailableView(
-        "No Session Selected",
-        systemImage: "rectangle.stack",
-        description: Text(emptyStateDescription)
-      )
+      ContentUnavailableView {
+        Label(emptyStateTitle, systemImage: "rectangle.stack")
+      } description: {
+        Text(emptyStateDescription)
+      } actions: {
+        emptyStateActions
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var emptyStateActions: some View {
+    if isSearchActive {
+      HStack(spacing: 10) {
+        if appState.selectedAgent != "all" {
+          Button {
+            appState.selectedAgent = "all"
+            searchNow(searchText)
+          } label: {
+            Label("Try All Agents", systemImage: "person.3")
+          }
+        }
+
+        Button {
+          searchText = ""
+          poller.clearSearch()
+        } label: {
+          Label("Clear Search", systemImage: "xmark.circle")
+        }
+
+        Button {
+          appState.chooseWatchedDirectory()
+          refresh()
+        } label: {
+          Label("Change Directory", systemImage: "folder")
+        }
+      }
+      .controlSize(.large)
     }
   }
 
@@ -315,7 +348,11 @@ struct DesktopDashboardView: View {
   }
 
   private var isSearchActive: Bool {
-    !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    !trimmedSearchText.isEmpty
+  }
+
+  private var trimmedSearchText: String {
+    searchText.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private var searchMatches: [String: SearchMatch] {
@@ -336,10 +373,33 @@ struct DesktopDashboardView: View {
     )
   }
 
+  private var emptyStateTitle: String {
+    if isSearchActive {
+      return "No Search Results"
+    }
+    return "No Session Selected"
+  }
+
   private var emptyStateDescription: String {
-    visibleSessions.isEmpty
-      ? "No matching sessions for the current directory."
-      : "Choose a session from the sidebar."
+    if isSearchActive {
+      return "No \(activeAgentScopeLabel) sessions matched \"\(trimmedSearchText)\" in \(directoryScopeLabel)."
+    }
+
+    if visibleSessions.isEmpty {
+      return "No \(activeAgentScopeLabel) sessions found in \(directoryScopeLabel)."
+    }
+
+    return "Choose a session from the sidebar."
+  }
+
+  private var activeAgentScopeLabel: String {
+    appState.selectedAgent == "all" ? "AI coding" : agentLabel(appState.selectedAgent)
+  }
+
+  private var directoryScopeLabel: String {
+    appState.includeSubdirectories
+      ? "\(appState.watchedDirectory) and subdirectories"
+      : appState.watchedDirectory
   }
 
   private func searchableText(for session: AgentSession) -> String {
@@ -442,7 +502,7 @@ struct DesktopDashboardView: View {
     guard let path = poller.actionResult?.outputPath ?? poller.actionResult?.paths?.first else {
       return
     }
-    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    FileLauncher.open(path: path)
   }
 
   private func openTerminal(title: String, command: String, sessionPath: String?) {
@@ -1145,9 +1205,17 @@ private struct DesktopActionResultBanner: View {
 
         }
 
+        if let filePath = replayPath {
+          Button {
+            FileLauncher.open(path: filePath)
+          } label: {
+            Label("Open", systemImage: "arrow.up.right.square")
+          }
+        }
+
         if let filePath = revealPath {
           Button {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
+            FileLauncher.reveal(path: filePath)
           } label: {
             Label("Show in Finder", systemImage: "folder")
           }
@@ -1180,6 +1248,10 @@ private struct DesktopActionResultBanner: View {
 
   private var revealPath: String? {
     result.outputPath ?? result.paths?.first
+  }
+
+  private var replayPath: String? {
+    result.action?.type == "replay" ? revealPath : nil
   }
 
   private func copyResumeCommand() {
