@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.7 fixes demo mode state isolation so exploring sample sessions does not overwrite the user's real agent filter or include-subdirectories preference.
+- KAGE v0.1.7 修复 demo mode 状态隔离，用户体验示例 sessions 时不会覆盖真实的 agent 筛选和 include-subdirectories 偏好。
+
 - KAGE v0.1.6 adds an opt-in desktop demo mode with sanitized Codex, Claude Code, and QoderCLI sessions so first-time users can explore KAGE before they have local agent history.
 - KAGE v0.1.6 增加显式开启的桌面 demo mode，内置脱敏的 Codex、Claude Code 和 QoderCLI sessions，让首次用户在没有本地 agent 历史时也能先体验 KAGE。
 
