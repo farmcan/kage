@@ -687,6 +687,8 @@ private func agentIconName(_ agent: String?) -> String {
 }
 
 private struct DesktopSessionDetailView: View {
+  @State private var isContextExpanded = false
+
   let session: AgentSession
   let match: SearchMatch?
   let actions: [KageAction]
@@ -701,40 +703,38 @@ private struct DesktopSessionDetailView: View {
   let onDismissResult: () -> Void
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 18) {
-        header
+    VStack(alignment: .leading, spacing: 12) {
+      header
 
-        if let actionResult, shouldShowResultCard(actionResult) {
-          DesktopActionResultBanner(
-            result: actionResult,
-            onOpenInKageTerminal: onOpenResultTerminal,
-            onDismiss: onDismissResult
-          )
-        } else if let actionMessage {
-          Text(actionMessage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-
-        terminalSection
-        actionSection
-        searchMatchSection
-        insightGrid
+      if let actionResult, shouldShowResultCard(actionResult) {
+        DesktopActionResultBanner(
+          result: actionResult,
+          onOpenInKageTerminal: onOpenResultTerminal,
+          onDismiss: onDismissResult
+        )
+      } else if let actionMessage {
+        Text(actionMessage)
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
-      .padding(24)
-      .frame(maxWidth: .infinity, alignment: .leading)
+
+      terminalSection
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      contextSection
     }
+    .padding(20)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     .background(Color(nsColor: .textBackgroundColor))
   }
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .top, spacing: 12) {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .center, spacing: 12) {
         Image(systemName: agentIcon)
-          .font(.system(size: 30))
+          .font(.system(size: 25))
           .foregroundStyle(agentTint(session.agent))
-          .frame(width: 52, height: 52)
+          .frame(width: 44, height: 44)
           .background(
             RoundedRectangle(cornerRadius: 8)
               .fill(agentTint(session.agent).opacity(0.11))
@@ -749,72 +749,51 @@ private struct DesktopSessionDetailView: View {
               .lineLimit(1)
           }
           Text(session.displayTitle)
-            .font(.title2)
+            .font(.title3)
             .fontWeight(.semibold)
-            .lineLimit(3)
+            .lineLimit(1)
             .textSelection(.enabled)
         }
 
         Spacer()
-      }
 
-      HStack(spacing: 8) {
-        Text(session.cwd)
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .textSelection(.enabled)
-        Spacer()
-      }
-      .padding(.horizontal, 10)
-      .padding(.vertical, 7)
-      .background(
-        RoundedRectangle(cornerRadius: 6)
-          .fill(Color.secondary.opacity(0.07))
-      )
-
-      if let primaryResumeAction {
-        Button {
-          onContinue(primaryResumeAction)
-        } label: {
-          if isOpening {
-            Label("Starting KAGE terminal", systemImage: "hourglass")
-          } else {
-            Label("Continue in KAGE terminal", systemImage: "play.fill")
-          }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(isOpening)
-      }
-    }
-  }
-
-  private var actionSection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text("Actions")
-        .font(.headline)
-
-      if secondaryActions.isEmpty {
-        Text("No actions available for this session.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      } else {
-        LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
-          ForEach(secondaryActions) { action in
-            Button {
-              onRunAction(action)
-            } label: {
-              Label(actionLabel(action), systemImage: actionIcon(action))
+        if let primaryResumeAction {
+          Button {
+            onContinue(primaryResumeAction)
+          } label: {
+            if isOpening {
+              Label("Starting", systemImage: "hourglass")
+            } else {
+              Label("Continue", systemImage: "play.fill")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .lineLimit(1)
           }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.large)
+          .disabled(isOpening)
+        }
+
+        if !secondaryActions.isEmpty {
+          Menu {
+            ForEach(secondaryActions) { action in
+              Button {
+                onRunAction(action)
+              } label: {
+                Label(actionLabel(action), systemImage: actionIcon(action))
+              }
+            }
+          } label: {
+            Label("Actions", systemImage: "ellipsis.circle")
+          }
+          .controlSize(.large)
         }
       }
+
+      Text(session.cwd)
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .textSelection(.enabled)
     }
   }
 
@@ -834,7 +813,8 @@ private struct DesktopSessionDetailView: View {
         }
         EmbeddedTerminalView(session: terminalSession)
           .id(terminalSession.id)
-          .frame(height: 620)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .frame(minHeight: 560)
           .clipShape(RoundedRectangle(cornerRadius: 8))
           .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -848,12 +828,6 @@ private struct DesktopSessionDetailView: View {
         onContinue: onContinue
       )
     }
-  }
-
-  private var actionColumns: [GridItem] {
-    [
-      GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 8, alignment: .leading)
-    ]
   }
 
   private var secondaryActions: [KageAction] {
@@ -931,6 +905,30 @@ private struct DesktopSessionDetailView: View {
       metadataSection
       recentMessagesSection
     }
+  }
+
+  private var contextSection: some View {
+    DisclosureGroup(isExpanded: $isContextExpanded) {
+      VStack(alignment: .leading, spacing: 14) {
+        searchMatchSection
+        insightGrid
+      }
+      .padding(.top, 10)
+    } label: {
+      HStack {
+        Label("Session context", systemImage: "doc.text.magnifyingglass")
+          .font(.headline)
+        Spacer()
+        Text(isContextExpanded ? "Hide details" : "Show details")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.secondary.opacity(0.06))
+    )
   }
 
   private var insightColumns: [GridItem] {
@@ -1020,23 +1018,24 @@ private struct DesktopTerminalReadyPanel: View {
   let onContinue: (KageAction) -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(alignment: .top, spacing: 10) {
+    VStack(alignment: .leading, spacing: 18) {
+      HStack(alignment: .center, spacing: 12) {
         Image(systemName: "terminal")
           .font(.title3)
           .foregroundStyle(agentTint(session.agent))
           .frame(width: 38, height: 38)
           .background(
             RoundedRectangle(cornerRadius: 8)
-              .fill(agentTint(session.agent).opacity(0.12))
+              .fill(agentTint(session.agent).opacity(0.18))
           )
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Ready to continue")
             .font(.headline)
+            .foregroundStyle(.white)
           Text("KAGE will run this \(session.agentLabel) session inside the embedded terminal.")
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.66))
         }
 
         Spacer()
@@ -1050,23 +1049,31 @@ private struct DesktopTerminalReadyPanel: View {
       }
 
       if let command = action.command {
-        Text(command)
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
-          .lineLimit(2)
-          .truncationMode(.middle)
-          .textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 10) {
+          Text("$ \(command)")
+            .font(.title3.monospaced())
+            .foregroundStyle(.white.opacity(0.86))
+            .lineLimit(2)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+
+          Text("Terminal output will appear here.")
+            .font(.callout.monospaced())
+            .foregroundStyle(.white.opacity(0.45))
+        }
       }
+
+      Spacer()
     }
-    .padding(14)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(20)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(
       RoundedRectangle(cornerRadius: 8)
-        .fill(agentTint(session.agent).opacity(0.06))
+        .fill(Color(red: 0.08, green: 0.09, blue: 0.10))
     )
     .overlay(
       RoundedRectangle(cornerRadius: 8)
-        .stroke(agentTint(session.agent).opacity(0.16))
+        .stroke(agentTint(session.agent).opacity(0.28))
     )
   }
 }
