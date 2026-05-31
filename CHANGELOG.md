@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Desktop v0.1.1 expands the KAGE workspace, makes the terminal the primary surface, and moves Bridge / Replay into an Actions menu.
+- Desktop v0.1.1 放大 KAGE 工作区，让 terminal 成为主界面，并把 Bridge / Replay 收进 Actions 菜单。
+
 - Improved the ambiguous session chooser with spaced card-style entries, full paths, session ids, and recent real user messages.
 - 改进了歧义 session 选择器，使用留白更清晰的卡片式条目，并展示完整路径、session id 和最近几条真实用户消息。
 
