@@ -18,13 +18,14 @@ The name comes from the "shadow clone" idea: a useful coding agent should be abl
 Action language in KAGE is intentionally narrow:
 
 - `Continue` resumes the original session in its native agent.
+- `New Session` starts a fresh Codex, Claude Code, or QoderCLI terminal in the watched project.
 - `Fork` creates a new same-agent session from the selected context, so you can branch the work without mutating the original session.
 - `Bridge` converts the session into another agent's native resume format.
 - `Replay story` creates a local, read-only HTML review of what happened in the transcript. It is not a fork.
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.9](https://github.com/farmcan/kage/releases/tag/v0.1.9)
+Latest release: [KAGE v0.1.10](https://github.com/farmcan/kage/releases/tag/v0.1.10)
 
 ## Use KAGE If
 
@@ -54,7 +55,7 @@ Before trying it, KAGE is most useful if you already have at least one Claude Co
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.9/KAGE-0.1.9.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.10/KAGE-0.1.10.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -71,6 +72,7 @@ Check what KAGE can see:
 kage doctor
 kage sessions
 kage sessions --include-subdirs
+kage sessions --since 90d --limit 120
 kage search "auth"
 ```
 
@@ -79,6 +81,8 @@ Bridge a useful session:
 ```bash
 kage c2x
 ```
+
+From the desktop app, use `New Session` to start a fresh Codex, Claude Code, or QoderCLI session in the watched directory. The embedded terminal runs commands through `/bin/zsh -lc`; if the embedded terminal feels slow for a noisy agent session, use the `Terminal.app` button to open the same command in macOS Terminal.
 
 Build and open the macOS desktop app from a local checkout:
 
@@ -171,10 +175,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.9 DMG from GitHub Releases:
+Download the v0.1.10 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.9/KAGE-0.1.9.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.10/KAGE-0.1.10.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -333,6 +337,7 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 --older-than <duration>
 --since <date|duration>
 --until <date|duration>
+--limit <n>
 --project <path>
 --include-subdirs
 --stdout
@@ -356,6 +361,7 @@ List current-project sessions across agents:
 kage sessions
 kage sessions --agent claude --json
 kage sessions --include-subdirs
+kage sessions --since 90d --limit 120 --json
 ```
 
 Generate menu-bar friendly actions and run one:
@@ -370,6 +376,7 @@ Find a past session by content, agent, date, or project:
 ```bash
 kage search "auth"
 kage search "resume" --agent codex --since 7d
+kage search "auth" --limit 20
 kage search --project ~/wrksp/kage --json
 kage search --project ~/wrksp/kage --include-subdirs --json
 ```

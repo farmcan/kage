@@ -49,18 +49,22 @@ export async function findMatchingSessions(rootDir = getDefaultRoot("codex"), op
   }
 
   const sortedFiles = files.sort();
+  const orderedFiles = options.newestFirst ? [...sortedFiles].reverse() : sortedFiles;
   const cwd = options.cwd ?? null;
-  const agent = normalizeAgent(options.agent) ?? detectAgent(rootDir) ?? detectAgent(sortedFiles[0]);
+  const agent = normalizeAgent(options.agent) ?? detectAgent(rootDir) ?? detectAgent(orderedFiles[0]);
 
   if (!cwd || !agent) {
-    return sortedFiles;
+    return options.limit ? orderedFiles.slice(0, options.limit) : orderedFiles;
   }
 
   const matches = [];
-  for (const filePath of sortedFiles) {
+  for (const filePath of orderedFiles) {
     const sessionCwd = await readSessionCwd(filePath, agent);
     if (await matchesCwd(sessionCwd, cwd, options)) {
       matches.push(filePath);
+      if (options.limit && matches.length >= options.limit) {
+        break;
+      }
     }
   }
 

@@ -11,7 +11,8 @@ export function readSessionCwd(items) {
 }
 
 export function parse(items, sessionPath, agent) {
-  const meta = items.find((item) => item.type === "session_meta")?.payload ?? {};
+  const metaItem = items.find((item) => item.type === "session_meta") ?? {};
+  const meta = metaItem.payload ?? {};
   const cwd = knownCwd(meta.cwd) ?? process.cwd();
   const messages = items
     .map((item) => {
@@ -45,7 +46,7 @@ export function parse(items, sessionPath, agent) {
     sessionId: meta.id ?? path.basename(sessionPath, ".jsonl"),
     cwd,
     title: null,
-    updatedAt: meta.timestamp ?? null,
+    updatedAt: meta.timestamp ?? metaItem.timestamp ?? null,
     rawItems: items,
     messages,
   };

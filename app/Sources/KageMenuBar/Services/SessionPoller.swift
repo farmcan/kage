@@ -14,6 +14,7 @@ final class SessionPoller: ObservableObject {
   @Published var lastRefresh: Date?
   @Published var actionMessage: String?
   @Published var actionResult: RunActionResponse?
+  @Published var loadsFullHistory = false
 
   private let cli = KageCLI()
   private var task: Task<Void, Never>?
@@ -21,6 +22,8 @@ final class SessionPoller: ObservableObject {
   private var lastScope: String?
   private var lastDoctorRefresh: Date?
   private let doctorRefreshInterval: TimeInterval = 300
+  private let recentHistorySince = "90d"
+  private let recentHistoryLimit = 120
 
   var totalSessions: Int {
     sessionsResponse?.sessions.count ?? 0
@@ -55,7 +58,7 @@ final class SessionPoller: ObservableObject {
   func refresh(appState: AppState, notifications: NotificationManager) async {
     let watchedDirectory = appState.watchedDirectory
     let includeSubdirectories = appState.includeSubdirectories
-    let scope = "\(watchedDirectory)|includeSubdirectories=\(includeSubdirectories)"
+    let scope = "\(watchedDirectory)|includeSubdirectories=\(includeSubdirectories)|fullHistory=\(loadsFullHistory)"
     let scopeChanged = lastScope != scope
     if lastScope != scope {
       previousSessionIds.removeAll()
@@ -71,8 +74,20 @@ final class SessionPoller: ObservableObject {
     }
 
     do {
-      async let sessions = cli.sessions(cwd: watchedDirectory, includeSubdirectories: includeSubdirectories)
-      async let actions = cli.actions(cwd: watchedDirectory, includeSubdirectories: includeSubdirectories)
+      let since = loadsFullHistory ? nil : recentHistorySince
+      let limit = loadsFullHistory ? nil : recentHistoryLimit
+      async let sessions = cli.sessions(
+        cwd: watchedDirectory,
+        includeSubdirectories: includeSubdirectories,
+        since: since,
+        limit: limit
+      )
+      async let actions = cli.actions(
+        cwd: watchedDirectory,
+        includeSubdirectories: includeSubdirectories,
+        since: since,
+        limit: limit
+      )
       let doctorTask: Task<DoctorResult, Error>? = shouldRefreshDoctor || scopeChanged
         ? Task { try await cli.doctor(cwd: watchedDirectory) }
         : nil
@@ -94,12 +109,20 @@ final class SessionPoller: ObservableObject {
     }
   }
 
+  func setLoadsFullHistory(_ enabled: Bool, appState: AppState, notifications: NotificationManager) async {
+    guard loadsFullHistory != enabled else {
+      return
+    }
+    loadsFullHistory = enabled
+    await refresh(appState: appState, notifications: notifications)
+  }
+
   func runAction(_ action: KageAction, appState: AppState, notifications: NotificationManager) async {
     actionMessage = nil
     actionResult = nil
     do {
       let result = try await cli.runAction(
-        id: action.id,
+        action,
         cwd: appState.watchedDirectory,
         includeSubdirectories: appState.includeSubdirectories
       )

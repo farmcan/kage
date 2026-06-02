@@ -42,12 +42,20 @@ actor KageCLI {
     try await decode(DoctorResult.self, args: ["doctor", "--json"], cwd: cwd)
   }
 
-  func sessions(cwd: String, includeSubdirectories: Bool) async throws -> SessionsResponse {
-    try await decode(SessionsResponse.self, args: scopedArgs(["sessions", "--json"], includeSubdirectories), cwd: cwd)
+  func sessions(cwd: String, includeSubdirectories: Bool, since: String? = nil, limit: Int? = nil) async throws -> SessionsResponse {
+    try await decode(
+      SessionsResponse.self,
+      args: scopedArgs(inventoryArgs(["sessions", "--json"], since: since, limit: limit), includeSubdirectories),
+      cwd: cwd
+    )
   }
 
-  func actions(cwd: String, includeSubdirectories: Bool) async throws -> ActionsResponse {
-    try await decode(ActionsResponse.self, args: scopedArgs(["actions", "--json"], includeSubdirectories), cwd: cwd)
+  func actions(cwd: String, includeSubdirectories: Bool, since: String? = nil, limit: Int? = nil) async throws -> ActionsResponse {
+    try await decode(
+      ActionsResponse.self,
+      args: scopedArgs(inventoryArgs(["actions", "--json"], since: since, limit: limit), includeSubdirectories),
+      cwd: cwd
+    )
   }
 
   func search(cwd: String, query: String, agent: String?, includeSubdirectories: Bool) async throws -> SearchResponse {
@@ -58,16 +66,52 @@ actor KageCLI {
     return try await decode(SearchResponse.self, args: scopedArgs(args, includeSubdirectories), cwd: cwd)
   }
 
-  func runAction(id: String, cwd: String, includeSubdirectories: Bool) async throws -> RunActionResponse {
-    try await decode(
+  func runAction(_ action: KageAction, cwd: String, includeSubdirectories: Bool) async throws -> RunActionResponse {
+    if let cliArgs = action.cliArgs {
+      let result = try await decode(RunActionResponse.self, args: cliArgs + ["--json"], cwd: cwd)
+      return attach(action: action, to: result)
+    }
+
+    let result = try await decode(
       RunActionResponse.self,
-      args: scopedArgs(["run-action", id, "--json"], includeSubdirectories),
+      args: scopedArgs(["run-action", action.id, "--json"], includeSubdirectories),
       cwd: cwd
     )
+    return attach(action: action, to: result)
   }
 
   private func scopedArgs(_ args: [String], _ includeSubdirectories: Bool) -> [String] {
     includeSubdirectories ? args + ["--include-subdirs"] : args
+  }
+
+  private func inventoryArgs(_ args: [String], since: String?, limit: Int?) -> [String] {
+    var next = args
+    if let since {
+      next += ["--since", since]
+    }
+    if let limit {
+      next += ["--limit", String(limit)]
+    }
+    return next
+  }
+
+  private func attach(action: KageAction, to result: RunActionResponse) -> RunActionResponse {
+    RunActionResponse(
+      mode: result.mode,
+      actionId: result.actionId ?? action.id,
+      ok: result.ok ?? true,
+      action: result.action ?? action,
+      sourceAgent: result.sourceAgent ?? action.agent,
+      targetAgent: result.targetAgent ?? action.targetAgent ?? action.agent,
+      sessionId: result.sessionId ?? action.sessionId,
+      sessionPath: result.sessionPath ?? action.sessionPath,
+      resumeCommand: result.resumeCommand,
+      outputPath: result.outputPath,
+      sidecarPath: result.sidecarPath,
+      paths: result.paths,
+      stdout: result.stdout,
+      stderr: result.stderr
+    )
   }
 
   private func decode<T: Decodable>(_ type: T.Type, args: [String], cwd: String) async throws -> T {

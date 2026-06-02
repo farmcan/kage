@@ -747,9 +747,9 @@ test("cli --help only documents native export commands", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
   assert.match(result.stdout, /kage doctor \[--json\]/);
-  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--include-subdirs\] \[--json\]/);
+  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--since 90d\]/);
   assert.match(result.stdout, /kage search \[query\]/);
-  assert.match(result.stdout, /kage actions \[--include-subdirs\] \[--json\]/);
+  assert.match(result.stdout, /kage actions \[--since 90d\]/);
   assert.match(result.stdout, /kage run-action <id> \[--include-subdirs\] \[--json\]/);
   assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
   assert.match(result.stdout, /kage completions bash\|zsh\|fish/);
@@ -760,6 +760,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /--preview/);
   assert.match(result.stdout, /--run/);
   assert.match(result.stdout, /--include-subdirs/);
+  assert.match(result.stdout, /--limit <n>/);
   assert.match(result.stdout, /--version/);
 });
 
@@ -936,6 +937,57 @@ test("cli sessions lists current-project sessions across agents as json", async 
     subtreePayload.sessions.map((session) => session.sessionId).sort(),
     ["claude-one", "codex-child", "codex-one", "qoder-one"].sort(),
   );
+
+  const limitedResult = await spawnCli(["sessions", "--include-subdirs", "--limit", "2", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const limitedPayload = JSON.parse(limitedResult.stdout);
+  assert.equal(limitedResult.code, 0);
+  assert.equal(limitedPayload.filters.limit, 2);
+  assert.equal(limitedPayload.sessions.length, 2);
+
+  const sinceResult = await spawnCli(["sessions", "--include-subdirs", "--agent", "codex", "--since", "2026-05-20", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const sincePayload = JSON.parse(sinceResult.stdout);
+  assert.equal(sinceResult.code, 0);
+  assert.deepEqual(
+    sincePayload.sessions.map((session) => session.sessionId).sort(),
+    ["codex-child", "codex-one"].sort(),
+  );
+});
+
+test("cli sessions applies --until before --limit", async () => {
+  const fakeHome = await makeTempDir("sessions-until-home");
+  const currentDir = await makeTempDir("sessions-until-workspace");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    path.join(codexProject, "rollout-z-new.jsonl"),
+    [
+      `{"timestamp":"2026-05-21T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-new","cwd":"${currentDir}","timestamp":"2026-05-21T10:00:00.000Z"}}`,
+      '{"timestamp":"2026-05-21T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"new plan"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(codexProject, "rollout-a-old.jsonl"),
+    [
+      `{"timestamp":"2026-05-19T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-old","cwd":"${currentDir}","timestamp":"2026-05-19T10:00:00.000Z"}}`,
+      '{"timestamp":"2026-05-19T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"old plan"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["sessions", "--agent", "codex", "--until", "2026-05-20", "--limit", "1", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(result.stdout);
+  assert.equal(result.code, 0);
+  assert.deepEqual(payload.sessions.map((session) => session.sessionId), ["codex-old"]);
 });
 
 test("cli search finds sessions by query, agent, project, and date filters", async () => {
@@ -980,6 +1032,14 @@ test("cli search finds sessions by query, agent, project, and date filters", asy
     allPayload.results.map((session) => session.sessionId).sort(),
     ["claude-auth", "codex-auth", "codex-child"].sort(),
   );
+
+  const limitedResult = await spawnCli(["search", "auth", "--limit", "1", "--json"], {
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const limitedPayload = JSON.parse(limitedResult.stdout);
+  assert.equal(limitedResult.code, 0);
+  assert.equal(limitedPayload.filters.limit, 1);
+  assert.equal(limitedPayload.results.length, 1);
 
   const filteredResult = await spawnCli(
     [

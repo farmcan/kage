@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.10 keeps large local histories responsive with a default recent 90-day / 120-session desktop window, an explicit full-history mode with older months folded, and new-session launch controls for Codex, Claude Code, and QoderCLI.
+- KAGE v0.1.10 通过默认加载最近 90 天 / 120 条 session、提供旧月份折叠的完整历史模式，并增加 Codex、Claude Code、QoderCLI 的新 session 启动入口，让大量本地历史下的桌面端更顺畅。
+
 - KAGE v0.1.9 refines the macOS menu bar icon from a filled app tile into a lighter linear Session Portal glyph.
 - KAGE v0.1.9 将 macOS 状态栏图标从实心 App tile 优化为更轻的线性 Session Portal glyph。
 

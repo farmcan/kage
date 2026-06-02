@@ -27,9 +27,9 @@ const removedAgentNames = new Set(["qoder"]);
 const helpText = `Usage:
   kage update
   kage doctor [--json]
-  kage sessions [--agent claude|codex|qodercli] [--include-subdirs] [--json]
-  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--json]
-  kage actions [--include-subdirs] [--json]
+  kage sessions [--agent claude|codex|qodercli] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
+  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
+  kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
   kage run-action <id> [--include-subdirs] [--json]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
@@ -72,6 +72,7 @@ Options:
   --older-than <duration>
   --since <date|duration>
   --until <date|duration>
+  --limit <n>
   --project <path>
   --include-subdirs
   --stdout
@@ -108,6 +109,7 @@ const completionOptions = [
   "--older-than",
   "--since",
   "--until",
+  "--limit",
   "--project",
   "--include-subdirs",
   "--stdout",
@@ -123,6 +125,54 @@ function parsePositiveInteger(value, option) {
     throw new Error(`${option} requires a positive integer, got: ${value ?? "(missing)"}`);
   }
   return parsed;
+}
+
+function parseDateFilter(value, { now = Date.now(), option = "date", boundary = "start" } = {}) {
+  if (!value) {
+    return null;
+  }
+
+  const duration = String(value).match(/^(\d+)([dhm])$/u);
+  if (duration) {
+    const [, amountText, unit] = duration;
+    const amount = Number(amountText);
+    const multipliers = {
+      d: 24 * 60 * 60 * 1000,
+      h: 60 * 60 * 1000,
+      m: 60 * 1000,
+    };
+    return new Date(now - amount * multipliers[unit]);
+  }
+
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    throw new Error(`${option} requires a date or duration like 2026-05-25 or 7d`);
+  }
+  if (boundary === "end" && /^\d{4}-\d{2}-\d{2}$/u.test(String(value))) {
+    return new Date(timestamp + 24 * 60 * 60 * 1000 - 1);
+  }
+  return new Date(timestamp);
+}
+
+function isWithinDateRange(updatedAt, sinceDate, untilDate) {
+  if (!sinceDate && !untilDate) {
+    return true;
+  }
+  if (!updatedAt) {
+    return false;
+  }
+
+  const timestamp = Date.parse(updatedAt);
+  if (Number.isNaN(timestamp)) {
+    return false;
+  }
+  if (sinceDate && timestamp < sinceDate.getTime()) {
+    return false;
+  }
+  if (untilDate && timestamp > untilDate.getTime()) {
+    return false;
+  }
+  return true;
 }
 
 function readOptionValue(argv, index, option, { allowOptionValue = false } = {}) {
@@ -150,6 +200,7 @@ function parseArgs(argv) {
     searchQuery: null,
     since: null,
     until: null,
+    limit: null,
     project: null,
     includeSubdirs: false,
     actions: false,
@@ -236,6 +287,9 @@ function parseArgs(argv) {
       } else if (arg === "--until") {
         args.until = readOptionValue(argv, i, arg);
         i += 1;
+      } else if (arg === "--limit") {
+        args.limit = parsePositiveInteger(readOptionValue(argv, i, arg), arg);
+        i += 1;
       } else if (arg === "--project") {
         args.project = readOptionValue(argv, i, arg);
         i += 1;
@@ -267,8 +321,11 @@ function parseArgs(argv) {
   if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
     return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
   }
-  if ((args.since || args.until || args.project) && first !== "search") {
-    return { ...args, error: "--since, --until, and --project are only supported with kage search" };
+  if ((args.since || args.until || args.limit) && !["sessions", "search", "actions"].includes(first)) {
+    return { ...args, error: "--since, --until, and --limit are only supported with kage sessions, search, and actions" };
+  }
+  if (args.project && first !== "search") {
+    return { ...args, error: "--project is only supported with kage search" };
   }
   if ([args.agent, args.target].some((value) => removedAgentNames.has(value))) {
     return { ...args, error: "Unsupported agent: qoder. Use qodercli instead." };
@@ -284,7 +341,11 @@ function parseArgs(argv) {
   }
   if (first === "sessions") {
     if (second) {
-      return { ...args, error: "Usage: kage sessions [--agent claude|codex|qodercli] [--include-subdirs] [--json]" };
+      return {
+        ...args,
+        error:
+          "Usage: kage sessions [--agent claude|codex|qodercli] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]",
+      };
     }
     return { ...args, sessions: true };
   }
@@ -293,14 +354,17 @@ function parseArgs(argv) {
       return {
         ...args,
         error:
-          "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--json]",
+          "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]",
       };
     }
     return { ...args, search: true, searchQuery: second ?? null };
   }
   if (first === "actions") {
     if (second) {
-      return { ...args, error: "Usage: kage actions [--include-subdirs] [--json]" };
+      return {
+        ...args,
+        error: "Usage: kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]",
+      };
     }
     return { ...args, actions: true };
   }
@@ -964,30 +1028,41 @@ function formatSessionLabel(agent) {
 async function buildSessionCandidates(args) {
   const rootDir = args.root ?? getDefaultRoot(args.agent ?? "codex");
   const resolvedAgent = formatAgentName(args.agent ?? "codex");
+  const sinceDate = parseDateFilter(args.since, { option: "--since" });
+  const untilDate = parseDateFilter(args.until, { option: "--until", boundary: "end" });
   const matches = await findMatchingSessions(rootDir, {
     cwd: process.cwd(),
     agent: resolvedAgent,
     includeSubdirs: args.includeSubdirs,
+    newestFirst: true,
+    limit: args.until ? null : args.limit ?? null,
   });
-  return Promise.all(
-    matches
-      .sort()
-      .reverse()
-      .map(async (sessionPath) => {
-        const session = await parseSession({ sessionPath, agent: resolvedAgent });
-        return {
-          agent: resolvedAgent,
-          agentLabel: formatSessionLabel(resolvedAgent),
-          sessionPath,
-          sessionId: session.sessionId,
-          cwd: session.cwd,
-          updatedAt: session.updatedAt,
-          title: getSessionTitle(session),
-          shortTitle: getShortSessionTitle(session),
-          recentUserMessages: getRecentUserMessages(session),
-        };
-      }),
-  );
+  const candidates = [];
+
+  for (const sessionPath of matches) {
+    const session = await parseSession({ sessionPath, agent: resolvedAgent });
+    if (!isWithinDateRange(session.updatedAt, sinceDate, untilDate)) {
+      continue;
+    }
+
+    candidates.push({
+      agent: resolvedAgent,
+      agentLabel: formatSessionLabel(resolvedAgent),
+      sessionPath,
+      sessionId: session.sessionId,
+      cwd: session.cwd,
+      updatedAt: session.updatedAt,
+      title: getSessionTitle(session),
+      shortTitle: getShortSessionTitle(session),
+      recentUserMessages: getRecentUserMessages(session),
+    });
+
+    if (args.limit && candidates.length >= args.limit) {
+      break;
+    }
+  }
+
+  return candidates.sort((left, right) => Date.parse(right.updatedAt ?? 0) - Date.parse(left.updatedAt ?? 0));
 }
 
 function toSessionPayload(candidate) {
@@ -1032,10 +1107,28 @@ async function buildSessionInventory(args = {}) {
     }
   }
 
+  if (args.limit) {
+    const selectedPaths = new Set(
+      groups
+        .flatMap((group) => group.sessions)
+        .sort((left, right) => Date.parse(right.updatedAt ?? 0) - Date.parse(left.updatedAt ?? 0))
+        .slice(0, args.limit)
+        .map((session) => session.path),
+    );
+    for (const group of groups) {
+      group.sessions = group.sessions.filter((session) => selectedPaths.has(session.path));
+    }
+  }
+
   return {
     mode: "sessions",
     cwd: process.cwd(),
     includeSubdirs: Boolean(args.includeSubdirs),
+    filters: {
+      since: parseDateFilter(args.since, { option: "--since" })?.toISOString() ?? null,
+      until: parseDateFilter(args.until, { option: "--until", boundary: "end" })?.toISOString() ?? null,
+      limit: args.limit ?? null,
+    },
     sessions: groups.flatMap((group) => group.sessions),
     agents: groups,
     errors,
@@ -1387,6 +1480,7 @@ async function main() {
       until: args.until,
       project: args.project,
       includeSubdirs: args.includeSubdirs,
+      limit: args.limit ?? undefined,
     });
     process.stdout.write(formatSearchResult(result, args.json));
     return;

@@ -13,10 +13,12 @@ struct DesktopDashboardView: View {
   @State private var searchTask: Task<Void, Never>?
   @State private var autoOpeningActionID: String?
   @State private var terminalSession: EmbeddedTerminalSession?
+  @State private var pendingNewSession: LaunchableAgent?
   @State private var isDemoMode = false
   @State private var demoSelectedAgent = "all"
   @State private var demoIncludeSubdirectories = false
   @State private var demoSearchResponse: SearchResponse?
+  @State private var expandedMonthIDs = Set<String>()
 
   var body: some View {
     NavigationSplitView {
@@ -27,6 +29,8 @@ struct DesktopDashboardView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
+        newSessionMenu
+
         Button {
           refresh()
         } label: {
@@ -50,6 +54,15 @@ struct DesktopDashboardView: View {
     .onChange(of: visibleSessions) { _, _ in
       ensureSelection()
     }
+    .onChange(of: selectedSessionID) { _, newValue in
+      guard newValue != nil else {
+        return
+      }
+      pendingNewSession = nil
+      if standaloneTerminalSession != nil {
+        terminalSession = nil
+      }
+    }
     .onChange(of: searchText) { _, newValue in
       scheduleSearch(newValue)
     }
@@ -61,6 +74,7 @@ struct DesktopDashboardView: View {
     .onChange(of: isDemoMode) { _, enabled in
       demoSearchResponse = nil
       terminalSession = nil
+      pendingNewSession = nil
       poller.clearActionResult()
       poller.actionMessage = nil
       if enabled {
@@ -135,31 +149,7 @@ struct DesktopDashboardView: View {
       List(selection: $selectedSessionID) {
         ForEach(sessionGroups) { group in
           Section {
-            ForEach(group.sessions, id: \.path) { session in
-              DesktopSessionListRow(session: session, match: searchMatches[session.path])
-                .tag(sessionKey(session))
-                .contextMenu {
-                  if let resumeAction = primaryResumeAction(for: session) {
-                    Button {
-                      runAndOpenAction(resumeAction)
-                    } label: {
-                      Label("Continue in \(agentLabel(session.agent))", systemImage: "play.fill")
-                    }
-                  }
-                  if !isDemoSession(session) {
-                    Button {
-                      NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
-                    } label: {
-                      Label("Show Session File", systemImage: "doc")
-                    }
-                  }
-                }
-                .onTapGesture(count: 2) {
-                  if let resumeAction = primaryResumeAction(for: session) {
-                    runAndOpenAction(resumeAction)
-                  }
-                }
-            }
+            sessionRows(for: group)
           } header: {
             DirectoryGroupHeader(group: group)
           }
@@ -176,7 +166,32 @@ struct DesktopDashboardView: View {
 
   @ViewBuilder
   private var detailPane: some View {
-    if poller.isRefreshing && visibleSessions.isEmpty {
+    if let terminalSession = standaloneTerminalSession {
+      DesktopStandaloneTerminalView(
+        session: terminalSession,
+        onClose: {
+          self.terminalSession = nil
+        }
+      )
+    } else if let pendingNewSession {
+      DesktopNewSessionReadyView(
+        agent: pendingNewSession,
+        cwd: appState.watchedDirectory,
+        onStartInKage: {
+          startNewSessionInKage(agent: pendingNewSession.id)
+        },
+        onStartInTerminalApp: {
+          openExternalTerminal(
+            command: AgentLaunchCommand.command(for: pendingNewSession.id, cwd: appState.watchedDirectory),
+            cwd: appState.watchedDirectory
+          )
+          self.pendingNewSession = nil
+        },
+        onCancel: {
+          self.pendingNewSession = nil
+        }
+      )
+    } else if poller.isRefreshing && visibleSessions.isEmpty {
       VStack(spacing: 14) {
         ProgressView()
           .controlSize(.large)
@@ -201,6 +216,7 @@ struct DesktopDashboardView: View {
         isOpening: autoOpeningActionID != nil,
         onContinue: runAndOpenAction,
         onRunAction: runAction,
+        onOpenExternalCommand: openExternalTerminal,
         onOpenResultTerminal: openResultInKageTerminal,
         onDismissResult: {
           poller.clearActionResult()
@@ -214,6 +230,20 @@ struct DesktopDashboardView: View {
       ) {
         emptyStateActions
       }
+    }
+  }
+
+  private var newSessionMenu: some View {
+    Menu {
+      ForEach(AgentLaunchCommand.agents) { agent in
+        Button {
+          prepareNewSession(agent: agent)
+        } label: {
+          Label(agent.label, systemImage: agent.iconName)
+        }
+      }
+    } label: {
+      Label("New Session", systemImage: "plus.circle")
     }
   }
 
@@ -279,6 +309,8 @@ struct DesktopDashboardView: View {
         } label: {
           Label("Getting Started", systemImage: "questionmark.circle")
         }
+
+        newSessionMenu
       }
       .controlSize(.large)
     }
@@ -355,6 +387,26 @@ struct DesktopDashboardView: View {
         Label("Demo Mode", systemImage: "play.rectangle")
           .font(.caption)
           .foregroundStyle(.secondary)
+      } else {
+        HStack(spacing: 8) {
+          Label(poller.loadsFullHistory ? "Full history" : "Recent 90d / 120 max", systemImage: "calendar")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+          Spacer()
+
+          Button {
+            Task {
+              await poller.setLoadsFullHistory(!poller.loadsFullHistory, appState: appState, notifications: notifications)
+              ensureSelection()
+            }
+          } label: {
+            Text(poller.loadsFullHistory ? "Recent Only" : "Load Full History")
+          }
+          .font(.caption)
+          .buttonStyle(.link)
+          .disabled(poller.isRefreshing)
+        }
       }
 
       if let doctor = poller.doctorResult {
@@ -539,6 +591,80 @@ struct DesktopDashboardView: View {
     activeSelectedAgent == "all" ? "AI coding" : agentLabel(activeSelectedAgent)
   }
 
+  private var standaloneTerminalSession: EmbeddedTerminalSession? {
+    guard let terminalSession, terminalSession.sessionPath.hasPrefix("kage-new-session:") else {
+      return nil
+    }
+    return terminalSession
+  }
+
+  @ViewBuilder
+  private func sessionRows(for group: DirectorySessionGroup) -> some View {
+    if poller.loadsFullHistory && !isSearchActive {
+      ForEach(group.monthGroups) { month in
+        if month.isCurrentMonth {
+          ForEach(month.sessions, id: \.path) { session in
+            sessionRow(session)
+          }
+        } else {
+          DisclosureGroup(isExpanded: monthExpansionBinding(group: group, month: month)) {
+            ForEach(month.sessions, id: \.path) { session in
+              sessionRow(session)
+            }
+          } label: {
+            MonthGroupHeader(month: month)
+          }
+        }
+      }
+    } else {
+      ForEach(group.sessions, id: \.path) { session in
+        sessionRow(session)
+      }
+    }
+  }
+
+  private func sessionRow(_ session: AgentSession) -> some View {
+    DesktopSessionListRow(session: session, match: searchMatches[session.path])
+      .tag(sessionKey(session))
+      .contextMenu {
+        if let resumeAction = primaryResumeAction(for: session) {
+          Button {
+            runAndOpenAction(resumeAction)
+          } label: {
+            Label("Continue in \(agentLabel(session.agent))", systemImage: "play.fill")
+          }
+        }
+        if !isDemoSession(session) {
+          Button {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: session.path)])
+          } label: {
+            Label("Show Session File", systemImage: "doc")
+          }
+        }
+      }
+      .onTapGesture(count: 2) {
+        if let resumeAction = primaryResumeAction(for: session) {
+          runAndOpenAction(resumeAction)
+        }
+      }
+  }
+
+  private func monthExpansionBinding(group: DirectorySessionGroup, month: MonthSessionGroup) -> Binding<Bool> {
+    let id = "\(group.id)|\(month.id)"
+    return Binding(
+      get: {
+        expandedMonthIDs.contains(id)
+      },
+      set: { expanded in
+        if expanded {
+          expandedMonthIDs.insert(id)
+        } else {
+          expandedMonthIDs.remove(id)
+        }
+      }
+    )
+  }
+
   private var directoryScopeLabel: String {
     if isDemoMode {
       return activeIncludeSubdirectories
@@ -556,6 +682,11 @@ struct DesktopDashboardView: View {
   }
 
   private func ensureSelection() {
+    if pendingNewSession != nil || standaloneTerminalSession != nil {
+      selectedSessionID = nil
+      return
+    }
+
     if let selectedSessionID, visibleSessions.contains(where: { sessionKey($0) == selectedSessionID }) {
       return
     }
@@ -704,7 +835,39 @@ struct DesktopDashboardView: View {
     NSWorkspace.shared.open(url)
   }
 
+  private func prepareNewSession(agent: LaunchableAgent) {
+    if isDemoMode {
+      stopDemoMode()
+    }
+    pendingNewSession = agent
+    terminalSession = nil
+    selectedSessionID = nil
+  }
+
+  private func startNewSessionInKage(agent: String) {
+    let cwd = appState.watchedDirectory
+    let command = AgentLaunchCommand.command(for: agent, cwd: cwd)
+    pendingNewSession = nil
+    terminalSession = EmbeddedTerminalSession(
+      title: "New \(AgentLaunchCommand.label(for: agent)) session",
+      command: command,
+      cwd: cwd,
+      sessionPath: "kage-new-session:\(agent):\(cwd)"
+    )
+    selectedSessionID = nil
+  }
+
+  private func openExternalTerminal(command: String, cwd: String) {
+    do {
+      try TerminalCommandLauncher.open(command: command, cwd: cwd)
+    } catch {
+      TerminalCommandLauncher.copy(command)
+      poller.actionMessage = "Could not open Terminal.app, so the command was copied."
+    }
+  }
+
   private func openTerminal(title: String, command: String, sessionPath: String?, cwd: String? = nil) {
+    pendingNewSession = nil
     terminalSession = EmbeddedTerminalSession(
       title: title,
       command: command,
@@ -870,6 +1033,16 @@ private struct DirectorySessionGroup: Identifiable {
     sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
   }
 
+  var monthGroups: [MonthSessionGroup] {
+    let grouped = Dictionary(grouping: sessions, by: monthBucket)
+    return grouped.map { _, sessions in
+      MonthSessionGroup(sessions: sessions.sorted(by: isNewer))
+    }
+    .sorted { lhs, rhs in
+      lhs.sortDate > rhs.sortDate
+    }
+  }
+
   var agentCounts: [(agent: String, label: String, count: Int)] {
     let grouped = Dictionary(grouping: sessions, by: \.agent)
     return grouped.map { agent, sessions in
@@ -881,6 +1054,34 @@ private struct DirectorySessionGroup: Identifiable {
       }
       return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
     }
+  }
+}
+
+private struct MonthSessionGroup: Identifiable {
+  let sessions: [AgentSession]
+
+  var id: String {
+    monthBucket(sessions.first)
+  }
+
+  var label: String {
+    guard let date = sessions.compactMap({ parseSessionDate($0.updatedAt) }).max() else {
+      return "Unknown date"
+    }
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMMM yyyy"
+    return formatter.string(from: date)
+  }
+
+  var sortDate: Date {
+    sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
+  }
+
+  var isCurrentMonth: Bool {
+    guard sortDate != .distantPast else {
+      return false
+    }
+    return Calendar.current.isDate(sortDate, equalTo: Date(), toGranularity: .month)
   }
 }
 
@@ -914,6 +1115,24 @@ private struct DirectoryGroupHeader: View {
   }
 }
 
+private struct MonthGroupHeader: View {
+  let month: MonthSessionGroup
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "calendar")
+      Text(month.label)
+        .fontWeight(.medium)
+      Spacer()
+      Text("\(month.sessions.count)")
+        .foregroundStyle(.secondary)
+    }
+    .font(.caption)
+    .foregroundStyle(.secondary)
+    .padding(.vertical, 4)
+  }
+}
+
 private func isNewer(_ lhs: AgentSession, _ rhs: AgentSession) -> Bool {
   let lhsDate = parseSessionDate(lhs.updatedAt) ?? .distantPast
   let rhsDate = parseSessionDate(rhs.updatedAt) ?? .distantPast
@@ -936,6 +1155,14 @@ private func parseSessionDate(_ value: String?) -> Date? {
 
   formatter.formatOptions = [.withInternetDateTime]
   return formatter.date(from: value)
+}
+
+private func monthBucket(_ session: AgentSession?) -> String {
+  guard let date = parseSessionDate(session?.updatedAt) else {
+    return "unknown"
+  }
+  let components = Calendar.current.dateComponents([.year, .month], from: date)
+  return String(format: "%04d-%02d", components.year ?? 0, components.month ?? 0)
 }
 
 private enum AgentBadgeSize {
@@ -1130,6 +1357,7 @@ private struct DesktopSessionDetailView: View {
   let isOpening: Bool
   let onContinue: (KageAction) -> Void
   let onRunAction: (KageAction) -> Void
+  let onOpenExternalCommand: (String, String) -> Void
   let onOpenResultTerminal: (RunActionResponse) -> Void
   let onDismissResult: () -> Void
 
@@ -1261,7 +1489,8 @@ private struct DesktopSessionDetailView: View {
         session: session,
         action: primaryResumeAction,
         isDemoMode: isDemoSession,
-        onContinue: onContinue
+        onContinue: onContinue,
+        onOpenExternalCommand: onOpenExternalCommand
       )
     }
   }
@@ -1458,6 +1687,7 @@ private struct DesktopTerminalReadyPanel: View {
   let action: KageAction
   let isDemoMode: Bool
   let onContinue: (KageAction) -> Void
+  let onOpenExternalCommand: (String, String) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -1490,6 +1720,14 @@ private struct DesktopTerminalReadyPanel: View {
           Label(isDemoMode ? "Preview" : "Start", systemImage: "play.fill")
         }
         .buttonStyle(.borderedProminent)
+
+        if !isDemoMode, let command = action.command {
+          Button {
+            onOpenExternalCommand(command, session.cwd)
+          } label: {
+            Label("Terminal.app", systemImage: "macwindow")
+          }
+        }
       }
 
       if let command = action.command {
@@ -1519,6 +1757,137 @@ private struct DesktopTerminalReadyPanel: View {
       RoundedRectangle(cornerRadius: 8)
         .stroke(agentTint(session.agent).opacity(0.28))
     )
+  }
+}
+
+private struct DesktopStandaloneTerminalView: View {
+  let session: EmbeddedTerminalSession
+  let onClose: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 12) {
+        Label(session.title, systemImage: "terminal")
+          .font(.title3)
+          .fontWeight(.semibold)
+
+        Spacer()
+
+        Text(session.cwd)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+
+        Button {
+          onClose()
+        } label: {
+          Image(systemName: "xmark")
+            .accessibilityLabel("Close terminal")
+        }
+        .buttonStyle(.borderless)
+      }
+
+      EmbeddedTerminalView(session: session)
+        .id(session.id)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(Color.secondary.opacity(0.18))
+        )
+    }
+    .padding(20)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    .background(Color(nsColor: .textBackgroundColor))
+  }
+}
+
+private struct DesktopNewSessionReadyView: View {
+  let agent: LaunchableAgent
+  let cwd: String
+  let onStartInKage: () -> Void
+  let onStartInTerminalApp: () -> Void
+  let onCancel: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      HStack(alignment: .center, spacing: 12) {
+        Image(systemName: agent.iconName)
+          .font(.title2)
+          .foregroundStyle(agentTint(agent.id))
+          .frame(width: 44, height: 44)
+          .background(
+            RoundedRectangle(cornerRadius: 8)
+              .fill(agentTint(agent.id).opacity(0.14))
+          )
+
+        VStack(alignment: .leading, spacing: 5) {
+          Text("New \(agent.label) session")
+            .font(.title3)
+            .fontWeight(.semibold)
+          Text(URL(fileURLWithPath: cwd).lastPathComponent.isEmpty ? cwd : URL(fileURLWithPath: cwd).lastPathComponent)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+
+        Spacer()
+
+        Button {
+          onStartInKage()
+        } label: {
+          Label("Start in KAGE", systemImage: "play.fill")
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+
+        Button {
+          onStartInTerminalApp()
+        } label: {
+          Label("Terminal.app", systemImage: "macwindow")
+        }
+        .controlSize(.large)
+
+        Button {
+          onCancel()
+        } label: {
+          Image(systemName: "xmark")
+            .accessibilityLabel("Cancel new session")
+        }
+        .buttonStyle(.borderless)
+      }
+
+      VStack(alignment: .leading, spacing: 10) {
+        Text("$ \(command)")
+          .font(.title3.monospaced())
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+
+        Text(cwd)
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+      }
+      .padding(14)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color.secondary.opacity(0.07))
+      )
+
+      Spacer()
+    }
+    .padding(20)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(Color(nsColor: .textBackgroundColor))
+  }
+
+  private var command: String {
+    AgentLaunchCommand.command(for: agent.id, cwd: cwd)
   }
 }
 

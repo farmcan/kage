@@ -78,6 +78,9 @@ struct MainMenuView: View {
         Text("Actions")
           .font(.headline)
         Spacer()
+
+        newSessionMenu
+
         Button {
           Task {
             await poller.refresh(appState: appState, notifications: notifications)
@@ -159,6 +162,21 @@ struct MainMenuView: View {
     }
   }
 
+  private var newSessionMenu: some View {
+    Menu {
+      ForEach(AgentLaunchCommand.agents) { agent in
+        Button {
+          openNewSession(agent: agent.id)
+        } label: {
+          Label(agent.label, systemImage: agent.iconName)
+        }
+      }
+    } label: {
+      Label("New", systemImage: "plus.circle")
+    }
+    .buttonStyle(.borderless)
+  }
+
   private var quickActions: [KageAction] {
     (poller.actionsResponse?.actions ?? []).filter { action in
       action.type != "bridge" && (action.isLatest ?? true)
@@ -188,6 +206,16 @@ struct MainMenuView: View {
       return
     }
     FileLauncher.open(path: path)
+  }
+
+  private func openNewSession(agent: String) {
+    let command = AgentLaunchCommand.command(for: agent, cwd: appState.watchedDirectory)
+    do {
+      try TerminalCommandLauncher.open(command: command, cwd: appState.watchedDirectory)
+    } catch {
+      TerminalCommandLauncher.copy(command)
+      poller.actionMessage = "Could not open Terminal.app, so the command was copied."
+    }
   }
 
   private func actionIcon(_ action: KageAction) -> String {
