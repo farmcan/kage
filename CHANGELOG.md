@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Cleaned up the docs tree by archiving May 2026 planning notes, updating docs indexes, and removing superseded icon concept assets.
+- 整理 docs 目录：归档 2026 年 5 月规划文档、更新文档索引，并移除已被当前图标取代的旧 icon concept 资产。
+
 - Refreshed the GitHub Pages homepage and README hero assets around the current Session Portal icon, dark desktop workspace, recent-history search, New Session controls, and v0.1.11 release path.
 - 围绕当前 Session Portal 图标、暗色桌面工作台、最近历史搜索、New Session 控件和 v0.1.11 发布路径，刷新 GitHub Pages 主页与 README 首屏资产。
 

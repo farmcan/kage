@@ -118,4 +118,4 @@ Run a five-round churn audit before public launches:
 4. First success: is the search -> bridge -> resume workflow obvious?
 5. Star decision: is there enough proof that the project is alive and worth remembering?
 
-Current audit: [Five-round user churn audit](user-churn-audit-2026-05-31.md).
+Archived audit: [Five-round user churn audit](archive/2026-05/user-churn-audit-2026-05-31.md).

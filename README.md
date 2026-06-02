@@ -572,12 +572,11 @@ The export pipeline can trim or branch a conversation before writing it:
 
 ## Project Docs
 
-- [Product strategy](docs/product-strategy-2026-05-28.md)
-- [Architecture review](docs/architecture-review-2026-05-28.md)
-- [Growth plan](docs/growth-plan-2026-05-28.md)
+- [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
-- [Five-round user churn audit](docs/user-churn-audit-2026-05-31.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
+- [Latest release notes](docs/release-notes/v0.1.11.md)
+- [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope
 
