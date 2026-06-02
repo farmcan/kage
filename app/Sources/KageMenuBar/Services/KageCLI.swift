@@ -45,7 +45,7 @@ actor KageCLI {
   func sessions(cwd: String, includeSubdirectories: Bool, since: String? = nil, limit: Int? = nil) async throws -> SessionsResponse {
     try await decode(
       SessionsResponse.self,
-      args: scopedArgs(inventoryArgs(["sessions", "--json"], since: since, limit: limit), includeSubdirectories),
+      args: KageCLIArguments.sessions(since: since, limit: limit, includeSubdirectories: includeSubdirectories),
       cwd: cwd
     )
   }
@@ -53,17 +53,31 @@ actor KageCLI {
   func actions(cwd: String, includeSubdirectories: Bool, since: String? = nil, limit: Int? = nil) async throws -> ActionsResponse {
     try await decode(
       ActionsResponse.self,
-      args: scopedArgs(inventoryArgs(["actions", "--json"], since: since, limit: limit), includeSubdirectories),
+      args: KageCLIArguments.actions(since: since, limit: limit, includeSubdirectories: includeSubdirectories),
       cwd: cwd
     )
   }
 
-  func search(cwd: String, query: String, agent: String?, includeSubdirectories: Bool) async throws -> SearchResponse {
-    var args = ["search", query, "--project", cwd, "--json"]
-    if let agent, agent != "all" {
-      args += ["--agent", agent]
-    }
-    return try await decode(SearchResponse.self, args: scopedArgs(args, includeSubdirectories), cwd: cwd)
+  func search(
+    cwd: String,
+    query: String,
+    agent: String?,
+    includeSubdirectories: Bool,
+    since: String? = nil,
+    limit: Int? = nil
+  ) async throws -> SearchResponse {
+    return try await decode(
+      SearchResponse.self,
+      args: KageCLIArguments.search(
+        query: query,
+        project: cwd,
+        agent: agent,
+        since: since,
+        limit: limit,
+        includeSubdirectories: includeSubdirectories
+      ),
+      cwd: cwd
+    )
   }
 
   func runAction(_ action: KageAction, cwd: String, includeSubdirectories: Bool) async throws -> RunActionResponse {
@@ -74,25 +88,10 @@ actor KageCLI {
 
     let result = try await decode(
       RunActionResponse.self,
-      args: scopedArgs(["run-action", action.id, "--json"], includeSubdirectories),
+      args: KageCLIArguments.runAction(id: action.id, includeSubdirectories: includeSubdirectories),
       cwd: cwd
     )
     return attach(action: action, to: result)
-  }
-
-  private func scopedArgs(_ args: [String], _ includeSubdirectories: Bool) -> [String] {
-    includeSubdirectories ? args + ["--include-subdirs"] : args
-  }
-
-  private func inventoryArgs(_ args: [String], since: String?, limit: Int?) -> [String] {
-    var next = args
-    if let since {
-      next += ["--since", since]
-    }
-    if let limit {
-      next += ["--limit", String(limit)]
-    }
-    return next
   }
 
   private func attach(action: KageAction, to result: RunActionResponse) -> RunActionResponse {

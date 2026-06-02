@@ -178,6 +178,43 @@ do {
   try require(search.results[0].agentSession.id == "codex:session-1", "search result should convert to session")
   try require(search.results[0].match?.text == "Fix login button state", "search match should decode")
 
+  let recentSearchArgs = KageCLIArguments.search(
+    query: "auth",
+    project: "/tmp/project",
+    agent: "all",
+    since: "90d",
+    limit: 50,
+    includeSubdirectories: true
+  )
+  try require(
+    recentSearchArgs == [
+      "search",
+      "auth",
+      "--project",
+      "/tmp/project",
+      "--json",
+      "--since",
+      "90d",
+      "--limit",
+      "50",
+      "--include-subdirs",
+    ],
+    "recent desktop search args should include the bounded history window"
+  )
+
+  let fullHistorySearchArgs = KageCLIArguments.search(
+    query: "auth",
+    project: "/tmp/project",
+    agent: "codex",
+    since: nil,
+    limit: 50,
+    includeSubdirectories: false
+  )
+  try require(
+    !fullHistorySearchArgs.contains("--since") && fullHistorySearchArgs.contains("--agent"),
+    "full-history search args should omit the recent bound and keep agent filters"
+  )
+
   let runAction = try decode(
     RunActionResponse.self,
     """

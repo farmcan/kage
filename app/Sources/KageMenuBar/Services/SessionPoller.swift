@@ -24,6 +24,7 @@ final class SessionPoller: ObservableObject {
   private let doctorRefreshInterval: TimeInterval = 300
   private let recentHistorySince = "90d"
   private let recentHistoryLimit = 120
+  private let searchResultLimit = 50
 
   var totalSessions: Int {
     sessionsResponse?.sessions.count ?? 0
@@ -150,11 +151,14 @@ final class SessionPoller: ObservableObject {
     }
 
     do {
+      let since = loadsFullHistory ? nil : recentHistorySince
       searchResponse = try await cli.search(
         cwd: appState.watchedDirectory,
         query: trimmedQuery,
         agent: appState.selectedAgent,
-        includeSubdirectories: appState.includeSubdirectories
+        includeSubdirectories: appState.includeSubdirectories,
+        since: since,
+        limit: searchResultLimit
       )
     } catch {
       searchErrorMessage = error.localizedDescription

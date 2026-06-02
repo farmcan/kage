@@ -30,3 +30,18 @@ test("menu bar bundle script ships the KAGE CLI resources", async () => {
   assert.match(content, /exec \/usr\/bin\/env node "\$SCRIPT_DIR\/kage-cli\/src\/cli\.js"/);
   assert.match(content, /chmod \+x "\$CLI_LAUNCHER"/);
 });
+
+test("homepage and release notes track the package version", async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
+  const version = packageJson.version;
+  const tag = `v${version}`;
+  const dmgName = `KAGE-${version}.dmg`;
+  const expectedDownload = `https://github.com/farmcan/kage/releases/download/${tag}/${dmgName}`;
+  const homepage = await fs.readFile(path.join(__dirname, "..", "docs", "index.html"), "utf8");
+  const releaseNotes = await fs.readFile(path.join(__dirname, "..", "docs", "release-notes", `${tag}.md`), "utf8");
+
+  assert.match(homepage, new RegExp(`Latest: ${tag}`));
+  assert.equal(homepage.split(expectedDownload).length - 1, 2);
+  assert.match(releaseNotes, new RegExp(`# KAGE ${tag}`));
+  assert.match(releaseNotes, new RegExp(`releases/download/${tag}/${dmgName}`));
+});
