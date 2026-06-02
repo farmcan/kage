@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.9 refines the macOS menu bar icon from a filled app tile into a lighter linear Session Portal glyph.
+- KAGE v0.1.9 将 macOS 状态栏图标从实心 App tile 优化为更轻的线性 Session Portal glyph。
+
 - KAGE v0.1.8 fixes the macOS app pipe deadlock that could leave large projects stuck on "Loading sessions..." and refreshes the desktop app identity.
 - KAGE v0.1.8 修复 macOS App 在大型项目中可能卡在 "Loading sessions..." 的管道死锁问题，并更新桌面 App 视觉识别。
 
