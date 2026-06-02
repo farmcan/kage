@@ -25,7 +25,7 @@ Action language in KAGE is intentionally narrow:
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.10](https://github.com/farmcan/kage/releases/tag/v0.1.10)
+Latest release: [KAGE v0.1.11](https://github.com/farmcan/kage/releases/tag/v0.1.11)
 
 ## Use KAGE If
 
@@ -55,7 +55,7 @@ Before trying it, KAGE is most useful if you already have at least one Claude Co
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.10/KAGE-0.1.10.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -175,10 +175,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.10 DMG from GitHub Releases:
+Download the v0.1.11 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.10/KAGE-0.1.10.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.

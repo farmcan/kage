@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.11 ships the post-release UX fixes: current homepage DMG links, a v0.1.10 release note archive, homepage version guard coverage, and desktop search scoped to the recent-history window by default.
+- KAGE v0.1.11 发布发布后 UX 修复：主页 DMG 链接指向当前版本、补齐 v0.1.10 release note、增加主页版本防回归测试，并让桌面搜索默认跟随最近历史窗口。
+
 - KAGE v0.1.10 keeps large local histories responsive with a default recent 90-day / 120-session desktop window, an explicit full-history mode with older months folded, and new-session launch controls for Codex, Claude Code, and QoderCLI.
 - KAGE v0.1.10 通过默认加载最近 90 天 / 120 条 session、提供旧月份折叠的完整历史模式，并增加 Codex、Claude Code、QoderCLI 的新 session 启动入口，让大量本地历史下的桌面端更顺畅。
 
