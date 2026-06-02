@@ -1,56 +1,62 @@
 <svg width="960" height="620" viewBox="0 0 960 620" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="960" height="620" rx="28" fill="#f4f2ed"/>
-  <rect x="0" y="0" width="960" height="40" fill="#fbfaf7"/>
-  <text x="22" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#2a2a2a">Finder</text>
-  <text x="790" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#2a2a2a">Sun 5:31 PM</text>
-  <rect x="704" y="7" width="68" height="26" rx="13" fill="#e6e3dc"/>
-  <g transform="translate(713 9) scale(0.34)">
-    <path fill="#2f2f2f" fill-rule="evenodd" d="M19 10h26c5 0 9 4 9 9v26c0 5-4 9-9 9H19c-5 0-9-4-9-9V19c0-5 4-9 9-9Zm2 8c-2 0-3 1-3 3v22c0 2 1 3 3 3h22c2 0 3-1 3-3V21c0-2-1-3-3-3H21Zm4 10c-2-2-2-5 0-7 2-1 4-1 6 0l10 9c1 1 2 3 2 5s-1 4-2 5L31 49c-2 1-4 1-6 0-2-2-2-5 0-7l7-7-7-7Z"/>
-    <rect x="35" y="42" width="13" height="6" rx="3" fill="#2f2f2f"/>
+  <rect width="960" height="620" rx="28" fill="#0d1114"/>
+  <rect x="0" y="0" width="960" height="40" fill="#151d23"/>
+  <text x="22" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#f7f2e6">Finder</text>
+  <text x="790" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#a7b2ba">Tue 8:19 PM</text>
+  <rect x="702" y="7" width="72" height="26" rx="13" fill="#1b252c" stroke="#2a343c"/>
+  <g transform="translate(712 8) scale(0.34)">
+    <g fill="none" stroke="#f7f2e6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="10" y="10" width="44" height="38" rx="10" stroke-width="5"/>
+      <path d="M23 25l9 7-9 7" stroke-width="5.8"/>
+      <path d="M37 39h9" stroke-width="5"/>
+    </g>
+    <circle cx="18" cy="55" r="3.2" fill="#f7f2e6"/>
+    <circle cx="32" cy="56" r="3.2" fill="#f7f2e6"/>
+    <circle cx="46" cy="55" r="3.2" fill="#f7f2e6"/>
   </g>
-  <text x="748" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="700" fill="#2a2a2a">5</text>
+  <text x="748" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#f7f2e6">12</text>
 
-  <path d="M738 40l-12 16h24l-12-16z" fill="#fbfaf7"/>
-  <rect x="530" y="52" width="390" height="518" rx="22" fill="#fbfaf7" stroke="#dedbd2"/>
-  <rect x="548" y="72" width="354" height="72" rx="14" fill="#f0eee8"/>
-  <text x="582" y="103" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">demo-app</text>
-  <text x="582" y="128" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#706d67">~/wrksp/demo-app</text>
-  <circle cx="566" cy="108" r="11" stroke="#706d67" stroke-width="2"/>
-  <path d="M566 92v32M550 108h32" stroke="#706d67" stroke-width="2"/>
+  <path d="M738 40l-12 16h24l-12-16z" fill="#11171c"/>
+  <rect x="520" y="52" width="400" height="522" rx="22" fill="#11171c" stroke="#2a343c"/>
+  <rect x="540" y="74" width="360" height="72" rx="12" fill="#141a1f" stroke="#2a343c"/>
+  <text x="578" y="104" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">kage</text>
+  <text x="578" y="128" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
+  <circle cx="560" cy="109" r="10" stroke="#74818a" stroke-width="2"/>
+  <path d="M560 94v30M545 109h30" stroke="#74818a" stroke-width="2"/>
 
-  <rect x="548" y="162" width="354" height="36" rx="9" fill="#e5e2db"/>
-  <rect x="622" y="162" width="94" height="36" rx="9" fill="#cecac1"/>
-  <text x="574" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#55524d">All</text>
-  <text x="642" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#252525">Claude 2</text>
-  <text x="736" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#55524d">Codex 2</text>
-  <text x="824" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="15" fill="#55524d">Qoder 1</text>
+  <rect x="540" y="164" width="360" height="36" rx="8" fill="#172029" stroke="#2a343c"/>
+  <rect x="544" y="168" width="58" height="28" rx="6" fill="#24313a"/>
+  <text x="566" y="187" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#f7f2e6">All</text>
+  <text x="626" y="187" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#a7b2ba">Codex</text>
+  <text x="704" y="187" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#a7b2ba">Claude</text>
+  <text x="796" y="187" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#a7b2ba">QoderCLI</text>
 
-  <line x1="548" y1="218" x2="902" y2="218" stroke="#dedbd2"/>
-  <rect x="548" y="236" width="354" height="80" rx="12" fill="#f3f1ec"/>
-  <text x="572" y="264" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#55524d">Claude Code</text>
-  <text x="572" y="292" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">Auth refactor plan</text>
-  <text x="828" y="264" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#77736c">2m ago</text>
+  <line x1="540" y1="220" x2="900" y2="220" stroke="#2a343c"/>
+  <rect x="540" y="238" width="360" height="78" rx="8" fill="#18261f" stroke="#4cc38a"/>
+  <text x="564" y="266" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#4cc38a">CODEX</text>
+  <text x="564" y="294" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
+  <text x="830" y="266" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">now</text>
 
-  <rect x="548" y="326" width="354" height="80" rx="12" fill="#fbfaf7"/>
-  <text x="572" y="354" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#55524d">Codex</text>
-  <text x="572" y="382" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">Fix login tests</text>
-  <text x="828" y="354" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#77736c">9m ago</text>
+  <rect x="540" y="328" width="360" height="78" rx="8" fill="#141a1f" stroke="#2a343c"/>
+  <text x="564" y="356" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#c7a7ff">CLAUDE CODE</text>
+  <text x="564" y="384" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">Session loading plan</text>
+  <text x="830" y="356" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">8m</text>
 
-  <line x1="548" y1="426" x2="902" y2="426" stroke="#dedbd2"/>
-  <text x="548" y="456" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="700" fill="#252525">Actions</text>
-  <rect x="548" y="474" width="108" height="34" rx="17" fill="#ece9e2"/>
-  <text x="574" y="496" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#252525">Bridge</text>
-  <rect x="668" y="474" width="112" height="34" rx="17" fill="#ece9e2"/>
-  <text x="694" y="496" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#252525">Refresh</text>
-  <rect x="792" y="474" width="110" height="34" rx="17" fill="#ece9e2"/>
-  <text x="818" y="496" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" fill="#252525">Settings</text>
+  <line x1="540" y1="428" x2="900" y2="428" stroke="#2a343c"/>
+  <text x="540" y="458" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">Actions</text>
+  <rect x="540" y="476" width="82" height="34" rx="8" fill="#4cc38a"/>
+  <text x="565" y="498" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#07110c">New</text>
+  <rect x="634" y="476" width="108" height="34" rx="8" fill="#192229" stroke="#2a343c"/>
+  <text x="666" y="498" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#f7f2e6">Bridge</text>
+  <rect x="754" y="476" width="104" height="34" rx="8" fill="#192229" stroke="#2a343c"/>
+  <text x="782" y="498" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#f7f2e6">Refresh</text>
 
-  <line x1="548" y1="526" x2="902" y2="526" stroke="#dedbd2"/>
-  <text x="548" y="552" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#77736c">~/wrksp/demo-app</text>
-  <text x="828" y="552" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#2e6f5c">KAGE 0.1.4</text>
+  <line x1="540" y1="530" x2="900" y2="530" stroke="#2a343c"/>
+  <text x="540" y="554" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
+  <text x="812" y="554" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#4cc38a">KAGE 0.1.11</text>
 
-  <text x="70" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="38" font-weight="800" fill="#252525">Menu bar control</text>
-  <text x="70" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#5d5a55">KAGE stays close in the macOS status bar.</text>
-  <text x="70" y="270" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#5d5a55">Check local sessions, refresh, bridge, or open</text>
-  <text x="70" y="304" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#5d5a55">the full desktop workspace.</text>
+  <text x="70" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="38" font-weight="850" fill="#f7f2e6">Menu bar control</text>
+  <text x="70" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#a7b2ba">KAGE stays close in the macOS status bar.</text>
+  <text x="70" y="270" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#a7b2ba">Open a new agent session, refresh the local</text>
+  <text x="70" y="304" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#a7b2ba">workspace, or jump into the desktop surface.</text>
 </svg>

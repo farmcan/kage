@@ -1,4 +1,12 @@
-# KAGE
+<p align="center">
+  <img src="docs/assets/kage-logo.svg" width="104" alt="KAGE session portal icon">
+</p>
+
+<h1 align="center">KAGE</h1>
+
+<p align="center">
+  Local-first desktop workspace and CLI for AI coding session memory.
+</p>
 
 [![CI](https://github.com/farmcan/kage/actions/workflows/ci.yml/badge.svg)](https://github.com/farmcan/kage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -8,7 +16,7 @@ KAGE finds, resumes, forks, replays, and bridges local AI coding sessions across
 
 > Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
 
-KAGE treats coding-agent sessions as local project assets. It gives you a macOS desktop workspace and a CLI for finding the session where useful work happened, continuing it, branching it, or moving it into another agent's native resume format.
+KAGE treats coding-agent sessions as local project assets. It gives you a macOS desktop workspace and a CLI for finding the session where useful work happened, continuing it, starting a fresh agent session, branching it, or moving it into another agent's native resume format.
 
 It does not upload transcript content, run its own coding model, or try to replace your terminal. The app is a thin native shell over the same JSON CLI contract, so transcript parsing and route logic stay in one place.
 
@@ -42,11 +50,11 @@ Latest release: [KAGE v0.1.11](https://github.com/farmcan/kage/releases/tag/v0.1
 
 ## Screenshots
 
-![KAGE search to bridge flow](docs/assets/screenshots/kage-demo-flow.svg)
-
 ![KAGE desktop preview](docs/assets/screenshots/kage-desktop-preview.svg)
 
 ![KAGE menu bar preview](docs/assets/screenshots/kage-menubar-preview.svg)
+
+![KAGE search to action flow](docs/assets/screenshots/kage-demo-flow.svg)
 
 ## Try It In 60 Seconds
 
@@ -70,9 +78,8 @@ Check what KAGE can see:
 
 ```bash
 kage doctor
-kage sessions
-kage sessions --include-subdirs
 kage sessions --since 90d --limit 120
+kage sessions --include-subdirs
 kage search "auth"
 ```
 

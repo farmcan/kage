@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- Refreshed the GitHub Pages homepage and README hero assets around the current Session Portal icon, dark desktop workspace, recent-history search, New Session controls, and v0.1.11 release path.
+- 围绕当前 Session Portal 图标、暗色桌面工作台、最近历史搜索、New Session 控件和 v0.1.11 发布路径，刷新 GitHub Pages 主页与 README 首屏资产。
+
 - KAGE v0.1.11 ships the post-release UX fixes: current homepage DMG links, a v0.1.10 release note archive, homepage version guard coverage, and desktop search scoped to the recent-history window by default.
 - KAGE v0.1.11 发布发布后 UX 修复：主页 DMG 链接指向当前版本、补齐 v0.1.10 release note、增加主页版本防回归测试，并让桌面搜索默认跟随最近历史窗口。
 

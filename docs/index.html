@@ -7,24 +7,31 @@
       name="description"
       content="Find, resume, fork, replay, and bridge local AI coding sessions across Claude Code, Codex, and QoderCLI."
     >
-    <title>KAGE - AI Coding Session Manager</title>
+    <title>KAGE - Local AI Coding Session Manager</title>
     <style>
       :root {
-        color-scheme: light;
-        --ink: #111418;
-        --muted: #52616b;
-        --paper: #faf8f2;
-        --line: #d8d4ca;
-        --leaf: #1f7a5d;
-        --leaf-soft: #dceee4;
+        color-scheme: dark;
+        --ink: #f7f2e6;
+        --muted: #a7b2ba;
+        --dim: #74818a;
+        --paper: #0d1114;
+        --panel: #141a1f;
+        --panel-2: #192229;
+        --line: #2a343c;
+        --green: #4cc38a;
         --gold: #f2b84b;
-        --red: #c85345;
-        --blue: #315b8d;
+        --blue: #6cb6ff;
+        --violet: #c7a7ff;
+        --red: #ef6f61;
         --white: #fffdf8;
       }
 
       * {
         box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
       }
 
       body {
@@ -41,21 +48,21 @@
       }
 
       .shell {
-        width: min(1120px, calc(100% - 40px));
+        width: min(1160px, calc(100% - 40px));
         margin: 0 auto;
       }
 
       header {
         position: sticky;
         top: 0;
-        z-index: 10;
-        border-bottom: 1px solid rgba(17, 20, 24, 0.1);
-        background: rgba(250, 248, 242, 0.92);
+        z-index: 20;
+        border-bottom: 1px solid rgba(247, 242, 230, 0.1);
+        background: rgba(13, 17, 20, 0.9);
         backdrop-filter: blur(16px);
       }
 
       nav {
-        min-height: 72px;
+        min-height: 70px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -72,8 +79,8 @@
       }
 
       .brand img {
-        width: 40px;
-        height: 40px;
+        width: 38px;
+        height: 38px;
       }
 
       .links {
@@ -88,19 +95,29 @@
         text-decoration: none;
       }
 
+      .links a:hover {
+        color: var(--ink);
+      }
+
       .button {
         display: inline-flex;
         min-height: 42px;
         align-items: center;
         justify-content: center;
-        border: 1px solid var(--ink);
+        border: 1px solid var(--green);
         border-radius: 8px;
         padding: 0 16px;
-        background: var(--ink);
-        color: var(--white);
-        font-weight: 700;
+        background: var(--green);
+        color: #07110c;
+        font-weight: 800;
         text-decoration: none;
         white-space: nowrap;
+      }
+
+      .button.secondary {
+        border-color: rgba(247, 242, 230, 0.24);
+        background: rgba(247, 242, 230, 0.08);
+        color: var(--ink);
       }
 
       main {
@@ -108,92 +125,40 @@
       }
 
       .hero {
-        min-height: calc(100svh - 72px);
-        display: grid;
-        grid-template-columns: minmax(0, 1.04fr) minmax(320px, 0.96fr);
-        align-items: center;
-        gap: 56px;
-        padding: 76px 0 42px;
-      }
-
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin: 0 0 18px;
-        color: var(--leaf);
-        font-size: 14px;
-        font-weight: 800;
-        text-transform: uppercase;
-      }
-
-      .eyebrow::before {
-        content: "";
-        width: 24px;
-        height: 3px;
-        border-radius: 999px;
-        background: var(--gold);
-      }
-
-      h1 {
-        margin: 0;
-        max-width: 780px;
-        font-size: 112px;
-        line-height: 0.9;
-        letter-spacing: 0;
-      }
-
-      .hero-copy {
-        max-width: 680px;
-        margin: 26px 0 0;
-        color: var(--muted);
-        font-size: 22px;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 34px;
-      }
-
-      .hero-proof {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 22px;
-        color: var(--muted);
-        font-size: 14px;
-        font-weight: 700;
-      }
-
-      .hero-proof span {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 7px 10px;
-        background: var(--white);
-      }
-
-      .secondary {
-        background: transparent;
-        color: var(--ink);
-      }
-
-      .terminal {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #171b20;
-        color: #eef4ed;
-        box-shadow: 0 26px 60px rgba(17, 20, 24, 0.18);
-      }
-
-      .terminal-top {
+        position: relative;
+        min-height: calc(100svh - 70px);
         display: flex;
         align-items: center;
-        gap: 8px;
-        min-height: 42px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 0 16px;
+        padding: 74px 0 66px;
+        border-bottom: 1px solid var(--line);
+        background: #0d1114;
+      }
+
+      .hero-scene {
+        position: absolute;
+        inset: 38px -170px 36px 50%;
+        opacity: 0.9;
+      }
+
+      .app-window {
+        min-width: 780px;
+        height: 100%;
+        min-height: 570px;
+        border: 1px solid rgba(247, 242, 230, 0.14);
+        border-radius: 18px;
+        background: #11171c;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        overflow: hidden;
+      }
+
+      .window-bar {
+        height: 54px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border-bottom: 1px solid var(--line);
+        padding: 0 20px;
+        background: #151d23;
       }
 
       .dot {
@@ -208,49 +173,257 @@
       }
 
       .dot:nth-child(3) {
-        background: #4aa66d;
+        background: var(--green);
       }
 
-      pre {
-        margin: 0;
-        overflow-x: auto;
-        padding: 24px;
-        font: 15px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      .window-title {
+        margin-left: 14px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
       }
 
-      .comment {
-        color: #9fb2bf;
-      }
-
-      .ok {
-        color: #81d199;
-      }
-
-      .panel-row {
+      .app-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
-        padding-bottom: 76px;
+        grid-template-columns: 286px minmax(0, 1fr);
+        min-height: 516px;
       }
 
-      .panel {
+      .sidebar {
+        border-right: 1px solid var(--line);
+        background: #121920;
+        padding: 20px;
+      }
+
+      .path-name {
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .path-sub {
+        margin-top: 4px;
+        color: var(--dim);
+        font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .tabs,
+      .search,
+      .history-pill {
+        margin-top: 18px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--white);
-        padding: 22px;
+        background: #172029;
       }
 
-      .panel h2,
-      .section h2 {
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        overflow: hidden;
+      }
+
+      .tabs span {
+        padding: 9px 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .tabs span:first-child {
+        background: #24313a;
+        color: var(--ink);
+      }
+
+      .search {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        color: var(--dim);
+        font-size: 13px;
+      }
+
+      .session-list {
+        margin-top: 22px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .session-row {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+        background: #151d24;
+      }
+
+      .session-row.active {
+        border-color: rgba(76, 195, 138, 0.65);
+        background: #18261f;
+      }
+
+      .agent {
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .session-title {
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .session-path {
+        margin-top: 7px;
+        color: var(--dim);
+        font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .history-pill {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .history-pill strong {
+        color: var(--green);
+      }
+
+      .detail {
+        padding: 28px;
+        background: #0f1519;
+      }
+
+      .detail-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .agent-icon {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: rgba(76, 195, 138, 0.14);
+        color: var(--green);
+        font-weight: 900;
+      }
+
+      .detail h3 {
         margin: 0;
-        font-size: 22px;
+        font-size: 24px;
+      }
+
+      .detail-meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 24px 0;
+      }
+
+      .mini-button {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px 12px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .mini-button.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #07110c;
+      }
+
+      .terminal {
+        min-height: 220px;
+        border: 1px solid rgba(247, 242, 230, 0.12);
+        border-radius: 8px;
+        background: #070a0d;
+        padding: 20px;
+        color: #dce8df;
+        font: 14px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .terminal .ok {
+        color: var(--green);
+      }
+
+      .hero-copy {
+        position: relative;
+        z-index: 2;
+        max-width: 560px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0 0 18px;
+        color: var(--green);
+        font-size: 14px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 26px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--gold);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(68px, 11vw, 132px);
+        line-height: 0.88;
         letter-spacing: 0;
       }
 
-      .panel p,
-      .section p {
-        margin: 10px 0 0;
+      .hero-copy p {
+        max-width: 520px;
+        margin: 26px 0 0;
         color: var(--muted);
+        font-size: clamp(18px, 2vw, 22px);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 32px;
+      }
+
+      .hero-proof {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .hero-proof span {
+        border: 1px solid rgba(247, 242, 230, 0.14);
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: rgba(247, 242, 230, 0.06);
       }
 
       .section {
@@ -258,55 +431,128 @@
         padding: 76px 0;
       }
 
-      .product-proof {
-        padding-bottom: 76px;
+      .section h2 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 46px);
+        letter-spacing: 0;
       }
 
-      .product-proof img {
+      .section p {
+        margin: 12px 0 0;
+        color: var(--muted);
+      }
+
+      .proof-strip {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: #10161b;
+        padding: 18px 0;
+      }
+
+      .proof-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .proof-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        background: var(--panel);
+      }
+
+      .proof-item strong {
+        display: block;
+        color: var(--ink);
+        font-size: 16px;
+      }
+
+      .proof-item span {
+        display: block;
+        margin-top: 5px;
+        color: var(--dim);
+        font-size: 13px;
+      }
+
+      .media-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .media-stack img {
         display: block;
         width: 100%;
         height: auto;
         border: 1px solid var(--line);
         border-radius: 8px;
-        box-shadow: 0 24px 56px rgba(17, 20, 24, 0.14);
+        background: var(--panel);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
       }
 
-      .product-proof img + img {
-        margin-top: 18px;
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 0.72fr) minmax(380px, 1.28fr);
+        gap: 42px;
+        align-items: start;
       }
 
-      .fit-grid {
+      .workflow-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 24px;
+        gap: 14px;
+      }
+
+      .workflow {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        background: var(--panel);
+      }
+
+      .workflow strong {
+        display: block;
+        font-size: 18px;
+      }
+
+      .workflow p {
+        font-size: 14px;
+      }
+
+      .fit-grid,
+      .roadmap {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .fit,
+      .step {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 22px;
       }
 
       .fit {
-        border-top: 4px solid var(--leaf);
-        background: var(--white);
-        padding: 24px;
+        border-top: 4px solid var(--green);
       }
 
       .fit:nth-child(2) {
-        border-color: var(--red);
+        border-top-color: var(--red);
       }
 
-      .fit h2 {
-        margin: 0 0 14px;
-        font-size: 22px;
+      .fit h3,
+      .step strong {
+        margin: 0;
+        font-size: 20px;
       }
 
       .fit ul {
-        margin: 0;
+        margin: 14px 0 0;
         padding-left: 20px;
         color: var(--muted);
-      }
-
-      .matrix {
-        display: grid;
-        grid-template-columns: minmax(0, 0.85fr) minmax(320px, 1.15fr);
-        gap: 48px;
-        align-items: start;
       }
 
       table {
@@ -315,7 +561,7 @@
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--white);
+        background: var(--panel);
       }
 
       th,
@@ -331,9 +577,19 @@
       }
 
       th {
-        background: var(--leaf-soft);
-        font-size: 13px;
+        background: var(--panel-2);
+        color: var(--muted);
+        font-size: 12px;
         text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      td:first-child {
+        color: var(--ink);
+        font-weight: 800;
       }
 
       code {
@@ -341,67 +597,67 @@
         font-size: 0.95em;
       }
 
-      .roadmap {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-        margin-top: 28px;
-      }
-
-      .step {
-        border-left: 4px solid var(--blue);
-        border-radius: 8px;
-        background: var(--white);
-        padding: 18px;
-      }
-
-      .step:nth-child(2) {
-        border-color: var(--leaf);
-      }
-
-      .step:nth-child(3) {
-        border-color: var(--gold);
-      }
-
-      .step:nth-child(4) {
-        border-color: var(--red);
-      }
-
       footer {
         border-top: 1px solid var(--line);
         padding: 30px 0;
-        color: var(--muted);
+        color: var(--dim);
         font-size: 14px;
       }
 
-      @media (max-width: 840px) {
+      @media (max-width: 1180px) and (min-width: 921px) {
+        .hero-scene {
+          inset: 44px -220px 42px 52%;
+        }
+
+        .hero-copy {
+          max-width: 500px;
+        }
+
+        .hero-copy p {
+          max-width: 480px;
+          font-size: 19px;
+        }
+
+        h1 {
+          font-size: 104px;
+        }
+      }
+
+      @media (max-width: 920px) {
         .links {
           display: none;
         }
 
-        .hero,
-        .matrix,
-        .fit-grid,
-        .panel-row,
-        .roadmap {
-          grid-template-columns: 1fr;
+        .hero {
+          min-height: auto;
+          align-items: start;
+          padding: 52px 0 0;
+        }
+
+        .hero-scene {
+          position: relative;
+          inset: auto;
+          width: calc(100% + 40px);
+          margin: 34px -20px 0;
+        }
+
+        .app-window {
+          min-width: 760px;
+          min-height: 520px;
+          transform: scale(0.74);
+          transform-origin: top left;
         }
 
         .hero {
-          min-height: auto;
-          padding-top: 52px;
+          padding-bottom: 0;
         }
 
-        .terminal {
-          max-width: 100%;
-        }
-
-        h1 {
-          font-size: 64px;
-        }
-
-        .hero-copy {
-          font-size: 18px;
+        .proof-grid,
+        .split,
+        .workflow-grid,
+        .fit-grid,
+        .roadmap {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -415,8 +671,8 @@
         </a>
         <div class="links">
           <a href="#workflows">Workflows</a>
+          <a href="#desktop">Desktop</a>
           <a href="#matrix">Routes</a>
-          <a href="#roadmap">Roadmap</a>
           <a href="https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg">Download</a>
           <a href="https://github.com/farmcan/kage/releases">Releases</a>
           <a href="https://github.com/farmcan/kage">GitHub</a>
@@ -425,101 +681,199 @@
     </header>
 
     <main id="top">
-      <section class="shell hero">
-        <div>
-          <p class="eyebrow">Local-first AI coding session manager</p>
-          <h1>KAGE</h1>
-          <p class="hero-copy">
-            A macOS desktop app and CLI for finding, searching, forking, opening replay stories, and moving
-            local coding-agent sessions across Claude Code, Codex, and QoderCLI without uploading transcript content.
-          </p>
-          <div class="actions">
-            <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg">Download DMG</a>
-            <a class="button secondary" href="https://github.com/farmcan/kage">Star on GitHub</a>
-            <a class="button secondary" href="https://github.com/farmcan/kage#install">Install CLI</a>
-            <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
-          </div>
-          <div class="hero-proof" aria-label="Product proof">
-            <span>Local-first</span>
-            <span>Desktop + CLI</span>
-            <span>Claude Code / Codex / QoderCLI</span>
-            <span>Latest: v0.1.11</span>
+      <section class="hero" aria-label="KAGE desktop workspace">
+        <div class="hero-scene" aria-hidden="true">
+          <div class="app-window">
+            <div class="window-bar">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="window-title">KAGE desktop workspace</span>
+            </div>
+            <div class="app-grid">
+              <aside class="sidebar">
+                <div class="path-name">kage</div>
+                <div class="path-sub">~/wrksp/kage</div>
+                <div class="tabs">
+                  <span>All</span>
+                  <span>Codex</span>
+                  <span>Claude</span>
+                </div>
+                <div class="search">Search transcripts</div>
+                <div class="session-list">
+                  <div class="session-row active">
+                    <div class="agent">Codex</div>
+                    <div class="session-title">Homepage release audit</div>
+                    <div class="session-path">~/wrksp/kage</div>
+                  </div>
+                  <div class="session-row">
+                    <div class="agent" style="color: var(--violet)">Claude Code</div>
+                    <div class="session-title">Session loading plan</div>
+                    <div class="session-path">~/wrksp/kage</div>
+                  </div>
+                  <div class="session-row">
+                    <div class="agent" style="color: var(--blue)">QoderCLI</div>
+                    <div class="session-title">Replay story export</div>
+                    <div class="session-path">~/wrksp/kage</div>
+                  </div>
+                </div>
+                <div class="history-pill">
+                  <span>Recent 90d / 120 max</span>
+                  <strong>Load Full History</strong>
+                </div>
+              </aside>
+              <section class="detail">
+                <div class="detail-top">
+                  <div class="agent-icon">&gt;_</div>
+                  <div>
+                    <h3>Homepage release audit</h3>
+                    <div class="detail-meta">Codex session in ~/wrksp/kage</div>
+                  </div>
+                </div>
+                <div class="detail-actions">
+                  <span class="mini-button primary">Continue</span>
+                  <span class="mini-button">New Session</span>
+                  <span class="mini-button">Terminal.app</span>
+                  <span class="mini-button">Replay story</span>
+                </div>
+                <div class="terminal">
+                  $ kage search "release" --since 90d --limit 50<br>
+                  <span class="ok">Found local sessions without scanning full history.</span><br><br>
+                  $ kage actions --limit 120<br>
+                  Continue, Fork, Bridge, Replay story, New Session
+                </div>
+              </section>
+            </div>
           </div>
         </div>
-        <div class="terminal" aria-label="KAGE terminal demo">
-          <div class="terminal-top">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
+
+        <div class="shell">
+          <div class="hero-copy">
+            <p class="eyebrow">Local-first AI coding session manager</p>
+            <h1>KAGE</h1>
+            <p>
+              A macOS desktop workspace and CLI for finding, searching, forking, replaying, and moving local
+              coding-agent sessions across Claude Code, Codex, and QoderCLI without uploading transcript content.
+            </p>
+            <div class="actions">
+              <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg">Download DMG</a>
+              <a class="button secondary" href="https://github.com/farmcan/kage">Star on GitHub</a>
+              <a class="button secondary" href="https://github.com/farmcan/kage#install">Install CLI</a>
+              <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
+            </div>
+            <div class="hero-proof" aria-label="Product proof">
+              <span>New Session</span>
+              <span>Recent history window</span>
+              <span>Claude Code / Codex / QoderCLI</span>
+              <span>Latest: v0.1.11</span>
+            </div>
           </div>
-          <pre><code>$ kage c2x --preview
-Export preview
-Source: claude
-Target: codex
-Format: codex-session
-Resume command:
-codex resume b3b958d7
-
-$ kage q
-<span class="ok">Matching QoderCLI sessions for ./repo</span>
-
-$ kage x2v
-<span class="comment">Open a local replay story for review.</span></code></pre>
         </div>
       </section>
 
-      <section class="shell product-proof" aria-label="KAGE desktop preview">
-        <img src="./assets/screenshots/kage-demo-flow.svg" alt="KAGE flow: search local memory, select a session, choose an action, and resume natively">
-        <img src="./assets/screenshots/kage-desktop-preview.svg" alt="KAGE desktop workspace with project sessions, agent filters, and an embedded terminal">
+      <section class="proof-strip" aria-label="Current capabilities">
+        <div class="shell proof-grid">
+          <div class="proof-item">
+            <strong>90d / 120</strong>
+            <span>Recent desktop window by default.</span>
+          </div>
+          <div class="proof-item">
+            <strong>Terminal.app</strong>
+            <span>Fallback for noisy interactive sessions.</span>
+          </div>
+          <div class="proof-item">
+            <strong>Demo mode</strong>
+            <span>Try KAGE before local history exists.</span>
+          </div>
+          <div class="proof-item">
+            <strong>Local first</strong>
+            <span>Transcript content stays on disk.</span>
+          </div>
+        </div>
       </section>
 
-      <section id="workflows" class="shell panel-row" aria-label="Core workflows">
-        <article class="panel">
-          <h2>Desktop Workspace</h2>
-          <p>Browse project sessions, search recent prompts, launch continue, fork, bridge, or replay story actions, and explore sanitized demo sessions before you have local history.</p>
-        </article>
-        <article class="panel">
-          <h2>Rescue Context</h2>
-          <p>Locate the coding session where the important decision, bug, or plan actually happened.</p>
-        </article>
-        <article class="panel">
-          <h2>Bridge Agents</h2>
-          <p>Move a useful session from Claude Code to Codex, Codex to QoderCLI, or any supported route.</p>
-        </article>
-        <article class="panel">
-          <h2>Replay Work</h2>
-          <p>Turn a transcript into a local story view so a session can be reviewed instead of guessed.</p>
-        </article>
+      <section id="desktop" class="section">
+        <div class="shell split">
+          <div>
+            <h2>Current desktop surface</h2>
+            <p>
+              The app is now centered on the full desktop workspace: recent local sessions on the left,
+              explicit action controls on the right, and a clear path to launch a new agent session.
+            </p>
+          </div>
+          <div class="media-stack">
+            <img src="./assets/screenshots/kage-desktop-preview.svg" alt="KAGE desktop workspace with recent history controls, new session actions, and embedded terminal">
+            <img src="./assets/screenshots/kage-menubar-preview.svg" alt="KAGE menu bar popover with quick new session and action controls">
+          </div>
+        </div>
+      </section>
+
+      <section id="workflows" class="section">
+        <div class="shell split">
+          <div>
+            <h2>Workflows that match local agent memory</h2>
+            <p>
+              KAGE is not another coding agent. It is the session layer around the agents you already use.
+            </p>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow">
+              <strong>Continue</strong>
+              <p>Resume the selected session in its native agent without hunting through JSONL files.</p>
+            </article>
+            <article class="workflow">
+              <strong>New Session</strong>
+              <p>Start Codex, Claude Code, or QoderCLI in the watched project from KAGE or Terminal.app.</p>
+            </article>
+            <article class="workflow">
+              <strong>Fork / Bridge</strong>
+              <p>Branch a session or move useful context into another agent's native resume format.</p>
+            </article>
+            <article class="workflow">
+              <strong>Replay story</strong>
+              <p>Turn a transcript into a local read-only review when the work needs to be inspected.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-label="Search to bridge flow">
+        <div class="shell media-stack">
+          <img src="./assets/screenshots/kage-demo-flow.svg" alt="KAGE flow from search to selected session to action to native resume command">
+        </div>
       </section>
 
       <section class="section" aria-label="Fit check">
-        <div class="shell fit-grid">
-          <article class="fit">
-            <h2>Use KAGE if</h2>
-            <ul>
-              <li>You use more than one AI coding agent.</li>
-              <li>You need to find old local sessions by project or transcript text.</li>
-              <li>You want to fork, bridge, or replay sessions without copy-pasting transcripts.</li>
-            </ul>
-          </article>
-          <article class="fit">
-            <h2>Skip it for now if</h2>
-            <ul>
-              <li>You only use one agent and never revisit old sessions.</li>
-              <li>You need a signed and notarized macOS installer today.</li>
-              <li>You expect hosted sync, team sharing, or mobile control today.</li>
-            </ul>
-          </article>
+        <div class="shell">
+          <h2>Fit check</h2>
+          <div class="fit-grid">
+            <article class="fit">
+              <h3>Use KAGE if</h3>
+              <ul>
+                <li>You use more than one AI coding agent.</li>
+                <li>You need to find old local sessions by project or transcript text.</li>
+                <li>You want to fork, bridge, or replay sessions without copy-pasting transcripts.</li>
+              </ul>
+            </article>
+            <article class="fit">
+              <h3>Skip it for now if</h3>
+              <ul>
+                <li>You only use one agent and never revisit old sessions.</li>
+                <li>You need a signed and notarized macOS installer today.</li>
+                <li>You expect hosted sync, team sharing, or mobile control today.</li>
+              </ul>
+            </article>
+          </div>
         </div>
       </section>
 
       <section id="matrix" class="section">
-        <div class="shell matrix">
+        <div class="shell split">
           <div>
             <h2>One local workspace for agent memory</h2>
             <p>
-              Each agent has its own native session store. KAGE keeps the local-first model, then adds
-              a desktop workspace, discovery, conversion, preview, cleanup, and replay on top.
+              Each agent keeps its own native session store. KAGE adds discovery, search, conversion,
+              preview, cleanup, replay, and desktop launch controls on top.
             </p>
           </div>
           <table>
@@ -539,8 +893,8 @@ $ kage x2v
                 <td>Move Codex context into QoderCLI resume format.</td>
               </tr>
               <tr>
-                <td><code>kage c</code></td>
-                <td>List matching Claude sessions for the current project.</td>
+                <td><code>kage sessions --since 90d --limit 120</code></td>
+                <td>List a bounded recent session window for large local histories.</td>
               </tr>
               <tr>
                 <td><code>kage q2v</code></td>
@@ -552,83 +906,32 @@ $ kage x2v
       </section>
 
       <section class="section">
-        <div class="shell matrix">
+        <div class="shell split">
           <div>
-            <h2>Not another agent or terminal</h2>
+            <h2>Built for open source adoption</h2>
             <p>
-              Codex, Claude Code, QoderCLI, Warp, and Terminal still run the work. KAGE manages the local
-              session layer around them: discovery, search, continue, fork, bridge, replay, and cleanup.
+              Releases carry user-facing workflow notes, GitHub issues hold the roadmap, and the public
+              homepage stays aligned with the latest DMG.
             </p>
           </div>
-          <table>
-            <tbody>
-              <tr>
-                <td>Native resume</td>
-                <td>Best for one agent's own sessions. KAGE adds cross-agent search and bridge workflows.</td>
-              </tr>
-              <tr>
-                <td>Warp / Terminal</td>
-                <td>Best for running shells. KAGE keeps the memory map of what happened across agents.</td>
-              </tr>
-              <tr>
-                <td>Cloud tools</td>
-                <td>Best for hosted team search. KAGE keeps transcript content local by default.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="roadmap" class="section">
-        <div class="shell">
-          <h2>Product direction</h2>
-          <p>KAGE is becoming a practical control surface for local AI coding work.</p>
           <div class="roadmap">
             <article class="step">
               <strong>Desktop</strong>
-              <p>Browse sessions, filter agents, inspect context, run per-session actions, and use demo mode for first-run exploration.</p>
+              <p>Browse sessions, filter agents, inspect context, run actions, and try demo mode.</p>
             </article>
             <article class="step">
               <strong>Search</strong>
-              <p>Search local sessions by project, agent, title, and transcript text.</p>
+              <p>Search local sessions by project, agent, title, date range, and transcript text.</p>
             </article>
             <article class="step">
               <strong>Bridge</strong>
               <p>Move useful context across Claude Code, Codex, and QoderCLI native sessions.</p>
             </article>
             <article class="step">
-              <strong>Local First</strong>
-              <p>Keep transcripts on disk and use the CLI JSON contract as the app boundary.</p>
+              <strong>Packaging</strong>
+              <p>DMG releases are published; signing and notarization remain tracked in GitHub issues.</p>
             </article>
           </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="shell matrix">
-          <div>
-            <h2>Built for open source adoption</h2>
-            <p>
-              The public roadmap lives in GitHub issues, releases carry user-facing workflow notes,
-              and the README stays focused on a fast local trial path.
-            </p>
-          </div>
-          <table>
-            <tbody>
-              <tr>
-                <td><code>README</code></td>
-                <td>60-second install, current workflows, and local-first product boundary.</td>
-              </tr>
-              <tr>
-                <td><code>Issues</code></td>
-                <td>Bug, feature, and growth templates keep feedback actionable.</td>
-              </tr>
-              <tr>
-                <td><code>Releases</code></td>
-                <td>DMG artifacts, screenshots, and launch notes once desktop packaging is ready.</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </section>
     </main>
