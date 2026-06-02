@@ -1,6 +1,23 @@
 import Foundation
 import KageContracts
 
+private final class ProcessDataBuffer: @unchecked Sendable {
+  private let lock = NSLock()
+  private var storage = Data()
+
+  func set(_ data: Data) {
+    lock.lock()
+    storage = data
+    lock.unlock()
+  }
+
+  var data: Data {
+    lock.lock()
+    defer { lock.unlock() }
+    return storage
+  }
+}
+
 enum KageCLIError: LocalizedError {
   case notFound
   case executionFailed(command: String, exitCode: Int, stderr: String)
@@ -117,13 +134,10 @@ actor KageCLI {
     }
 
     try process.run()
-    process.waitUntilExit()
-
-    let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-    let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+    let output = drainOutput(stdout: stdout, stderr: stderr, process: process)
 
     guard process.terminationStatus == 0 else {
-      let stderrText = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      let stderrText = String(data: output.stderr, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
       throw KageCLIError.executionFailed(
         command: command,
         exitCode: Int(process.terminationStatus),
@@ -131,7 +145,7 @@ actor KageCLI {
       )
     }
 
-    return stdoutData
+    return output.stdout
   }
 
   private func runBinary(binary: String, args: [String], cwd: String, command: String) throws -> Data {
@@ -147,13 +161,10 @@ actor KageCLI {
     process.environment = executionEnvironment()
 
     try process.run()
-    process.waitUntilExit()
-
-    let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-    let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
+    let output = drainOutput(stdout: stdout, stderr: stderr, process: process)
 
     guard process.terminationStatus == 0 else {
-      let stderrText = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      let stderrText = String(data: output.stderr, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
       throw KageCLIError.executionFailed(
         command: command,
         exitCode: Int(process.terminationStatus),
@@ -161,7 +172,31 @@ actor KageCLI {
       )
     }
 
-    return stdoutData
+    return output.stdout
+  }
+
+  private func drainOutput(stdout: Pipe, stderr: Pipe, process: Process) -> (stdout: Data, stderr: Data) {
+    let stdoutBuffer = ProcessDataBuffer()
+    let stderrBuffer = ProcessDataBuffer()
+    let group = DispatchGroup()
+    let queue = DispatchQueue.global(qos: .userInitiated)
+
+    group.enter()
+    queue.async {
+      stdoutBuffer.set(stdout.fileHandleForReading.readDataToEndOfFile())
+      group.leave()
+    }
+
+    group.enter()
+    queue.async {
+      stderrBuffer.set(stderr.fileHandleForReading.readDataToEndOfFile())
+      group.leave()
+    }
+
+    process.waitUntilExit()
+    group.wait()
+
+    return (stdoutBuffer.data, stderrBuffer.data)
   }
 
   private func executionEnvironment() -> [String: String] {

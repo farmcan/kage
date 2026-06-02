@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.8 fixes the macOS app pipe deadlock that could leave large projects stuck on "Loading sessions..." and refreshes the desktop app identity.
+- KAGE v0.1.8 修复 macOS App 在大型项目中可能卡在 "Loading sessions..." 的管道死锁问题，并更新桌面 App 视觉识别。
+
 - KAGE v0.1.7 fixes demo mode state isolation so exploring sample sessions does not overwrite the user's real agent filter or include-subdirectories preference.
 - KAGE v0.1.7 修复 demo mode 状态隔离，用户体验示例 sessions 时不会覆盖真实的 agent 筛选和 include-subdirectories 偏好。
 
