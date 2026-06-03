@@ -1071,6 +1071,49 @@ test("cli desktop-state returns sessions and actions from one inventory", async 
   assert.ok(payload.actions.find((action) => action.id === "bridge:x2c:codex-desktop"));
 });
 
+test("cli sessions persists and reuses session metadata cache", async () => {
+  const fakeHome = await makeTempDir("session-cache-home");
+  const currentDir = await makeTempDir("session-cache-workspace");
+  const cacheDir = await makeTempDir("session-cache-store");
+  const cachePath = path.join(cacheDir, "session-metadata.json");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "06", "03");
+  const sessionFile = path.join(codexProject, "rollout-codex-cache.jsonl");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    sessionFile,
+    [
+      `{"timestamp":"2026-06-03T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-cache","cwd":"${currentDir}"}}`,
+      '{"timestamp":"2026-06-03T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"cache me"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const env = { ...process.env, HOME: fakeHome, KAGE_SESSION_CACHE_PATH: cachePath };
+  const firstResult = await spawnCli(["sessions", "--agent", "codex", "--json"], {
+    cwd: currentDir,
+    env,
+  });
+  const firstPayload = JSON.parse(firstResult.stdout);
+  assert.equal(firstResult.code, 0);
+  assert.deepEqual(firstPayload.sessions.map((session) => session.sessionId), ["codex-cache"]);
+
+  const firstCache = JSON.parse(await fs.readFile(cachePath, "utf8"));
+  const cacheEntry = firstCache.entries[`codex:${sessionFile}`];
+  assert.equal(firstCache.version, 1);
+  assert.equal(cacheEntry.summary.sessionId, "codex-cache");
+  assert.deepEqual(cacheEntry.summary.recentUserMessages, ["cache me"]);
+
+  const secondResult = await spawnCli(["sessions", "--agent", "codex", "--json"], {
+    cwd: currentDir,
+    env,
+  });
+  const secondPayload = JSON.parse(secondResult.stdout);
+  const secondCache = JSON.parse(await fs.readFile(cachePath, "utf8"));
+  assert.equal(secondResult.code, 0);
+  assert.deepEqual(secondPayload.sessions, firstPayload.sessions);
+  assert.equal(secondCache.entries[`codex:${sessionFile}`].cachedAt, cacheEntry.cachedAt);
+});
+
 test("cli search finds sessions by query, agent, project, and date filters", async () => {
   const fakeHome = await makeTempDir("search-home");
   const currentDir = await makeTempDir("search-current");

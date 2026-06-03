@@ -5,20 +5,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseSession } from "./adapters/sources/index.js";
 import { formatAgentName, getDefaultRoot, supportedAgents } from "./core/agents.js";
 import { cleanDuplicateExports } from "./core/clean.js";
-import { findMatchingSessions, findSessionById } from "./core/discovery.js";
+import { findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
+import { sameOrSubpath, samePath, walk } from "./core/files.js";
 import { resolveInstallPlan } from "./core/install.js";
 import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./core/routing.js";
 import { searchSessions } from "./core/search.js";
-import {
-  compactSessionText,
-  getRecentUserMessages,
-  getSessionTitle,
-  getShortSessionTitle,
-} from "./core/session-labels.js";
+import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
+import { compactSessionText } from "./core/session-labels.js";
 
 const shorthandAgents = ["c", "x", "q", "qw"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
@@ -1068,40 +1064,66 @@ function formatSessionLabel(agent) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-async function buildSessionCandidates(args) {
+async function saveSessionCache(cache) {
+  try {
+    await cache?.save();
+  } catch {
+    // Cache writes are an optimization; session discovery should stay best-effort.
+  }
+}
+
+async function matchesCurrentCwd(sessionCwd, cwd, { includeSubdirs = false } = {}) {
+  if (!sessionCwd) {
+    return false;
+  }
+  return includeSubdirs ? sameOrSubpath(sessionCwd, cwd) : samePath(sessionCwd, cwd);
+}
+
+async function buildSessionCandidates(args, options = {}) {
   const rootDir = args.root ?? getDefaultRoot(args.agent ?? "codex");
   const resolvedAgent = formatAgentName(args.agent ?? "codex");
   const sinceDate = parseDateFilter(args.since, { option: "--since" });
   const untilDate = parseDateFilter(args.until, { option: "--until", boundary: "end" });
-  const matches = await findMatchingSessions(rootDir, {
-    cwd: process.cwd(),
-    agent: resolvedAgent,
-    includeSubdirs: args.includeSubdirs,
-    newestFirst: true,
-    limit: args.until ? null : args.limit ?? null,
-  });
+  const cwd = process.cwd();
+  const cache = options.sessionCache ?? (await SessionMetadataCache.load());
+  const ownsCache = !options.sessionCache;
   const candidates = [];
 
-  for (const sessionPath of matches) {
-    const session = await parseSession({ sessionPath, agent: resolvedAgent });
-    if (!isWithinDateRange(session.updatedAt, sinceDate, untilDate)) {
-      continue;
+  try {
+    const files = await walk(rootDir);
+    if (files.length === 0) {
+      throw new Error(`No session files found in ${rootDir}`);
     }
 
-    candidates.push({
-      agent: resolvedAgent,
-      agentLabel: formatSessionLabel(resolvedAgent),
-      sessionPath,
-      sessionId: session.sessionId,
-      cwd: session.cwd,
-      updatedAt: session.updatedAt,
-      title: getSessionTitle(session),
-      shortTitle: getShortSessionTitle(session),
-      recentUserMessages: getRecentUserMessages(session),
-    });
+    const orderedFiles = files.sort().reverse();
+    for (const sessionPath of orderedFiles) {
+      const summary = await readSessionSummary(sessionPath, resolvedAgent, cache);
+      if (!(await matchesCurrentCwd(summary.cwd, cwd, { includeSubdirs: args.includeSubdirs }))) {
+        continue;
+      }
+      if (!isWithinDateRange(summary.updatedAt, sinceDate, untilDate)) {
+        continue;
+      }
 
-    if (args.limit && candidates.length >= args.limit) {
-      break;
+      candidates.push({
+        agent: resolvedAgent,
+        agentLabel: formatSessionLabel(resolvedAgent),
+        sessionPath: summary.sessionPath ?? sessionPath,
+        sessionId: summary.sessionId,
+        cwd: summary.cwd,
+        updatedAt: summary.updatedAt,
+        title: summary.title,
+        shortTitle: summary.shortTitle,
+        recentUserMessages: summary.recentUserMessages ?? [],
+      });
+
+      if (args.limit && candidates.length >= args.limit) {
+        break;
+      }
+    }
+  } finally {
+    if (ownsCache) {
+      await saveSessionCache(cache);
     }
   }
 
@@ -1130,24 +1152,29 @@ async function buildSessionInventory(args = {}) {
 
   const groups = [];
   const errors = [];
-  for (const agent of agents) {
-    try {
-      const root = args.root ?? getDefaultRoot(agent);
-      const candidates = await buildSessionCandidates({ ...args, agent, root });
-      groups.push({
-        agent,
-        agentLabel: formatSessionLabel(agent),
-        root,
-        sessions: candidates.map(toSessionPayload),
-      });
-    } catch (error) {
-      errors.push({
-        agent,
-        agentLabel: formatSessionLabel(agent),
-        root: args.root ?? getDefaultRoot(agent),
-        error: error.message,
-      });
+  const sessionCache = await SessionMetadataCache.load();
+  try {
+    for (const agent of agents) {
+      try {
+        const root = args.root ?? getDefaultRoot(agent);
+        const candidates = await buildSessionCandidates({ ...args, agent, root }, { sessionCache });
+        groups.push({
+          agent,
+          agentLabel: formatSessionLabel(agent),
+          root,
+          sessions: candidates.map(toSessionPayload),
+        });
+      } catch (error) {
+        errors.push({
+          agent,
+          agentLabel: formatSessionLabel(agent),
+          root: args.root ?? getDefaultRoot(agent),
+          error: error.message,
+        });
+      }
     }
+  } finally {
+    await saveSessionCache(sessionCache);
   }
 
   if (args.limit) {
