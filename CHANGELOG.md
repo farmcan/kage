@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.13 adds a desktop Check for Updates button, fixes optional QoderWork doctor decoding, and aligns agent badge colors exactly with the app icon dots.
+- KAGE v0.1.13 增加桌面端 Check for Updates 按钮，修复可选 QoderWork doctor 解码，并让 agent badge 色值与 App icon dots 精确一致。
+
 - KAGE v0.1.12 ships QoderWork source support, refreshed agent badge/icon colors, and a new unsigned DMG.
 - KAGE v0.1.12 发布 QoderWork source 支持、刷新 agent badge/icon 色值，并发布新的 unsigned DMG。
 
