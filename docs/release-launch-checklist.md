@@ -12,6 +12,7 @@ Avoid release notes that only list implementation files.
 
 ## Before Cutting A Release
 
+- [ ] `npm run check:all`
 - [ ] `npm test`
 - [ ] `npm run test:e2e:real` after `(cd app && ./package.sh)`
 - [ ] `swift build --package-path app`

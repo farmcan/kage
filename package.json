@@ -13,6 +13,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "check:all": "node scripts/check-all.mjs",
     "test": "node --test",
     "test:e2e:real": "node scripts/e2e-real.mjs"
   },
