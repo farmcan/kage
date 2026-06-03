@@ -1042,6 +1042,35 @@ test("cli sessions applies --until before --limit", async () => {
   assert.deepEqual(payload.sessions.map((session) => session.sessionId), ["codex-old"]);
 });
 
+test("cli desktop-state returns sessions and actions from one inventory", async () => {
+  const fakeHome = await makeTempDir("desktop-state-home");
+  const currentDir = await makeTempDir("desktop-state-workspace");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "06", "03");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    path.join(codexProject, "rollout-codex-desktop.jsonl"),
+    [
+      `{"timestamp":"2026-06-03T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-desktop","cwd":"${currentDir}"}}`,
+      '{"timestamp":"2026-06-03T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"desktop state plan"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const result = await spawnCli(["desktop-state", "--since", "90d", "--limit", "120", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.mode, "desktop-state");
+  assert.equal(await canonicalPath(payload.cwd), await canonicalPath(currentDir));
+  assert.deepEqual(payload.sessions.map((session) => session.sessionId), ["codex-desktop"]);
+  assert.ok(payload.actions.find((action) => action.id === "resume:codex:codex-desktop"));
+  assert.ok(payload.actions.find((action) => action.id === "fork:x2x:codex-desktop"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:x2c:codex-desktop"));
+});
+
 test("cli search finds sessions by query, agent, project, and date filters", async () => {
   const fakeHome = await makeTempDir("search-home");
   const currentDir = await makeTempDir("search-current");

@@ -161,6 +161,34 @@ public struct ActionsResponse: Decodable, Sendable {
   }
 }
 
+public struct DesktopStateResponse: Decodable, Sendable {
+  public let mode: String
+  public let cwd: String
+  public let sessions: [AgentSession]
+  public let agents: [AgentGroup]
+  public let actions: [KageAction]
+  public let errors: [AgentError]
+
+  public var sessionsResponse: SessionsResponse {
+    SessionsResponse(
+      mode: "sessions",
+      cwd: cwd,
+      sessions: sessions,
+      agents: agents,
+      errors: errors
+    )
+  }
+
+  public var actionsResponse: ActionsResponse {
+    ActionsResponse(
+      mode: "actions",
+      cwd: cwd,
+      actions: actions,
+      errors: errors
+    )
+  }
+}
+
 public struct SearchResponse: Decodable, Sendable {
   public let mode: String
   public let query: String?

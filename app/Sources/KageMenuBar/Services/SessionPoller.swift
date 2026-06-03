@@ -77,13 +77,7 @@ final class SessionPoller: ObservableObject {
     do {
       let since = loadsFullHistory ? nil : recentHistorySince
       let limit = loadsFullHistory ? nil : recentHistoryLimit
-      async let sessions = cli.sessions(
-        cwd: watchedDirectory,
-        includeSubdirectories: includeSubdirectories,
-        since: since,
-        limit: limit
-      )
-      async let actions = cli.actions(
+      async let desktopState = cli.desktopState(
         cwd: watchedDirectory,
         includeSubdirectories: includeSubdirectories,
         since: since,
@@ -93,8 +87,9 @@ final class SessionPoller: ObservableObject {
         ? Task { try await cli.doctor(cwd: watchedDirectory) }
         : nil
 
-      let resolvedSessions = try await sessions
-      let resolvedActions = try await actions
+      let resolvedDesktopState = try await desktopState
+      let resolvedSessions = resolvedDesktopState.sessionsResponse
+      let resolvedActions = resolvedDesktopState.actionsResponse
       let resolvedDoctor = try await doctorTask?.value
 
       notifyNewSessions(resolvedSessions.sessions, appState: appState, notifications: notifications)

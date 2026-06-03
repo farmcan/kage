@@ -204,6 +204,7 @@ function parseArgs(argv) {
     sessions: false,
     search: false,
     searchQuery: null,
+    desktopState: false,
     since: null,
     until: null,
     limit: null,
@@ -327,8 +328,11 @@ function parseArgs(argv) {
   if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
     return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
   }
-  if ((args.since || args.until || args.limit) && !["sessions", "search", "actions"].includes(first)) {
-    return { ...args, error: "--since, --until, and --limit are only supported with kage sessions, search, and actions" };
+  if ((args.since || args.until || args.limit) && !["sessions", "search", "actions", "desktop-state"].includes(first)) {
+    return {
+      ...args,
+      error: "--since, --until, and --limit are only supported with kage sessions, search, actions, and desktop-state",
+    };
   }
   if (args.project && first !== "search") {
     return { ...args, error: "--project is only supported with kage search" };
@@ -373,6 +377,15 @@ function parseArgs(argv) {
       };
     }
     return { ...args, actions: true };
+  }
+  if (first === "desktop-state") {
+    if (second) {
+      return {
+        ...args,
+        error: "Usage: kage desktop-state [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]",
+      };
+    }
+    return { ...args, desktopState: true, json: true };
   }
   if (first === "run-action") {
     if (!second || positional.length > 2) {
@@ -1377,6 +1390,18 @@ async function buildActionsResult(args = {}) {
   };
 }
 
+async function buildDesktopStateResult(args = {}) {
+  const inventory = await buildSessionInventory(args);
+  return {
+    mode: "desktop-state",
+    cwd: inventory.cwd,
+    sessions: inventory.sessions,
+    agents: inventory.agents,
+    actions: buildActionList(inventory),
+    errors: inventory.errors,
+  };
+}
+
 function formatActionsResult(result, asJson) {
   if (asJson) {
     return `${JSON.stringify(result, null, 2)}\n`;
@@ -1531,6 +1556,11 @@ async function main() {
   if (args.actions) {
     const result = await buildActionsResult(args);
     process.stdout.write(formatActionsResult(result, args.json));
+    return;
+  }
+  if (args.desktopState) {
+    const result = await buildDesktopStateResult(args);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
   if (args.runActionId) {

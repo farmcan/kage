@@ -153,6 +153,82 @@ do {
   try require(actions.actions[2].targetAgent == "claude", "bridge target should decode")
   try require(actions.actions[0].isLatest == true, "latest marker should decode")
 
+  let desktopState = try decode(
+    DesktopStateResponse.self,
+    """
+    {
+      "mode": "desktop-state",
+      "cwd": "/tmp/project",
+      "sessions": [
+        {
+          "agent": "codex",
+          "agentLabel": "Codex",
+          "sessionId": "session-1",
+          "title": "Fix login",
+          "shortTitle": "Fix login",
+          "updatedAt": "2026-05-25T06:56:02.409Z",
+          "cwd": "/tmp/project",
+          "path": "/Users/test/.codex/sessions/session-1.jsonl",
+          "recentUserMessages": ["Fix login"]
+        }
+      ],
+      "agents": [
+        {
+          "agent": "codex",
+          "agentLabel": "Codex",
+          "root": "/Users/test/.codex/sessions",
+          "sessions": [
+            {
+              "agent": "codex",
+              "agentLabel": "Codex",
+              "sessionId": "session-1",
+              "title": "Fix login",
+              "shortTitle": "Fix login",
+              "updatedAt": "2026-05-25T06:56:02.409Z",
+              "cwd": "/tmp/project",
+              "path": "/Users/test/.codex/sessions/session-1.jsonl",
+              "recentUserMessages": ["Fix login"]
+            }
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "resume:codex:session-1",
+          "type": "resume",
+          "label": "Resume latest Codex session",
+          "agent": "codex",
+          "sessionId": "session-1",
+          "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
+          "command": "codex resume session-1",
+          "isLatest": true
+        }
+      ],
+      "errors": []
+    }
+    """
+  )
+  try require(desktopState.sessionsResponse.sessions[0].id == "codex:session-1", "desktop sessions should decode")
+  try require(desktopState.actionsResponse.actions[0].command == "codex resume session-1", "desktop actions should decode")
+
+  let recentDesktopStateArgs = KageCLIArguments.desktopState(
+    since: "90d",
+    limit: 120,
+    includeSubdirectories: true
+  )
+  try require(
+    recentDesktopStateArgs == [
+      "desktop-state",
+      "--json",
+      "--since",
+      "90d",
+      "--limit",
+      "120",
+      "--include-subdirs",
+    ],
+    "recent desktop state args should include bounded history"
+  )
+
   let search = try decode(
     SearchResponse.self,
     """

@@ -58,6 +58,19 @@ actor KageCLI {
     )
   }
 
+  func desktopState(
+    cwd: String,
+    includeSubdirectories: Bool,
+    since: String? = nil,
+    limit: Int? = nil
+  ) async throws -> DesktopStateResponse {
+    try await decode(
+      DesktopStateResponse.self,
+      args: KageCLIArguments.desktopState(since: since, limit: limit, includeSubdirectories: includeSubdirectories),
+      cwd: cwd
+    )
+  }
+
   func search(
     cwd: String,
     query: String,

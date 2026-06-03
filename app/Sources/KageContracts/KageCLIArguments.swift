@@ -15,6 +15,14 @@ public enum KageCLIArguments {
     scoped(bounded(["actions", "--json"], since: since, limit: limit), includeSubdirectories: includeSubdirectories)
   }
 
+  public static func desktopState(
+    since: String? = nil,
+    limit: Int? = nil,
+    includeSubdirectories: Bool = false
+  ) -> [String] {
+    scoped(bounded(["desktop-state", "--json"], since: since, limit: limit), includeSubdirectories: includeSubdirectories)
+  }
+
   public static func search(
     query: String,
     project: String,
