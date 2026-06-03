@@ -1333,8 +1333,8 @@ private func agentTint(_ agent: String?) -> Color {
 }
 
 private enum AgentPalette {
-  static let codex = Color(hex: 0x10A37F)
-  static let qoder = Color(hex: 0x8B5CF6)
+  static let codex = Color(hex: 0x3A86FF)
+  static let qoder = Color(hex: 0x10A37F)
   static let claude = Color(hex: 0xD97757)
 }
 

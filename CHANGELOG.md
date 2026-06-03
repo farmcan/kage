@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.16 fixes agent brand colors across the desktop app, app icon, GitHub screenshots, and homepage previews: Codex is blue, Qoder is green, and Claude remains orange.
+- KAGE v0.1.16 修正桌面端、App 图标、GitHub screenshots 和主页预览里的 agent 品牌色：Codex 为蓝色、Qoder 为绿色、Claude 保持橙色。
+
 - KAGE v0.1.15 adds a real packaged E2E test script and makes notification permission failures readable in Settings.
 - KAGE v0.1.15 增加真实打包端到端测试脚本，并让 Settings 里的通知权限失败变成可读文案。
 

@@ -8,8 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 
 const palette = {
-  codex: { css: "#10a37f", swift: "0x10A37F" },
-  qoder: { css: "#8b5cf6", swift: "0x8B5CF6" },
+  codex: { css: "#3a86ff", swift: "0x3A86FF" },
+  qoder: { css: "#10a37f", swift: "0x10A37F" },
   claude: { css: "#d97757", swift: "0xD97757" },
 };
 
@@ -26,6 +26,7 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   const homepage = await readRepoFile("docs", "index.html");
   const logo = await readRepoFile("docs", "assets", "kage-logo.svg");
   const desktopPreview = await readRepoFile("docs", "assets", "screenshots", "kage-desktop-preview.svg");
+  const menuBarPreview = await readRepoFile("docs", "assets", "screenshots", "kage-menubar-preview.svg");
   const demoFlow = await readRepoFile("docs", "assets", "screenshots", "kage-demo-flow.svg");
 
   assert.match(dashboard, /case "codex":\s*return AgentPalette\.codex/u);
@@ -36,20 +37,32 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(dashboard, new RegExp(`static let qoder = Color\\(hex: ${palette.qoder.swift}\\)`, "u"));
   assert.match(dashboard, new RegExp(`static let claude = Color\\(hex: ${palette.claude.swift}\\)`, "u"));
 
-  assert.match(homepage, new RegExp(`--green: ${palette.codex.css};`, "u"));
-  assert.match(homepage, new RegExp(`--violet: ${palette.qoder.css};`, "u"));
-  assert.match(homepage, new RegExp(`--orange: ${palette.claude.css};`, "u"));
+  assert.match(homepage, new RegExp(`--agent-codex: ${palette.codex.css};`, "u"));
+  assert.match(homepage, new RegExp(`--agent-qoder: ${palette.qoder.css};`, "u"));
+  assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
+  assert.match(homepage, /\.agent\s*\{[^}]*color: var\(--agent-codex\);/su);
+  assert.match(homepage, /<div class="agent" style="color: var\(--agent-claude\)">Claude Code<\/div>/u);
+  assert.match(homepage, /<div class="agent" style="color: var\(--agent-qoder\)">QoderCLI<\/div>/u);
+  assert.match(homepage, /\.agent-icon\s*\{[^}]*color: var\(--agent-codex\);/su);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
-  assert.match(logo, new RegExp(`fill="${palette.codex.css}"`, "u"));
-  assert.match(logo, new RegExp(`fill="${palette.qoder.css}"`, "u"));
-  assert.match(logo, new RegExp(`fill="${palette.claude.css}"`, "u"));
+  assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
+  assert.match(logo, new RegExp(`<circle cx="256" cy="376" r="24" fill="${palette.qoder.css}"/>`, "u"));
+  assert.match(logo, new RegExp(`<circle cx="348" cy="360" r="24" fill="${palette.claude.css}"/>`, "u"));
 
-  for (const asset of [desktopPreview, demoFlow]) {
-    assert.match(asset, new RegExp(`fill="${palette.codex.css}"`, "u"));
-    assert.match(asset, new RegExp(`fill="${palette.qoder.css}"`, "u"));
-    assert.match(asset, new RegExp(`fill="${palette.claude.css}"`, "u"));
-  }
+  assert.match(desktopPreview, new RegExp(`fill="${palette.codex.css}">CODEX</text>`, "u"));
+  assert.match(desktopPreview, new RegExp(`fill="${palette.qoder.css}">QODERCLI</text>`, "u"));
+  assert.match(desktopPreview, new RegExp(`fill="${palette.claude.css}">CLAUDE CODE</text>`, "u"));
+  assert.match(desktopPreview, new RegExp(`fill="${palette.codex.css}">Codex</text>`, "u"));
+
+  assert.match(menuBarPreview, new RegExp(`fill="${palette.codex.css}">CODEX</text>`, "u"));
+  assert.match(menuBarPreview, new RegExp(`fill="${palette.claude.css}">CLAUDE CODE</text>`, "u"));
+
+  assert.match(demoFlow, new RegExp(`fill="${palette.codex.css}">CODEX</text>`, "u"));
+  assert.match(demoFlow, new RegExp(`fill="${palette.claude.css}">CLAUDE CODE</text>`, "u"));
+  assert.match(demoFlow, new RegExp(`<circle cx="49" cy="126" r="7" fill="${palette.codex.css}"/>`, "u"));
+  assert.match(demoFlow, new RegExp(`<circle cx="79" cy="132" r="7" fill="${palette.qoder.css}"/>`, "u"));
+  assert.match(demoFlow, new RegExp(`<circle cx="109" cy="126" r="7" fill="${palette.claude.css}"/>`, "u"));
 });
 
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {

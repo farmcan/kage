@@ -31,8 +31,8 @@
   <text x="82" y="352" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="800" fill="#a7b2ba">Projects</text>
   <text x="354" y="352" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#74818a">12</text>
 
-  <rect x="76" y="374" width="324" height="106" rx="8" fill="#18261f" stroke="#4cc38a"/>
-  <text x="100" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#10a37f">CODEX</text>
+  <rect x="76" y="374" width="324" height="106" rx="8" fill="#13213a" stroke="#3a86ff"/>
+  <text x="100" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#3a86ff">CODEX</text>
   <text x="100" y="436" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
   <text x="100" y="462" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
   <text x="336" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">now</text>
@@ -43,7 +43,7 @@
   <text x="100" y="584" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
 
   <rect x="76" y="618" width="324" height="106" rx="8" fill="#151d24" stroke="#2a343c"/>
-  <text x="100" y="650" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#8b5cf6">QODERCLI</text>
+  <text x="100" y="650" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#10a37f">QODERCLI</text>
   <text x="100" y="680" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#f7f2e6">Replay story export</text>
   <text x="100" y="706" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
 
@@ -53,10 +53,10 @@
 
   <rect x="448" y="112" width="908" height="744" rx="16" fill="#0f1519" stroke="#2a343c"/>
   <g transform="translate(502 152)">
-    <rect width="52" height="52" rx="10" fill="#172a21"/>
-    <text x="14" y="34" font-family="SFMono-Regular, Menlo, monospace" font-size="18" font-weight="800" fill="#4cc38a">&gt;_</text>
+    <rect width="52" height="52" rx="10" fill="#13213a"/>
+    <text x="14" y="34" font-family="SFMono-Regular, Menlo, monospace" font-size="18" font-weight="800" fill="#3a86ff">&gt;_</text>
   </g>
-  <text x="582" y="176" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#10a37f">Codex</text>
+  <text x="582" y="176" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#3a86ff">Codex</text>
   <text x="582" y="216" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="30" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
   <text x="582" y="246" font-family="SFMono-Regular, Menlo, monospace" font-size="14" fill="#74818a">~/wrksp/kage</text>
 

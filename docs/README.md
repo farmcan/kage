@@ -17,6 +17,7 @@ The old icon concept assets were removed after the Session Portal icon became th
 
 ## Release Notes
 
+- [v0.1.16](release-notes/v0.1.16.md)
 - [v0.1.15](release-notes/v0.1.15.md)
 - [v0.1.14](release-notes/v0.1.14.md)
 - [v0.1.13](release-notes/v0.1.13.md)

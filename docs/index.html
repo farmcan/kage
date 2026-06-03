@@ -20,10 +20,11 @@
         --line: #2a343c;
         --green: #10a37f;
         --gold: #f2b84b;
-        --violet: #8b5cf6;
-        --orange: #d97757;
         --red: #ef6f61;
         --white: #fffdf8;
+        --agent-codex: #3a86ff;
+        --agent-qoder: #10a37f;
+        --agent-claude: #d97757;
       }
 
       * {
@@ -258,12 +259,12 @@
       }
 
       .session-row.active {
-        border-color: rgba(76, 195, 138, 0.65);
-        background: #18261f;
+        border-color: rgba(58, 134, 255, 0.66);
+        background: #13213a;
       }
 
       .agent {
-        color: var(--green);
+        color: var(--agent-codex);
         font-size: 11px;
         font-weight: 900;
         text-transform: uppercase;
@@ -312,8 +313,8 @@
         display: grid;
         place-items: center;
         border-radius: 8px;
-        background: rgba(76, 195, 138, 0.14);
-        color: var(--green);
+        background: rgba(58, 134, 255, 0.14);
+        color: var(--agent-codex);
         font-weight: 900;
       }
 
@@ -703,7 +704,7 @@
           <a href="#workflows">Workflows</a>
           <a href="#desktop">Desktop</a>
           <a href="#matrix">Routes</a>
-          <a href="https://github.com/farmcan/kage/releases/download/v0.1.15/KAGE-0.1.15.dmg">Download</a>
+          <a href="https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg">Download</a>
           <a href="https://github.com/farmcan/kage/releases">Releases</a>
           <a href="https://github.com/farmcan/kage">GitHub</a>
         </div>
@@ -737,12 +738,12 @@
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
-                    <div class="agent" style="color: var(--orange)">Claude Code</div>
+                    <div class="agent" style="color: var(--agent-claude)">Claude Code</div>
                     <div class="session-title">Session loading plan</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
-                    <div class="agent" style="color: var(--violet)">QoderCLI</div>
+                    <div class="agent" style="color: var(--agent-qoder)">QoderCLI</div>
                     <div class="session-title">Replay story export</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
@@ -786,7 +787,7 @@
               sessions across Claude Code, Codex, QoderCLI, and QoderWork without uploading transcript content.
             </p>
             <div class="actions">
-              <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.15/KAGE-0.1.15.dmg">Download DMG</a>
+              <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg">Download DMG</a>
               <a class="button secondary" href="https://github.com/farmcan/kage">Star on GitHub</a>
               <a class="button secondary" href="https://github.com/farmcan/kage#install">Install CLI</a>
               <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
@@ -795,7 +796,7 @@
               <span>New Session</span>
               <span>Recent history window</span>
               <span>Claude Code / Codex / QoderCLI / QoderWork</span>
-              <span>Latest: v0.1.15</span>
+              <span>Latest: v0.1.16</span>
             </div>
           </div>
         </div>
