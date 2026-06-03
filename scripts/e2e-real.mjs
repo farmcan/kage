@@ -230,11 +230,22 @@ try {
     cwd: projectDir,
     env: e2eEnv(),
   });
-  const foundIds = new Set(sessions.sessions.map((session) => session.sessionId));
-  for (const id of [codexId, claudeId, qoderId]) {
-    requireCondition(foundIds.has(id), `sessions --json did not include ${id}.`);
+  const expectedSessions = new Map([
+    [codexId, "codex"],
+    [claudeId, "claude"],
+    [qoderId, "qodercli"],
+  ]);
+  for (const [id, agentName] of expectedSessions) {
+    const session = sessions.sessions.find((candidate) => candidate.sessionId === id);
+    requireCondition(session, `sessions --json did not include ${id}.`);
+    requireCondition(session.agent === agentName, `sessions --json detected ${id} as ${session.agent}, expected ${agentName}.`);
+    requireCondition(session.cwd === projectDir, `sessions --json detected ${id} in ${session.cwd}, expected ${projectDir}.`);
   }
-  summary.push("verified sessions inventory across Codex, Claude, and QoderCLI");
+  for (const [id, agentName] of expectedSessions) {
+    const agentGroup = sessions.agents.find((candidate) => candidate.agent === agentName);
+    requireCondition(agentGroup?.sessions.some((session) => session.sessionId === id), `sessions agent group ${agentName} did not include ${id}.`);
+  }
+  summary.push("verified sessions detection across Codex, Claude, and QoderCLI");
 
   const search = runJson(kageBin, ["search", token, "--json", "--include-subdirs", "--limit", "20"], {
     cwd: projectDir,
