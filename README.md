@@ -33,7 +33,7 @@ Action language in KAGE is intentionally narrow:
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.14](https://github.com/farmcan/kage/releases/tag/v0.1.14)
+Latest release: [KAGE v0.1.15](https://github.com/farmcan/kage/releases/tag/v0.1.15)
 
 ## Use KAGE If
 
@@ -63,7 +63,7 @@ Before trying it, KAGE is most useful if you already have at least one Claude Co
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.14/KAGE-0.1.14.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.15/KAGE-0.1.15.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -185,10 +185,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.14 DMG from GitHub Releases:
+Download the v0.1.15 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.14/KAGE-0.1.14.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.15/KAGE-0.1.15.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -582,7 +582,7 @@ The export pipeline can trim or branch a conversation before writing it:
 - [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
-- [Latest release notes](docs/release-notes/v0.1.14.md)
+- [Latest release notes](docs/release-notes/v0.1.15.md)
 - [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope

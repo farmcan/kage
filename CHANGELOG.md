@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.15 adds a real packaged E2E test script and makes notification permission failures readable in Settings.
+- KAGE v0.1.15 增加真实打包端到端测试脚本，并让 Settings 里的通知权限失败变成可读文案。
+
 - KAGE v0.1.14 makes the desktop updater resilient to unauthenticated GitHub API rate limits by falling back to the GitHub Releases latest redirect.
 - KAGE v0.1.14 让桌面端更新检查在 GitHub unauthenticated API 达到 rate limit 时 fallback 到 GitHub Releases latest redirect。
 

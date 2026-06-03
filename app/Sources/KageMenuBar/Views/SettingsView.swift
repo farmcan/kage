@@ -77,7 +77,18 @@ struct SettingsView: View {
         Stepper(value: $appState.refreshIntervalSec, in: 15...3600, step: 15) {
           Text("\(Int(appState.refreshIntervalSec)) seconds")
         }
-        Toggle("Notifications", isOn: $appState.notificationsEnabled)
+        Toggle(
+          "Notifications",
+          isOn: Binding(
+            get: { appState.notificationsEnabled },
+            set: { enabled in
+              appState.notificationsEnabled = enabled
+              if !enabled {
+                notifications.clearError()
+              }
+            }
+          )
+        )
         Toggle(
           "Launch at login",
           isOn: Binding(
@@ -88,7 +99,7 @@ struct SettingsView: View {
         if let launchAtLoginError = appState.launchAtLoginError {
           SettingsWarningText(launchAtLoginError)
         }
-        if let notificationError = notifications.lastError {
+        if appState.notificationsEnabled, let notificationError = notifications.lastError {
           SettingsWarningText(notificationError)
         }
       }

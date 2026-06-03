@@ -13,6 +13,7 @@ Avoid release notes that only list implementation files.
 ## Before Cutting A Release
 
 - [ ] `npm test`
+- [ ] `npm run test:e2e:real` after `(cd app && ./package.sh)`
 - [ ] `swift build --package-path app`
 - [ ] `swift run --package-path app kage-contract-smoke`
 - [ ] `(cd app && ./bundle.sh)`
