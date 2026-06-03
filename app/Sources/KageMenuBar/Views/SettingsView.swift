@@ -2,9 +2,11 @@ import KageContracts
 import SwiftUI
 
 struct SettingsView: View {
+  @Environment(\.openURL) private var openURL
   @EnvironmentObject private var appState: AppState
   @EnvironmentObject private var poller: SessionPoller
   @EnvironmentObject private var notifications: NotificationManager
+  @State private var updateStatus: UpdateCheckStatus = .idle
 
   var body: some View {
     Form {
@@ -91,18 +93,39 @@ struct SettingsView: View {
         }
       }
 
+      Section("Updates") {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(spacing: 10) {
+            Text("KAGE \(currentKageVersion)")
+              .font(.headline)
+            Spacer()
+            Button {
+              checkForUpdates()
+            } label: {
+              Label(
+                updateStatus.isChecking ? "Checking..." : "Check for Updates",
+                systemImage: updateStatus.isChecking ? "arrow.triangle.2.circlepath" : "arrow.down.circle"
+              )
+            }
+            .disabled(updateStatus.isChecking)
+          }
+
+          updateStatusView
+        }
+      }
+
       Section("Doctor") {
         if let doctor = poller.doctorResult {
           Text("KAGE \(doctor.kageVersion)")
           ForEach(doctor.agents) { agent in
             VStack(alignment: .leading, spacing: 4) {
               HStack {
-                Image(systemName: agent.installed && agent.sessionRoot.isHealthy ? "checkmark.circle" : "exclamationmark.triangle")
-                  .foregroundStyle(agent.installed && agent.sessionRoot.isHealthy ? .green : .orange)
+                Image(systemName: agent.isReady ? "checkmark.circle" : "exclamationmark.triangle")
+                  .foregroundStyle(agent.isReady ? .green : .orange)
                 Text(agent.label)
                   .fontWeight(.medium)
                 Spacer()
-                Text(agent.version ?? "not installed")
+                Text(agent.version ?? (agent.command == nil ? "source only" : "not installed"))
                   .foregroundStyle(.secondary)
               }
               Text(agent.sessionRoot.path)
@@ -135,10 +158,83 @@ struct SettingsView: View {
     DirectoryHistory.normalized(directory) == DirectoryHistory.normalized(appState.watchedDirectory)
   }
 
+  private var currentKageVersion: String {
+    if let doctorVersion = poller.doctorResult?.kageVersion, !doctorVersion.isEmpty {
+      return doctorVersion
+    }
+    if let bundleVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+       !bundleVersion.isEmpty {
+      return bundleVersion
+    }
+    return "0.0.0"
+  }
+
+  @ViewBuilder
+  private var updateStatusView: some View {
+    switch updateStatus {
+    case .idle:
+      Text("Check GitHub Releases for a newer DMG.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .checking:
+      Text("Contacting GitHub Releases...")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .upToDate(let latestVersion):
+      Text("You are up to date. Latest release is \(latestVersion).")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .available(let latestVersion, let releaseURL):
+      HStack(spacing: 10) {
+        Text("KAGE \(latestVersion) is available.")
+          .font(.caption)
+          .foregroundStyle(.orange)
+        Button {
+          openURL(releaseURL)
+        } label: {
+          Label("Open Release", systemImage: "arrow.up.right.square")
+        }
+        .controlSize(.small)
+      }
+    case .failed(let message):
+      SettingsWarningText(message)
+    }
+  }
+
+  private func checkForUpdates() {
+    updateStatus = .checking
+    let currentVersion = currentKageVersion
+    Task { @MainActor in
+      do {
+        let result = try await GitHubReleaseUpdateChecker().check(currentVersion: currentVersion)
+        updateStatus = result.isUpdateAvailable
+          ? .available(version: result.latestVersion, releaseURL: result.releaseURL)
+          : .upToDate(version: result.latestVersion)
+      } catch {
+        updateStatus = .failed(error.localizedDescription)
+      }
+    }
+  }
+
   private func refresh() {
     Task {
       await poller.refresh(appState: appState, notifications: notifications)
     }
+  }
+}
+
+private enum UpdateCheckStatus: Equatable {
+  case idle
+  case checking
+  case upToDate(version: String)
+  case available(version: String, releaseURL: URL)
+  case failed(String)
+
+  var isChecking: Bool {
+    if case .checking = self {
+      return true
+    }
+    return false
   }
 }
 

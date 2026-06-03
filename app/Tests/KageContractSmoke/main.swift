@@ -26,6 +26,24 @@ do {
           },
           "resumeCommand": "codex resume <session-id>",
           "forkCommand": "codex fork <session-id>"
+        },
+        {
+          "agent": "qoderwork",
+          "label": "QoderWork",
+          "command": null,
+          "installed": true,
+          "version": null,
+          "commandRequired": false,
+          "commandError": null,
+          "sessionRoot": {
+            "path": "/Users/test/.qoderwork/projects",
+            "exists": false,
+            "readable": false,
+            "writable": false
+          },
+          "sessionRootRequired": false,
+          "resumeCommand": null,
+          "forkCommand": null
         }
       ]
     }
@@ -33,6 +51,8 @@ do {
   )
   try require(doctor.ok, "doctor ok should decode")
   try require(doctor.agents[0].sessionRoot.isHealthy, "doctor session root should decode as healthy")
+  try require(doctor.agents[1].command == nil, "optional source command should decode as nil")
+  try require(doctor.agents[1].isReady, "optional QoderWork source should not make doctor unhealthy")
 
   let sessions = try decode(
     SessionsResponse.self,

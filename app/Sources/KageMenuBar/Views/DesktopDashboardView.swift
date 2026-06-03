@@ -1322,13 +1322,29 @@ private struct DesktopEmptyStateView<Actions: View>: View {
 private func agentTint(_ agent: String?) -> Color {
   switch agent {
   case "claude":
-    return Color(red: 0.85, green: 0.47, blue: 0.34)
+    return AgentPalette.claude
   case "codex":
-    return Color(red: 0.06, green: 0.64, blue: 0.50)
+    return AgentPalette.codex
   case "qodercli", "qoderwork":
-    return Color(red: 0.55, green: 0.36, blue: 0.96)
+    return AgentPalette.qoder
   default:
     return .secondary
+  }
+}
+
+private enum AgentPalette {
+  static let codex = Color(hex: 0x10A37F)
+  static let qoder = Color(hex: 0x8B5CF6)
+  static let claude = Color(hex: 0xD97757)
+}
+
+private extension Color {
+  init(hex: UInt32) {
+    self.init(
+      red: Double((hex >> 16) & 0xff) / 255.0,
+      green: Double((hex >> 8) & 0xff) / 255.0,
+      blue: Double(hex & 0xff) / 255.0
+    )
   }
 }
 

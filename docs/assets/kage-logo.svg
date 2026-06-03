@@ -19,6 +19,7 @@
   <path d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M267 267h72" fill="none" stroke="#f7f2e6" stroke-width="24" stroke-linecap="round"/>
 
+  <!-- Agent dots, left to right: Codex, QoderCLI/QoderWork, Claude. Keep these hex colors in sync with agentTint(). -->
   <circle cx="164" cy="360" r="24" fill="#10a37f"/>
   <circle cx="256" cy="376" r="24" fill="#8b5cf6"/>
   <circle cx="348" cy="360" r="24" fill="#d97757"/>

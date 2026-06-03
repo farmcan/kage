@@ -109,16 +109,30 @@ public struct DoctorResult: Decodable, Sendable {
 public struct DoctorAgent: Decodable, Identifiable, Sendable {
   public let agent: String
   public let label: String
-  public let command: String
+  public let command: String?
   public let installed: Bool
   public let version: String?
+  public let commandRequired: Bool?
   public let commandError: String?
   public let sessionRoot: SessionRoot
+  public let sessionRootRequired: Bool?
   public let resumeCommand: String?
   public let forkCommand: String?
 
   public var id: String {
     agent
+  }
+
+  public var isReady: Bool {
+    (!isCommandRequired || installed) && (!isSessionRootRequired || sessionRoot.isHealthy)
+  }
+
+  public var isCommandRequired: Bool {
+    commandRequired ?? true
+  }
+
+  public var isSessionRootRequired: Bool {
+    sessionRootRequired ?? true
   }
 }
 
