@@ -197,11 +197,17 @@ try {
   }
 
   const kageBin = path.join(appPath, "Contents", "Resources", "kage");
+  const appIconPath = path.join(appPath, "Contents", "Resources", "AppIcon.icns");
+  const menuBarIconPath = path.join(appPath, "Contents", "Resources", "MenuBarIconTemplate.png");
   const appVersion = run("defaults", ["read", path.join(appPath, "Contents", "Info"), "CFBundleShortVersionString"]).trim();
+  const appIconName = run("defaults", ["read", path.join(appPath, "Contents", "Info"), "CFBundleIconFile"]).trim();
   const cliVersion = run(kageBin, ["--version"]).trim();
   requireCondition(appVersion === version, `Expected app version ${version}, got ${appVersion}.`);
+  requireCondition(appIconName === "AppIcon", `Expected CFBundleIconFile AppIcon, got ${appIconName}.`);
+  requireCondition(await exists(appIconPath), `Packaged app icon not found: ${appIconPath}.`);
+  requireCondition(await exists(menuBarIconPath), `Packaged menu bar icon not found: ${menuBarIconPath}.`);
   requireCondition(cliVersion === `kage ${version}`, `Expected CLI version kage ${version}, got ${cliVersion}.`);
-  summary.push(`verified app and bundled CLI version ${version}`);
+  summary.push(`verified app icon, menu bar icon, and bundled CLI version ${version}`);
 
   const fixtures = await createFixtures();
   summary.push(`created real session roots under ${tmpHome}`);

@@ -17,6 +17,10 @@ async function readRepoFile(...parts) {
   return fs.readFile(path.join(repoRoot, ...parts), "utf8");
 }
 
+async function readRepoBytes(...parts) {
+  return fs.readFile(path.join(repoRoot, ...parts));
+}
+
 test("agent colors stay in sync across desktop app and public assets", async () => {
   const dashboard = await readRepoFile("app", "Sources", "KageMenuBar", "Views", "DesktopDashboardView.swift");
   const homepage = await readRepoFile("docs", "index.html");
@@ -46,4 +50,22 @@ test("agent colors stay in sync across desktop app and public assets", async () 
     assert.match(asset, new RegExp(`fill="${palette.qoder.css}"`, "u"));
     assert.match(asset, new RegExp(`fill="${palette.claude.css}"`, "u"));
   }
+});
+
+test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
+  const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
+  const bundleScript = await readRepoFile("app", "bundle.sh");
+  const appIcon = await readRepoBytes("app", "Resources", "AppIcon.icns");
+
+  assert.match(buildIconScript, /SOURCE_SVG="\$\{1:-\$REPO_ROOT\/docs\/assets\/kage-logo\.svg\}"/u);
+  assert.match(buildIconScript, /OUTPUT_ICON="\$RESOURCES_DIR\/AppIcon\.icns"/u);
+  assert.match(buildIconScript, /sips -s format png -z 1024 1024 "\$SOURCE_SVG"/u);
+  assert.match(buildIconScript, /iconutil -c icns "\$ICONSET_DIR" -o "\$OUTPUT_ICON"/u);
+
+  assert.match(bundleScript, /ICON_NAME="AppIcon"/u);
+  assert.match(bundleScript, /<key>CFBundleIconFile<\/key>\s*<string>\$ICON_NAME<\/string>/u);
+  assert.match(bundleScript, /find "\$RESOURCE_SOURCE_DIR" -maxdepth 1 -type f -exec cp \{\} "\$RESOURCES_DIR\/" \\;/u);
+
+  assert.equal(appIcon.subarray(0, 4).toString("ascii"), "icns");
+  assert.ok(appIcon.length > 100_000, "AppIcon.icns should contain the full macOS iconset, not a tiny placeholder.");
 });
