@@ -2,6 +2,9 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.14 makes the desktop updater resilient to unauthenticated GitHub API rate limits by falling back to the GitHub Releases latest redirect.
+- KAGE v0.1.14 让桌面端更新检查在 GitHub unauthenticated API 达到 rate limit 时 fallback 到 GitHub Releases latest redirect。
+
 - KAGE v0.1.13 adds a desktop Check for Updates button, fixes optional QoderWork doctor decoding, and aligns agent badge colors exactly with the app icon dots.
 - KAGE v0.1.13 增加桌面端 Check for Updates 按钮，修复可选 QoderWork doctor 解码，并让 agent badge 色值与 App icon dots 精确一致。
 

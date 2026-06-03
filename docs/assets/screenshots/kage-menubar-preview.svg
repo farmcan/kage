@@ -53,7 +53,7 @@
 
   <line x1="540" y1="530" x2="900" y2="530" stroke="#2a343c"/>
   <text x="540" y="554" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
-  <text x="812" y="554" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#4cc38a">KAGE 0.1.13</text>
+  <text x="812" y="554" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#4cc38a">KAGE 0.1.14</text>
 
   <text x="70" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="38" font-weight="850" fill="#f7f2e6">Menu bar control</text>
   <text x="70" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#a7b2ba">KAGE stays close in the macOS status bar.</text>
