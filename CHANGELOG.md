@@ -2,11 +2,20 @@
 
 ## Unreleased / 未发布
 
+- KAGE v0.1.12 ships QoderWork source support, refreshed agent badge/icon colors, and a new unsigned DMG.
+- KAGE v0.1.12 发布 QoderWork source 支持、刷新 agent badge/icon 色值，并发布新的 unsigned DMG。
+
+- Added QoderWork as a Qoder-format session source for discovery, search, replay, and bridges into Codex, Claude Code, or QoderCLI while leaving native QoderWork continue/fork disabled until a stable resume interface exists.
+- 增加 QoderWork 作为 Qoder 格式 session source，支持发现、搜索、回放，以及桥接到 Codex、Claude Code 或 QoderCLI；在没有稳定 resume 接口前不暴露 QoderWork 原生 continue/fork。
+
+- Updated agent badge/icon colors toward current brand accents: Claude orange, Codex green, and Qoder violet.
+- 更新 agent badge/icon 色值，使其贴近当前品牌强调色：Claude 橙、Codex 绿、Qoder 紫。
+
 - Cleaned up the docs tree by archiving May 2026 planning notes, updating docs indexes, and removing superseded icon concept assets.
 - 整理 docs 目录：归档 2026 年 5 月规划文档、更新文档索引，并移除已被当前图标取代的旧 icon concept 资产。
 
-- Refreshed the GitHub Pages homepage and README hero assets around the current Session Portal icon, dark desktop workspace, recent-history search, New Session controls, and v0.1.11 release path.
-- 围绕当前 Session Portal 图标、暗色桌面工作台、最近历史搜索、New Session 控件和 v0.1.11 发布路径，刷新 GitHub Pages 主页与 README 首屏资产。
+- Refreshed the GitHub Pages homepage and README hero assets around the current Session Portal icon, dark desktop workspace, recent-history search, New Session controls, and current release path.
+- 围绕当前 Session Portal 图标、暗色桌面工作台、最近历史搜索、New Session 控件和当前发布路径，刷新 GitHub Pages 主页与 README 首屏资产。
 
 - KAGE v0.1.11 ships the post-release UX fixes: current homepage DMG links, a v0.1.10 release note archive, homepage version guard coverage, and desktop search scoped to the recent-history window by default.
 - KAGE v0.1.11 发布发布后 UX 修复：主页 DMG 链接指向当前版本、补齐 v0.1.10 release note、增加主页版本防回归测试，并让桌面搜索默认跟随最近历史窗口。

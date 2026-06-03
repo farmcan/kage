@@ -12,7 +12,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-desktop_app-black.svg)](app/)
 
-KAGE finds, resumes, forks, replays, and bridges local AI coding sessions across `Claude Code`, `Codex`, and `QoderCLI`.
+KAGE finds, searches, replays, and bridges local AI coding sessions across `Claude Code`, `Codex`, `QoderCLI`, and `QoderWork`, with native resume/fork actions where the agent exposes a stable interface.
 
 > Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
 
@@ -33,7 +33,7 @@ Action language in KAGE is intentionally narrow:
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.11](https://github.com/farmcan/kage/releases/tag/v0.1.11)
+Latest release: [KAGE v0.1.12](https://github.com/farmcan/kage/releases/tag/v0.1.12)
 
 ## Use KAGE If
 
@@ -58,12 +58,12 @@ Latest release: [KAGE v0.1.11](https://github.com/farmcan/kage/releases/tag/v0.1
 
 ## Try It In 60 Seconds
 
-Before trying it, KAGE is most useful if you already have at least one Claude Code, Codex, or QoderCLI session on this machine. If you do not, open the desktop app and click `Explore Demo` to inspect sanitized local sample sessions first.
+Before trying it, KAGE is most useful if you already have at least one Claude Code, Codex, QoderCLI, or QoderWork session on this machine. If you do not, open the desktop app and click `Explore Demo` to inspect sanitized local sample sessions first.
 
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.12/KAGE-0.1.12.dmg
 ```
 
 The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
@@ -175,6 +175,9 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 | `qodercli` | `codex` | `codex-session` | `codex resume ...` |
 | `qodercli` | `claude` | `claude-session` | `claude --resume ...` |
 | `qodercli` | `qodercli` | `qoder-session` fork | `qodercli --cwd ... --resume ...` |
+| `qoderwork` | `codex` | `codex-session` | `codex resume ...` |
+| `qoderwork` | `claude` | `claude-session` | `claude --resume ...` |
+| `qoderwork` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 | `codex` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 | `claude` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 
@@ -182,10 +185,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.11 DMG from GitHub Releases:
+Download the v0.1.12 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.12/KAGE-0.1.12.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -313,14 +316,17 @@ Agent shorthands:
 - `x`: `codex`
 - `c`: `claude`
 - `q`: `qodercli`
+- `qw`: `qoderwork`
 
-You can also run `kage x`, `kage c`, or `kage q` to list matching sessions for the current directory without exporting.
+You can also run `kage x`, `kage c`, `kage q`, or `kage qw` to list matching sessions for the current directory without exporting.
 
 Use explicit source and target instead of aliases:
 
 ```bash
 kage codex claude
 kage qodercli codex
+kage qoderwork codex
+kage qw claude
 kage claude qodercli
 ```
 
@@ -499,6 +505,7 @@ Matching rules:
 - `codex`: `session_meta.payload.cwd`
 - `claude`: `cwd` from transcript rows
 - `qodercli`: `working_dir`
+- `qoderwork`: `working_dir`
 
 ## Export Behavior
 
@@ -575,7 +582,7 @@ The export pipeline can trim or branch a conversation before writing it:
 - [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
-- [Latest release notes](docs/release-notes/v0.1.11.md)
+- [Latest release notes](docs/release-notes/v0.1.12.md)
 - [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope
@@ -583,3 +590,4 @@ The export pipeline can trim or branch a conversation before writing it:
 - exports visible transcript history only
 - does not preserve hidden reasoning, tool runtime state, or UI state
 - `qoder-session` is implemented as a best-effort native export format, with resume support verified on `qodercli 1.0.0`
+- `qoderwork` is supported as a Qoder-format session source; native QoderWork continue/fork is intentionally not exposed until a stable resume interface exists

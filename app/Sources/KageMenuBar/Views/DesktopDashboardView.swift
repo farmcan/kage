@@ -197,7 +197,7 @@ struct DesktopDashboardView: View {
           .controlSize(.large)
         Text("Loading sessions...")
           .font(.headline)
-        Text("KAGE is scanning local Codex, Claude Code, and QoderCLI transcripts.")
+        Text("KAGE is scanning local Codex, Claude Code, QoderCLI, and QoderWork transcripts.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -581,7 +581,7 @@ struct DesktopDashboardView: View {
     }
 
     if visibleSessions.isEmpty {
-      return "No \(activeAgentScopeLabel) sessions found in \(directoryScopeLabel). Start or resume Codex, Claude Code, or QoderCLI in this project, enable subdirectories, or choose another directory."
+      return "No \(activeAgentScopeLabel) sessions found in \(directoryScopeLabel). Start or resume Codex, Claude Code, QoderCLI, or QoderWork in this project, enable subdirectories, or choose another directory."
     }
 
     return "Choose a session from the sidebar."
@@ -932,7 +932,7 @@ struct DesktopDashboardView: View {
 
   private func agentGroups(for sessions: [AgentSession]) -> [AgentGroup] {
     let grouped = Dictionary(grouping: sessions, by: \.agent)
-    return ["codex", "claude", "qodercli"].compactMap { agent -> AgentGroup? in
+    return ["codex", "claude", "qodercli", "qoderwork"].compactMap { agent -> AgentGroup? in
       guard let sessions = grouped[agent] else {
         return nil
       }
@@ -957,6 +957,8 @@ struct DesktopDashboardView: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "Agent"
     }
@@ -1320,11 +1322,11 @@ private struct DesktopEmptyStateView<Actions: View>: View {
 private func agentTint(_ agent: String?) -> Color {
   switch agent {
   case "claude":
-    return Color(red: 0.55, green: 0.32, blue: 0.83)
+    return Color(red: 0.85, green: 0.47, blue: 0.34)
   case "codex":
-    return Color(red: 0.10, green: 0.47, blue: 0.36)
-  case "qodercli":
-    return Color(red: 0.13, green: 0.36, blue: 0.74)
+    return Color(red: 0.06, green: 0.64, blue: 0.50)
+  case "qodercli", "qoderwork":
+    return Color(red: 0.55, green: 0.36, blue: 0.96)
   default:
     return .secondary
   }
@@ -1336,7 +1338,7 @@ private func agentIconName(_ agent: String?) -> String {
     return "sparkles"
   case "codex":
     return "terminal"
-  case "qodercli":
+  case "qodercli", "qoderwork":
     return "q.square"
   default:
     return "cpu"
@@ -1676,6 +1678,8 @@ private struct DesktopSessionDetailView: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "Target"
     }
@@ -2011,6 +2015,8 @@ private struct DesktopActionResultBanner: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "target"
     }

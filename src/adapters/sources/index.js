@@ -8,6 +8,7 @@ const adapters = {
   claude,
   codex,
   qodercli: qoder,
+  qoderwork: qoder,
 };
 
 export function getSourceAdapter(agent) {

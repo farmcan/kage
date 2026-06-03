@@ -166,6 +166,8 @@ private struct SessionRowView: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "Target"
     }

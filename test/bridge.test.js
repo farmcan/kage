@@ -84,12 +84,13 @@ test("joinBlocks handles native transcript content variants", () => {
 });
 
 test("supportedAgents exposes the native-export adapter set", () => {
-  assert.deepEqual(supportedAgents.sort(), ["claude", "codex", "qodercli"].sort());
+  assert.deepEqual(supportedAgents.sort(), ["claude", "codex", "qodercli", "qoderwork"].sort());
 });
 
-test("detectAgent recognizes Codex, Claude, and QoderCLI paths", () => {
+test("detectAgent recognizes Codex, Claude, QoderCLI, and QoderWork paths", () => {
   assert.equal(detectAgent("/tmp/.codex/sessions/2026/03/demo.jsonl"), "codex");
   assert.equal(detectAgent("/tmp/.claude/projects/foo.jsonl"), "claude");
+  assert.equal(detectAgent("/tmp/.qoderwork/projects/demo/session.jsonl"), "qoderwork");
   assert.equal(detectAgent("/tmp/.qoder/projects/demo.jsonl"), "qodercli");
   assert.equal(detectAgent("/tmp/.qoder/bin/qodercli/demo.jsonl"), "qodercli");
 });
@@ -116,6 +117,10 @@ test("getExportCapability exposes qodercli export pairs", () => {
   assert.equal(getExportCapability("qodercli", "qodercli")?.fork, true);
   assert.equal(getExportCapability("qodercli", "codex")?.format, "codex-session");
   assert.equal(getExportCapability("qodercli", "claude")?.format, "claude-session");
+  assert.equal(getExportCapability("qoderwork", "qoderwork"), null);
+  assert.equal(getExportCapability("qoderwork", "codex")?.format, "codex-session");
+  assert.equal(getExportCapability("qoderwork", "claude")?.format, "claude-session");
+  assert.equal(getExportCapability("qoderwork", "qodercli")?.format, "qoder-session");
   assert.equal(getExportCapability("codex", "qodercli")?.format, "qoder-session");
   assert.equal(getExportCapability("codex", "qodercli")?.resumable, true);
   assert.equal(getExportCapability("claude", "qodercli")?.format, "qoder-session");
@@ -186,6 +191,18 @@ test("parseSession reads QoderCLI sessions and drops meta rows", async () => {
   assert.equal(session.sessionId, "qoder-session");
   assert.equal(session.title, "Demo Qoder Session");
   assert.equal(session.messages.length, 2);
+  assert.equal(session.messages[0].text, "你好");
+});
+
+test("parseSession reads QoderWork sessions with the Qoder layout", async () => {
+  const session = await parseSession({
+    sessionPath: path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl"),
+    agent: "qoderwork",
+  });
+
+  assert.equal(session.agent, "qoderwork");
+  assert.equal(session.sessionId, "qoder-session");
+  assert.equal(session.cwd, "/workspace/demo");
   assert.equal(session.messages[0].text, "你好");
 });
 
@@ -747,7 +764,7 @@ test("cli --help only documents native export commands", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /kage <source> <target> \[options\]/);
   assert.match(result.stdout, /kage doctor \[--json\]/);
-  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\] \[--since 90d\]/);
+  assert.match(result.stdout, /kage sessions \[--agent claude\|codex\|qodercli\|qoderwork\] \[--since 90d\]/);
   assert.match(result.stdout, /kage search \[query\]/);
   assert.match(result.stdout, /kage actions \[--since 90d\]/);
   assert.match(result.stdout, /kage run-action <id> \[--include-subdirs\] \[--json\]/);
@@ -856,6 +873,7 @@ test("cli doctor emits machine-readable readiness checks", async () => {
   await fs.mkdir(path.join(fakeHome, ".claude", "projects"), { recursive: true });
   await fs.mkdir(path.join(fakeHome, ".codex", "sessions"), { recursive: true });
   await fs.mkdir(path.join(fakeHome, ".qoder", "projects"), { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".qoderwork", "projects"), { recursive: true });
   await writeExecutable(path.join(binDir, "claude"), "#!/bin/sh\necho 'claude 2.1.98'\n");
   await writeExecutable(path.join(binDir, "codex"), "#!/bin/sh\necho 'codex-cli 0.130.0'\n");
   await writeExecutable(path.join(binDir, "qodercli"), "#!/bin/sh\necho 'Qoder CLI v1.0.0'\n");
@@ -868,10 +886,36 @@ test("cli doctor emits machine-readable readiness checks", async () => {
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "doctor");
   assert.equal(payload.ok, true);
-  assert.equal(payload.agents.length, 3);
+  assert.equal(payload.agents.length, 4);
   assert.equal(payload.agents.find((agent) => agent.agent === "claude").version, "claude 2.1.98");
   assert.equal(payload.agents.find((agent) => agent.agent === "codex").resumeCommand, "codex resume <session-id>");
   assert.equal(payload.agents.find((agent) => agent.agent === "qodercli").sessionRoot.exists, true);
+  assert.equal(payload.agents.find((agent) => agent.agent === "qoderwork").commandRequired, false);
+  assert.equal(payload.agents.find((agent) => agent.agent === "qoderwork").sessionRootRequired, false);
+  assert.equal(payload.agents.find((agent) => agent.agent === "qoderwork").sessionRoot.exists, true);
+});
+
+test("cli doctor treats missing QoderWork storage as optional", async () => {
+  const fakeHome = await makeTempDir("doctor-qoderwork-optional-home");
+  const binDir = await makeTempDir("doctor-qoderwork-optional-bin");
+  await fs.mkdir(path.join(fakeHome, ".claude", "projects"), { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".codex", "sessions"), { recursive: true });
+  await fs.mkdir(path.join(fakeHome, ".qoder", "projects"), { recursive: true });
+  await writeExecutable(path.join(binDir, "claude"), "#!/bin/sh\necho 'claude 2.1.98'\n");
+  await writeExecutable(path.join(binDir, "codex"), "#!/bin/sh\necho 'codex-cli 0.130.0'\n");
+  await writeExecutable(path.join(binDir, "qodercli"), "#!/bin/sh\necho 'Qoder CLI v1.0.0'\n");
+
+  const result = await spawnCli(["doctor", "--json"], {
+    env: { ...process.env, HOME: fakeHome, PATH: binDir },
+  });
+  const payload = JSON.parse(result.stdout);
+  const qoderWork = payload.agents.find((agent) => agent.agent === "qoderwork");
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.ok, true);
+  assert.equal(qoderWork.commandRequired, false);
+  assert.equal(qoderWork.sessionRootRequired, false);
+  assert.equal(qoderWork.sessionRoot.exists, false);
 });
 
 test("cli sessions lists current-project sessions across agents as json", async () => {
@@ -881,10 +925,12 @@ test("cli sessions lists current-project sessions across agents as json", async 
   const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace");
   const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "05", "20");
   const qoderProject = path.join(fakeHome, ".qoder", "projects", "-workspace");
+  const qoderWorkProject = path.join(fakeHome, ".qoderwork", "projects", "-workspace");
   await fs.mkdir(childDir, { recursive: true });
   await fs.mkdir(claudeProject, { recursive: true });
   await fs.mkdir(codexProject, { recursive: true });
   await fs.mkdir(qoderProject, { recursive: true });
+  await fs.mkdir(qoderWorkProject, { recursive: true });
   await fs.writeFile(
     path.join(claudeProject, "claude-one.jsonl"),
     `{"type":"user","message":{"role":"user","content":"claude plan"},"timestamp":"2026-05-20T10:00:00.000Z","cwd":"${currentDir}","sessionId":"claude-one"}\n`,
@@ -911,6 +957,11 @@ test("cli sessions lists current-project sessions across agents as json", async 
     `{"type":"user","cwd":"${currentDir}","sessionId":"qoder-one","message":{"role":"user","content":[{"type":"text","text":"qoder plan"}]}}\n`,
     "utf8",
   );
+  await fs.writeFile(
+    path.join(qoderWorkProject, "qoderwork-one.jsonl"),
+    `{"type":"user","cwd":"${currentDir}","sessionId":"qoderwork-one","message":{"role":"user","content":[{"type":"text","text":"qoderwork plan"}]}}\n`,
+    "utf8",
+  );
 
   const result = await spawnCli(["sessions", "--json"], {
     cwd: currentDir,
@@ -922,9 +973,10 @@ test("cli sessions lists current-project sessions across agents as json", async 
   assert.equal(payload.mode, "sessions");
   assert.deepEqual(
     payload.sessions.map((session) => session.sessionId).sort(),
-    ["claude-one", "codex-one", "qoder-one"].sort(),
+    ["claude-one", "codex-one", "qoder-one", "qoderwork-one"].sort(),
   );
   assert.equal(payload.sessions.find((session) => session.sessionId === "qoder-one").agent, "qodercli");
+  assert.equal(payload.sessions.find((session) => session.sessionId === "qoderwork-one").agent, "qoderwork");
 
   const subtreeResult = await spawnCli(["sessions", "--include-subdirs", "--json"], {
     cwd: currentDir,
@@ -935,7 +987,7 @@ test("cli sessions lists current-project sessions across agents as json", async 
   assert.equal(subtreePayload.includeSubdirs, true);
   assert.deepEqual(
     subtreePayload.sessions.map((session) => session.sessionId).sort(),
-    ["claude-one", "codex-child", "codex-one", "qoder-one"].sort(),
+    ["claude-one", "codex-child", "codex-one", "qoder-one", "qoderwork-one"].sort(),
   );
 
   const limitedResult = await spawnCli(["sessions", "--include-subdirs", "--limit", "2", "--json"], {
@@ -1180,6 +1232,45 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(forkPayload.targetAgent, "claude");
   assert.match(forkPayload.resumeCommand, /^claude --resume [0-9a-f-]{36}$/u);
   assert.match(forkPayload.outputPath, /\.claude\/projects\/.*\/[0-9a-f-]{36}\.jsonl$/u);
+});
+
+test("cli actions expose QoderWork as replay and bridge source only", async () => {
+  const fakeHome = await makeTempDir("qoderwork-actions-home");
+  const currentDir = await makeTempDir("qoderwork-actions-workspace");
+  const qoderWorkProject = path.join(fakeHome, ".qoderwork", "projects", "-workspace");
+  await fs.mkdir(qoderWorkProject, { recursive: true });
+  await fs.writeFile(
+    path.join(qoderWorkProject, "qoderwork-action.jsonl"),
+    `{"type":"user","cwd":"${currentDir}","sessionId":"qoderwork-action","message":{"role":"user","content":[{"type":"text","text":"ship qoderwork support"}]}}\n`,
+    "utf8",
+  );
+
+  const actionsResult = await spawnCli(["actions", "--agent", "qoderwork", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const payload = JSON.parse(actionsResult.stdout);
+
+  assert.equal(actionsResult.code, 0);
+  assert.ok(!payload.actions.find((action) => action.type === "resume"));
+  assert.ok(!payload.actions.find((action) => action.type === "fork"));
+  assert.ok(payload.actions.find((action) => action.id === "replay:qoderwork:qoderwork-action"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:qoderwork:codex:qoderwork-action"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:qoderwork:claude:qoderwork-action"));
+  assert.ok(payload.actions.find((action) => action.id === "bridge:qoderwork:qodercli:qoderwork-action"));
+
+  const bridgeAction = payload.actions.find((action) => action.id === "bridge:qoderwork:codex:qoderwork-action");
+  const bridgeResult = await spawnCli(["run-action", bridgeAction.id, "--agent", "qoderwork", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const bridgePayload = JSON.parse(bridgeResult.stdout);
+
+  assert.equal(bridgeResult.code, 0);
+  assert.equal(bridgePayload.action.id, bridgeAction.id);
+  assert.equal(bridgePayload.sourceAgent, "qoderwork");
+  assert.equal(bridgePayload.targetAgent, "codex");
+  assert.equal(bridgePayload.resumeCommand, "codex resume qoderwork-action");
 });
 
 test("cli shows the selected session card when only one match exists", async () => {
@@ -2003,6 +2094,8 @@ test("cli generates shell completions with QoderCLI aliases", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /complete -F _kage_completions kage/);
   assert.match(result.stdout, /qodercli/);
+  assert.match(result.stdout, /qoderwork/);
+  assert.match(result.stdout, /qw/);
   assert.match(result.stdout, /q2x/);
 });
 

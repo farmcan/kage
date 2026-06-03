@@ -15,6 +15,9 @@ function agentLabel(agent) {
   if (value === "qodercli") {
     return "QoderCLI";
   }
+  if (value === "qoderwork") {
+    return "QoderWork";
+  }
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 

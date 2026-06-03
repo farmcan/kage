@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Find, resume, fork, replay, and bridge local AI coding sessions across Claude Code, Codex, and QoderCLI."
+      content="Find, search, replay, and bridge local AI coding sessions across Claude Code, Codex, QoderCLI, and QoderWork, with native resume and fork actions where supported."
     >
     <title>KAGE - Local AI Coding Session Manager</title>
     <style>
@@ -18,10 +18,10 @@
         --panel: #141a1f;
         --panel-2: #192229;
         --line: #2a343c;
-        --green: #4cc38a;
+        --green: #10a37f;
         --gold: #f2b84b;
-        --blue: #6cb6ff;
-        --violet: #c7a7ff;
+        --violet: #8b5cf6;
+        --orange: #d97757;
         --red: #ef6f61;
         --white: #fffdf8;
       }
@@ -126,17 +126,18 @@
 
       .hero {
         position: relative;
-        min-height: calc(100svh - 70px);
+        box-sizing: border-box;
+        min-height: calc(100svh - 118px);
         display: flex;
         align-items: center;
-        padding: 74px 0 66px;
+        padding: 52px 0 44px;
         border-bottom: 1px solid var(--line);
         background: #0d1114;
       }
 
       .hero-scene {
         position: absolute;
-        inset: 38px -170px 36px 50%;
+        inset: 28px -170px 28px 50%;
         opacity: 0.9;
       }
 
@@ -630,22 +631,51 @@
 
         .hero {
           min-height: auto;
-          align-items: start;
-          padding: 52px 0 0;
+          flex-direction: column;
+          align-items: stretch;
+          padding: 40px 0 0;
+        }
+
+        .hero > .shell {
+          order: 1;
         }
 
         .hero-scene {
+          order: 2;
           position: relative;
           inset: auto;
           width: calc(100% + 40px);
-          margin: 34px -20px 0;
+          height: 250px;
+          margin: 26px -20px 0;
+          opacity: 0.82;
+          overflow: hidden;
         }
 
         .app-window {
           min-width: 760px;
           min-height: 520px;
-          transform: scale(0.74);
+          transform: scale(0.58);
           transform-origin: top left;
+        }
+
+        .hero-copy p {
+          margin-top: 18px;
+          font-size: 17px;
+        }
+
+        .actions {
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        .button {
+          min-height: 38px;
+          padding: 0 12px;
+          font-size: 14px;
+        }
+
+        .hero-proof {
+          display: none;
         }
 
         .hero {
@@ -673,7 +703,7 @@
           <a href="#workflows">Workflows</a>
           <a href="#desktop">Desktop</a>
           <a href="#matrix">Routes</a>
-          <a href="https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg">Download</a>
+          <a href="https://github.com/farmcan/kage/releases/download/v0.1.12/KAGE-0.1.12.dmg">Download</a>
           <a href="https://github.com/farmcan/kage/releases">Releases</a>
           <a href="https://github.com/farmcan/kage">GitHub</a>
         </div>
@@ -707,12 +737,12 @@
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
-                    <div class="agent" style="color: var(--violet)">Claude Code</div>
+                    <div class="agent" style="color: var(--orange)">Claude Code</div>
                     <div class="session-title">Session loading plan</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
-                    <div class="agent" style="color: var(--blue)">QoderCLI</div>
+                    <div class="agent" style="color: var(--violet)">QoderCLI</div>
                     <div class="session-title">Replay story export</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
@@ -752,11 +782,11 @@
             <p class="eyebrow">Local-first AI coding session manager</p>
             <h1>KAGE</h1>
             <p>
-              A macOS desktop workspace and CLI for finding, searching, forking, replaying, and moving local
-              coding-agent sessions across Claude Code, Codex, and QoderCLI without uploading transcript content.
+              A macOS desktop workspace and CLI for finding, searching, replaying, and moving local coding-agent
+              sessions across Claude Code, Codex, QoderCLI, and QoderWork without uploading transcript content.
             </p>
             <div class="actions">
-              <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.11/KAGE-0.1.11.dmg">Download DMG</a>
+              <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.12/KAGE-0.1.12.dmg">Download DMG</a>
               <a class="button secondary" href="https://github.com/farmcan/kage">Star on GitHub</a>
               <a class="button secondary" href="https://github.com/farmcan/kage#install">Install CLI</a>
               <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
@@ -764,8 +794,8 @@
             <div class="hero-proof" aria-label="Product proof">
               <span>New Session</span>
               <span>Recent history window</span>
-              <span>Claude Code / Codex / QoderCLI</span>
-              <span>Latest: v0.1.11</span>
+              <span>Claude Code / Codex / QoderCLI / QoderWork</span>
+              <span>Latest: v0.1.12</span>
             </div>
           </div>
         </div>
@@ -900,6 +930,10 @@
                 <td><code>kage q2v</code></td>
                 <td>Replay a QoderCLI session as a local HTML story.</td>
               </tr>
+              <tr>
+                <td><code>kage qoderwork qoderwork --export session-story-html</code></td>
+                <td>Replay a QoderWork source session as a local HTML story.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -925,7 +959,7 @@
             </article>
             <article class="step">
               <strong>Bridge</strong>
-              <p>Move useful context across Claude Code, Codex, and QoderCLI native sessions.</p>
+              <p>Move useful context across Claude Code, Codex, QoderCLI, and QoderWork sessions.</p>
             </article>
             <article class="step">
               <strong>Packaging</strong>

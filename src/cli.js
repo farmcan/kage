@@ -11,7 +11,7 @@ import { cleanDuplicateExports } from "./core/clean.js";
 import { findMatchingSessions, findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
 import { resolveInstallPlan } from "./core/install.js";
-import { inferDefaultExportFormat, routeAliases } from "./core/routing.js";
+import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./core/routing.js";
 import { searchSessions } from "./core/search.js";
 import {
   compactSessionText,
@@ -20,15 +20,16 @@ import {
   getShortSessionTitle,
 } from "./core/session-labels.js";
 
-const shorthandAgents = ["c", "x", "q"];
+const shorthandAgents = ["c", "x", "q", "qw"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
 const removedAgentNames = new Set(["qoder"]);
+const agentUsage = "claude|codex|qodercli|qoderwork";
 
 const helpText = `Usage:
   kage update
   kage doctor [--json]
-  kage sessions [--agent claude|codex|qodercli] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
-  kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
+  kage sessions [--agent ${agentUsage}] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
+  kage search [query] [--agent ${agentUsage}] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
   kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
   kage run-action <id> [--include-subdirs] [--json]
   kage clean [--confirm] [--older-than 7d] [--json]
@@ -51,10 +52,15 @@ Route aliases:
   q2c   qodercli -> claude
   q2v   qodercli -> visualize
 
+QoderWork sessions are supported as a source via qoderwork/qw. Use explicit routes such as:
+  kage qoderwork codex --session <path>
+  kage qw claude --session <path>
+
 Agent shorthands:
   x     codex
   c     claude
   q     qodercli
+  qw    qoderwork
 
 Options:
   --agent <agent>
@@ -344,7 +350,7 @@ function parseArgs(argv) {
       return {
         ...args,
         error:
-          "Usage: kage sessions [--agent claude|codex|qodercli] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]",
+          `Usage: kage sessions [--agent ${agentUsage}] [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]`,
       };
     }
     return { ...args, sessions: true };
@@ -354,7 +360,7 @@ function parseArgs(argv) {
       return {
         ...args,
         error:
-          "Usage: kage search [query] [--agent claude|codex|qodercli] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]",
+          `Usage: kage search [query] [--agent ${agentUsage}] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]`,
       };
     }
     return { ...args, search: true, searchQuery: second ?? null };
@@ -543,6 +549,9 @@ function commandForAgent(agent) {
   if (agent === "qodercli") {
     return "qodercli";
   }
+  if (agent === "qoderwork") {
+    return null;
+  }
   return agent;
 }
 
@@ -570,6 +579,9 @@ function nativeForkExample(agent) {
 }
 
 async function captureCommand(command, args = ["--version"], { timeoutMs = 2500 } = {}) {
+  if (!command) {
+    return { ok: true, exists: true, version: null, optional: true, error: null };
+  }
   return new Promise((resolve) => {
     let settled = false;
     let stdout = "";
@@ -881,8 +893,10 @@ async function buildDoctorResult(args = {}) {
         command,
         installed,
         version: commandStatus.version ?? null,
+        commandRequired: !commandStatus.optional,
         commandError: installed && commandStatus.ok ? null : commandStatus.error,
         sessionRoot,
+        sessionRootRequired: command !== null,
         resumeCommand: nativeResumeExample(agent),
         forkCommand: nativeForkExample(agent),
       };
@@ -891,7 +905,11 @@ async function buildDoctorResult(args = {}) {
 
   return {
     mode: "doctor",
-    ok: agents.every((agent) => agent.installed && agent.sessionRoot.exists && agent.sessionRoot.readable),
+    ok: agents.every(
+      (agent) =>
+        (!agent.commandRequired || agent.installed) &&
+        (!agent.sessionRootRequired || (agent.sessionRoot.exists && agent.sessionRoot.readable)),
+    ),
     cwd: process.cwd(),
     kageVersion: version,
     agents,
@@ -905,15 +923,24 @@ function formatDoctorResult(result, asJson) {
 
   const lines = [`KAGE doctor: ${result.ok ? "ready" : "attention needed"}`, `Version: ${result.kageVersion}`, `CWD: ${result.cwd}`];
   for (const agent of result.agents) {
-    const commandStatus = agent.installed ? agent.version ?? "installed" : `missing (${agent.commandError})`;
+    const commandStatus =
+      agent.command == null
+        ? "not required"
+        : agent.installed
+          ? agent.version ?? "installed"
+          : `missing (${agent.commandError})`;
     const rootStatus = agent.sessionRoot.exists
       ? `${agent.sessionRoot.readable ? "readable" : "not readable"}, ${agent.sessionRoot.writable ? "writable" : "not writable"}`
-      : "missing";
+      : agent.sessionRootRequired
+        ? "missing"
+        : "missing, optional";
     lines.push("");
     lines.push(`${agent.label}`);
-    lines.push(`  Command: ${agent.command} (${commandStatus})`);
+    lines.push(agent.command == null ? "  Command: not required (desktop app source)" : `  Command: ${agent.command} (${commandStatus})`);
     lines.push(`  Session root: ${agent.sessionRoot.path} (${rootStatus})`);
-    lines.push(`  Resume: ${agent.resumeCommand}`);
+    if (agent.resumeCommand) {
+      lines.push(`  Resume: ${agent.resumeCommand}`);
+    }
     if (agent.forkCommand) {
       lines.push(`  Fork: ${agent.forkCommand}`);
     }
@@ -1021,6 +1048,9 @@ function formatSessionLabel(agent) {
   const value = formatAgentName(agent);
   if (value === "qodercli") {
     return "QoderCLI";
+  }
+  if (value === "qoderwork") {
+    return "QoderWork";
   }
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -1218,6 +1248,9 @@ function shellQuote(value) {
 }
 
 function routeAliasForAgent(agent, suffix) {
+  if (agent === "qoderwork") {
+    return null;
+  }
   const prefix = agent === "claude" ? "c" : agent === "codex" ? "x" : "q";
   return `${prefix}2${suffix}`;
 }
@@ -1257,38 +1290,45 @@ function buildActionList(inventory) {
       const isLatest = index === 0;
       const sessionTitle = session.shortTitle ?? formatSessionTitle(session.title, 60);
       const resumeCommand = buildResumeCommandForSession(session);
-      actions.push({
-        id: `resume:${session.agent}:${session.sessionId}`,
-        type: "resume",
-        label: isLatest
-          ? `Resume latest ${formatSessionLabel(session.agent)} session`
-          : `Resume ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
-        agent: session.agent,
-        sessionId: session.sessionId,
-        sessionPath: session.path,
-        command: resumeCommand,
-        isLatest,
-      });
+      if (resumeCommand) {
+        actions.push({
+          id: `resume:${session.agent}:${session.sessionId}`,
+          type: "resume",
+          label: isLatest
+            ? `Resume latest ${formatSessionLabel(session.agent)} session`
+            : `Resume ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
+          agent: session.agent,
+          sessionId: session.sessionId,
+          sessionPath: session.path,
+          command: resumeCommand,
+          isLatest,
+        });
+      }
 
       const forkAlias = routeAliasBetweenAgents(session.agent, session.agent);
-      actions.push({
-        id: `fork:${forkAlias}:${session.sessionId}`,
-        type: "fork",
-        label: isLatest
-          ? `Fork latest ${formatSessionLabel(session.agent)} session into a new session`
-          : `Fork ${formatSessionLabel(session.agent)} session into a new session: ${sessionTitle}`,
-        agent: session.agent,
-        targetAgent: session.agent,
-        sessionId: session.sessionId,
-        sessionPath: session.path,
-        routeAlias: forkAlias,
-        cliArgs: [forkAlias, "--session", session.path],
-        isLatest,
-      });
+      if (forkAlias && getExportCapability(session.agent, session.agent)?.fork) {
+        actions.push({
+          id: `fork:${forkAlias}:${session.sessionId}`,
+          type: "fork",
+          label: isLatest
+            ? `Fork latest ${formatSessionLabel(session.agent)} session into a new session`
+            : `Fork ${formatSessionLabel(session.agent)} session into a new session: ${sessionTitle}`,
+          agent: session.agent,
+          targetAgent: session.agent,
+          sessionId: session.sessionId,
+          sessionPath: session.path,
+          routeAlias: forkAlias,
+          cliArgs: [forkAlias, "--session", session.path],
+          isLatest,
+        });
+      }
 
       const replayAlias = routeAliasForAgent(session.agent, "v");
+      const replayCliArgs = replayAlias
+        ? [replayAlias, "--session", session.path]
+        : [session.agent, session.agent, "--export", "session-story-html", "--session", session.path];
       actions.push({
-        id: `replay:${replayAlias}:${session.sessionId}`,
+        id: `replay:${replayAlias ?? session.agent}:${session.sessionId}`,
         type: "replay",
         label: isLatest
           ? `Open replay story for latest ${formatSessionLabel(session.agent)} session`
@@ -1297,14 +1337,17 @@ function buildActionList(inventory) {
         sessionId: session.sessionId,
         sessionPath: session.path,
         routeAlias: replayAlias,
-        cliArgs: [replayAlias, "--session", session.path],
+        cliArgs: replayCliArgs,
         isLatest,
       });
 
-      for (const targetAgent of supportedAgents.filter((agent) => agent !== session.agent)) {
+      for (const targetAgent of supportedAgents.filter((agent) => agent !== session.agent && getExportCapability(session.agent, agent))) {
         const routeAlias = routeAliasBetweenAgents(session.agent, targetAgent);
+        const bridgeCliArgs = routeAlias
+          ? [routeAlias, "--session", session.path]
+          : [session.agent, targetAgent, "--session", session.path];
         actions.push({
-          id: `bridge:${routeAlias}:${session.sessionId}`,
+          id: `bridge:${routeAlias ?? `${session.agent}:${targetAgent}`}:${session.sessionId}`,
           type: "bridge",
           label: isLatest
             ? `Bridge latest ${formatSessionLabel(session.agent)} session to ${formatSessionLabel(targetAgent)}`
@@ -1314,7 +1357,7 @@ function buildActionList(inventory) {
           sessionId: session.sessionId,
           sessionPath: session.path,
           routeAlias,
-          cliArgs: [routeAlias, "--session", session.path],
+          cliArgs: bridgeCliArgs,
           isLatest,
         });
       }

@@ -245,6 +245,8 @@ struct MainMenuView: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "Target"
     }
@@ -397,6 +399,8 @@ private struct ActionResultCard: View {
       return "Codex"
     case "qodercli":
       return "QoderCLI"
+    case "qoderwork":
+      return "QoderWork"
     default:
       return agent ?? "target"
     }

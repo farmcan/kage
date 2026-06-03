@@ -6,9 +6,9 @@ KAGE's GitHub page is the main product surface until the desktop app has signed 
 
 Keep these fields aligned after every positioning change:
 
-- Description: `Local-first desktop and CLI session manager for Claude Code, Codex, and QoderCLI.`
+- Description: `Local-first desktop and CLI session manager for Claude Code, Codex, QoderCLI, and QoderWork.`
 - Website: `https://farmcan.github.io/kage/`
-- Topics: `ai-coding`, `claude-code`, `codex`, `qodercli`, `session-management`, `desktop-app`, `macos`
+- Topics: `ai-coding`, `claude-code`, `codex`, `qodercli`, `qoderwork`, `session-management`, `desktop-app`, `macos`
 
 Do not add topics that imply shipped capabilities before they exist, such as `ios`, `sync`, `daemon`, or `terminal-emulator`.
 
@@ -22,7 +22,7 @@ The README should convert a first-time visitor in this order:
 4. Proof: screenshot or GIF of desktop search and bridge flow.
 5. Fast path: install, doctor, sessions, search, bridge.
 6. Product boundary: local-first, not a terminal or coding agent.
-7. Support matrix: Claude Code, Codex, QoderCLI routes.
+7. Support matrix: Claude Code, Codex, QoderCLI, and QoderWork routes.
 8. Contribution path: issue templates, contributing guide, current docs.
 
 Keep the top third short. Move deep route tables and implementation details below the quick-start path.

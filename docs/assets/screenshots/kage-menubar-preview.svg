@@ -33,12 +33,12 @@
 
   <line x1="540" y1="220" x2="900" y2="220" stroke="#2a343c"/>
   <rect x="540" y="238" width="360" height="78" rx="8" fill="#18261f" stroke="#4cc38a"/>
-  <text x="564" y="266" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#4cc38a">CODEX</text>
+  <text x="564" y="266" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#10a37f">CODEX</text>
   <text x="564" y="294" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
   <text x="830" y="266" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">now</text>
 
   <rect x="540" y="328" width="360" height="78" rx="8" fill="#141a1f" stroke="#2a343c"/>
-  <text x="564" y="356" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#c7a7ff">CLAUDE CODE</text>
+  <text x="564" y="356" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#d97757">CLAUDE CODE</text>
   <text x="564" y="384" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" fill="#f7f2e6">Session loading plan</text>
   <text x="830" y="356" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">8m</text>
 
@@ -53,7 +53,7 @@
 
   <line x1="540" y1="530" x2="900" y2="530" stroke="#2a343c"/>
   <text x="540" y="554" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
-  <text x="812" y="554" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#4cc38a">KAGE 0.1.11</text>
+  <text x="812" y="554" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="800" fill="#4cc38a">KAGE 0.1.12</text>
 
   <text x="70" y="186" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="38" font-weight="850" fill="#f7f2e6">Menu bar control</text>
   <text x="70" y="236" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="19" fill="#a7b2ba">KAGE stays close in the macOS status bar.</text>

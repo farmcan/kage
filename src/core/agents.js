@@ -1,18 +1,20 @@
 import os from "node:os";
 import path from "node:path";
 
-export const supportedAgents = ["claude", "codex", "qodercli"];
+export const supportedAgents = ["claude", "codex", "qodercli", "qoderwork"];
 
 const agentRoots = {
   claude: path.join(os.homedir(), ".claude", "projects"),
   codex: path.join(os.homedir(), ".codex", "sessions"),
   qodercli: path.join(os.homedir(), ".qoder", "projects"),
+  qoderwork: path.join(os.homedir(), ".qoderwork", "projects"),
 };
 
 const agentAliases = {
   c: "claude",
   x: "codex",
   q: "qodercli",
+  qw: "qoderwork",
 };
 
 export function normalizeAgent(agent) {
@@ -34,6 +36,9 @@ export function detectAgent(sessionPath) {
   }
   if (value.includes("/.codex/")) {
     return "codex";
+  }
+  if (value.includes("/.qoderwork/")) {
+    return "qoderwork";
   }
   if (value.includes("/.qoder/")) {
     return "qodercli";

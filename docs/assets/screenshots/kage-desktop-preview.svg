@@ -32,18 +32,18 @@
   <text x="354" y="352" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" fill="#74818a">12</text>
 
   <rect x="76" y="374" width="324" height="106" rx="8" fill="#18261f" stroke="#4cc38a"/>
-  <text x="100" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#4cc38a">CODEX</text>
+  <text x="100" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#10a37f">CODEX</text>
   <text x="100" y="436" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
   <text x="100" y="462" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
   <text x="336" y="406" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#a7b2ba">now</text>
 
   <rect x="76" y="496" width="324" height="106" rx="8" fill="#151d24" stroke="#2a343c"/>
-  <text x="100" y="528" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#c7a7ff">CLAUDE CODE</text>
+  <text x="100" y="528" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#d97757">CLAUDE CODE</text>
   <text x="100" y="558" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#f7f2e6">Session loading plan</text>
   <text x="100" y="584" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
 
   <rect x="76" y="618" width="324" height="106" rx="8" fill="#151d24" stroke="#2a343c"/>
-  <text x="100" y="650" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#6cb6ff">QODERCLI</text>
+  <text x="100" y="650" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#8b5cf6">QODERCLI</text>
   <text x="100" y="680" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="800" fill="#f7f2e6">Replay story export</text>
   <text x="100" y="706" font-family="SFMono-Regular, Menlo, monospace" font-size="12" fill="#74818a">~/wrksp/kage</text>
 
@@ -56,7 +56,7 @@
     <rect width="52" height="52" rx="10" fill="#172a21"/>
     <text x="14" y="34" font-family="SFMono-Regular, Menlo, monospace" font-size="18" font-weight="800" fill="#4cc38a">&gt;_</text>
   </g>
-  <text x="582" y="176" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#4cc38a">Codex</text>
+  <text x="582" y="176" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#10a37f">Codex</text>
   <text x="582" y="216" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-size="30" font-weight="800" fill="#f7f2e6">Homepage release audit</text>
   <text x="582" y="246" font-family="SFMono-Regular, Menlo, monospace" font-size="14" fill="#74818a">~/wrksp/kage</text>
 
