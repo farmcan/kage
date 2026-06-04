@@ -588,7 +588,15 @@ function nativeForkExample(agent) {
   return null;
 }
 
-async function captureCommand(command, args = ["--version"], { timeoutMs = 2500 } = {}) {
+function commandTimeoutMs() {
+  const configured = Number(process.env.KAGE_COMMAND_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  return 2500;
+}
+
+async function captureCommand(command, args = ["--version"], { timeoutMs = commandTimeoutMs() } = {}) {
   if (!command) {
     return { ok: true, exists: true, version: null, optional: true, error: null };
   }

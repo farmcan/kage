@@ -892,7 +892,7 @@ test("cli doctor emits machine-readable readiness checks", async () => {
   await writeExecutable(path.join(binDir, "qodercli"), "#!/bin/sh\necho 'Qoder CLI v1.0.0'\n");
 
   const result = await spawnCli(["doctor", "--json"], {
-    env: { ...process.env, HOME: fakeHome, PATH: binDir },
+    env: { ...process.env, HOME: fakeHome, PATH: binDir, KAGE_COMMAND_TIMEOUT_MS: "10000" },
   });
   const payload = JSON.parse(result.stdout);
 
@@ -920,7 +920,7 @@ test("cli doctor treats missing QoderWork storage as optional", async () => {
   await writeExecutable(path.join(binDir, "qodercli"), "#!/bin/sh\necho 'Qoder CLI v1.0.0'\n");
 
   const result = await spawnCli(["doctor", "--json"], {
-    env: { ...process.env, HOME: fakeHome, PATH: binDir },
+    env: { ...process.env, HOME: fakeHome, PATH: binDir, KAGE_COMMAND_TIMEOUT_MS: "10000" },
   });
   const payload = JSON.parse(result.stdout);
   const qoderWork = payload.agents.find((agent) => agent.agent === "qoderwork");

@@ -21,6 +21,8 @@ final class SessionPoller: ObservableObject {
   private var previousSessionIds = Set<String>()
   private var lastScope: String?
   private var lastDoctorRefresh: Date?
+  private var refreshGeneration = 0
+  private var doctorRefreshInFlight = false
   private let doctorRefreshInterval: TimeInterval = 300
   private let recentHistorySince = "90d"
   private let recentHistoryLimit = 120
@@ -57,50 +59,55 @@ final class SessionPoller: ObservableObject {
   }
 
   func refresh(appState: AppState, notifications: NotificationManager) async {
+    refreshGeneration += 1
+    let generation = refreshGeneration
     let watchedDirectory = appState.watchedDirectory
     let includeSubdirectories = appState.includeSubdirectories
     let scope = "\(watchedDirectory)|includeSubdirectories=\(includeSubdirectories)|fullHistory=\(loadsFullHistory)"
-    let scopeChanged = lastScope != scope
     if lastScope != scope {
       previousSessionIds.removeAll()
-      lastDoctorRefresh = nil
       lastScope = scope
     }
 
     isRefreshing = true
     errorMessage = nil
     defer {
-      isRefreshing = false
-      lastRefresh = Date()
+      if generation == refreshGeneration {
+        isRefreshing = false
+        lastRefresh = Date()
+      }
     }
 
     do {
       let since = loadsFullHistory ? nil : recentHistorySince
       let limit = loadsFullHistory ? nil : recentHistoryLimit
-      async let desktopState = cli.desktopState(
+      let resolvedDesktopState = try await cli.desktopState(
         cwd: watchedDirectory,
         includeSubdirectories: includeSubdirectories,
         since: since,
         limit: limit
       )
-      let doctorTask: Task<DoctorResult, Error>? = shouldRefreshDoctor || scopeChanged
-        ? Task { try await cli.doctor(cwd: watchedDirectory) }
-        : nil
+      guard generation == refreshGeneration else {
+        return
+      }
 
-      let resolvedDesktopState = try await desktopState
       let resolvedSessions = resolvedDesktopState.sessionsResponse
       let resolvedActions = resolvedDesktopState.actionsResponse
-      let resolvedDoctor = try await doctorTask?.value
 
       notifyNewSessions(resolvedSessions.sessions, appState: appState, notifications: notifications)
 
       sessionsResponse = resolvedSessions
-      if let resolvedDoctor {
-        doctorResult = resolvedDoctor
-        lastDoctorRefresh = Date()
-      }
       actionsResponse = resolvedActions
+
+      if beginDoctorRefreshIfNeeded() {
+        Task { [weak self] in
+          await self?.refreshDoctor(cwd: watchedDirectory, generation: generation)
+        }
+      }
     } catch {
+      guard generation == refreshGeneration else {
+        return
+      }
       errorMessage = error.localizedDescription
     }
   }
@@ -194,5 +201,33 @@ final class SessionPoller: ObservableObject {
       return true
     }
     return Date().timeIntervalSince(lastDoctorRefresh) >= doctorRefreshInterval
+  }
+
+  private func beginDoctorRefreshIfNeeded() -> Bool {
+    guard shouldRefreshDoctor, !doctorRefreshInFlight else {
+      return false
+    }
+    doctorRefreshInFlight = true
+    return true
+  }
+
+  private func refreshDoctor(cwd: String, generation: Int) async {
+    defer {
+      doctorRefreshInFlight = false
+    }
+
+    do {
+      let result = try await cli.doctor(cwd: cwd)
+      guard generation == refreshGeneration else {
+        return
+      }
+      doctorResult = result
+      lastDoctorRefresh = Date()
+    } catch {
+      guard generation == refreshGeneration else {
+        return
+      }
+      errorMessage = error.localizedDescription
+    }
   }
 }
