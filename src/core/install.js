@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { getDefaultRoot, normalizeAgent } from "./agents.js";
+import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./resume-commands.js";
 
 function datePartsFromTimestamp(timestamp) {
   const date = new Date(timestamp ?? Date.now());
@@ -45,14 +46,6 @@ function replaceExtension(filePath, pattern, replacement, fallbackSuffix) {
   return `${filePath}${fallbackSuffix}`;
 }
 
-function shellQuote(value) {
-  const text = String(value ?? "");
-  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) {
-    return text;
-  }
-  return `'${text.replace(/'/gu, "'\\''")}'`;
-}
-
 export function resolveInstallPlan({ args, exported, targetAgent }) {
   if (args.out) {
     if (exported.mode === "qoder-session") {
@@ -80,7 +73,7 @@ export function resolveInstallPlan({ args, exported, targetAgent }) {
     const outputPath = resolveCodexInstallPath(exported.files[0].fileName, exported.timestamp);
     return {
       files: [withPath(exported.files[0], outputPath)],
-      resumeCommand: `codex resume ${exported.sessionId}`,
+      resumeCommand: buildCodexResumeCommand(exported.sessionId),
     };
   }
 
@@ -88,14 +81,14 @@ export function resolveInstallPlan({ args, exported, targetAgent }) {
     const outputPath = resolveClaudeInstallPath(exported.projectKey, exported.files[0].fileName);
     return {
       files: [withPath(exported.files[0], outputPath)],
-      resumeCommand: `claude --resume ${exported.sessionId}`,
+      resumeCommand: buildClaudeResumeCommand(exported.sessionId, exported.session?.cwd),
     };
   }
 
   if (exported.mode === "qoder-session" && normalizeAgent(targetAgent) === "qodercli") {
     return {
       files: exported.files.map((file) => withPath(file, resolveQoderInstallPath(exported.projectKey, file.fileName))),
-      resumeCommand: `qodercli --cwd ${shellQuote(exported.workingDir)} --resume ${exported.sessionId}`,
+      resumeCommand: buildQoderResumeCommand(exported.sessionId, exported.workingDir),
     };
   }
 

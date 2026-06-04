@@ -9,6 +9,7 @@ import os from "node:os";
 import { chooseClaudeSessionPath, chooseSessionPath } from "../src/cli.js";
 import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
+import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import {
   buildStoryPayload,
@@ -81,6 +82,18 @@ test("joinBlocks handles native transcript content variants", () => {
   assert.equal(joinBlocks(["one", { text: "two" }, { content: "three" }, null]), "one\ntwo\nthree");
   assert.equal(joinBlocks(undefined), "");
   assert.equal(joinBlocks({ nested: true }), "");
+});
+
+test("buildClaudeResumeCommand scopes resume to cwd and shell-quotes values", () => {
+  assert.equal(buildClaudeResumeCommand("session-1", "/tmp/project"), "cd /tmp/project && claude --resume session-1");
+  assert.equal(
+    buildClaudeResumeCommand("session with space", "/tmp/project with space"),
+    "cd '/tmp/project with space' && claude --resume 'session with space'",
+  );
+  assert.equal(
+    buildClaudeResumeCommand("session-1", "/tmp/can't"),
+    "cd '/tmp/can'\\''t' && claude --resume session-1",
+  );
 });
 
 test("supportedAgents exposes the native-export adapter set", () => {
@@ -888,6 +901,7 @@ test("cli doctor emits machine-readable readiness checks", async () => {
   assert.equal(payload.ok, true);
   assert.equal(payload.agents.length, 4);
   assert.equal(payload.agents.find((agent) => agent.agent === "claude").version, "claude 2.1.98");
+  assert.equal(payload.agents.find((agent) => agent.agent === "claude").resumeCommand, "cd <cwd> && claude --resume <session-id>");
   assert.equal(payload.agents.find((agent) => agent.agent === "codex").resumeCommand, "codex resume <session-id>");
   assert.equal(payload.agents.find((agent) => agent.agent === "qodercli").sessionRoot.exists, true);
   assert.equal(payload.agents.find((agent) => agent.agent === "qoderwork").commandRequired, false);
@@ -1253,7 +1267,7 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(actionsResult.code, 0);
   assert.equal(payload.mode, "actions");
   assert.equal(resumeAction.id, "resume:claude:claude-action");
-  assert.equal(resumeAction.command, "claude --resume claude-action");
+  assert.equal(resumeAction.command, `cd ${currentDir} && claude --resume claude-action`);
   assert.equal(resumeAction.isLatest, true);
   assert.ok(payload.actions.find((action) => action.id === "resume:claude:claude-older"));
   assert.ok(payload.actions.find((action) => action.id === "fork:c2c:claude-action"));
@@ -1272,7 +1286,7 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   const runPayload = JSON.parse(runResult.stdout);
   assert.equal(runPayload.mode, "run-action");
   assert.equal(runPayload.ok, true);
-  assert.equal(runPayload.resumeCommand, "claude --resume claude-action");
+  assert.equal(runPayload.resumeCommand, `cd ${currentDir} && claude --resume claude-action`);
   assert.match(runPayload.stdout, /ACTION_OK/);
 
   const bridgeAction = payload.actions.find((action) => action.id === "bridge:c2x:claude-action");
@@ -1302,7 +1316,7 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(forkPayload.mode, "run-action");
   assert.equal(forkPayload.action.type, "fork");
   assert.equal(forkPayload.targetAgent, "claude");
-  assert.match(forkPayload.resumeCommand, /^claude --resume [0-9a-f-]{36}$/u);
+  assert.match(forkPayload.resumeCommand, new RegExp(`^cd ${currentDir} && claude --resume [0-9a-f-]{36}$`, "u"));
   assert.match(forkPayload.outputPath, /\.claude\/projects\/.*\/[0-9a-f-]{36}\.jsonl$/u);
 });
 
@@ -1378,7 +1392,7 @@ test("cli shows the selected session card when only one match exists", async () 
   assert.equal(result.code, 0);
   assert.match(result.stderr, /\[1\] QoderCLI Only Session/);
   assert.match(result.stderr, /Selected: qoder-one/);
-  assert.match(result.stdout, /claude --resume qoder-one/);
+  assert.match(result.stdout, new RegExp(`cd ${currentDir} && claude --resume qoder-one`, "u"));
 });
 
 test("cli supports single-agent list mode", async () => {
@@ -1424,7 +1438,7 @@ test("cli supports x2c as a Claude session export", async () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "claude-session");
-  assert.equal(payload.resumeCommand, "claude --resume sample-session");
+  assert.equal(payload.resumeCommand, "cd /tmp/demo && claude --resume sample-session");
 });
 
 test("cli supports c2x as a Codex session export", async () => {
@@ -1452,9 +1466,9 @@ test("cli supports c2c as a Claude fork export", async () => {
   assert.equal(payload.mode, "claude-session");
   assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(payload.sessionId, "claude-session");
-  assert.equal(payload.resumeCommand, `claude --resume ${payload.sessionId}`);
+  assert.equal(payload.resumeCommand, `cd /workspace/claude-demo && claude --resume ${payload.sessionId}`);
   assert.deepEqual(payload.hints, [
-    "Claude Code supports native forks now: claude --resume claude-session --fork-session",
+    "Claude Code supports native forks now: cd /workspace/claude-demo && claude --resume claude-session --fork-session",
     "Inside Claude Code, use /branch; /fork is an alias.",
   ]);
 });
@@ -1467,8 +1481,8 @@ test("cli prints native Claude fork guidance for c2c", async () => {
   });
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /Run:\nclaude --resume [0-9a-f-]{36}/);
-  assert.match(result.stdout, /Hint:\nClaude Code supports native forks now: claude --resume claude-session --fork-session/);
+  assert.match(result.stdout, /Run:\ncd \/workspace\/claude-demo && claude --resume [0-9a-f-]{36}/);
+  assert.match(result.stdout, /Hint:\nClaude Code supports native forks now: cd \/workspace\/claude-demo && claude --resume claude-session --fork-session/);
   assert.match(result.stdout, /Inside Claude Code, use \/branch; \/fork is an alias\./);
 });
 

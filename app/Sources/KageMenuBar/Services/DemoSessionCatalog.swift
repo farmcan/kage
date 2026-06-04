@@ -203,7 +203,7 @@ enum DemoSessionCatalog {
         targetAgent: session.agent,
         sessionId: session.sessionId,
         sessionPath: session.path,
-        command: previewResumeCommand(agent: session.agent, sessionId: session.sessionId),
+        command: previewResumeCommand(agent: session.agent, sessionId: session.sessionId, cwd: session.cwd),
         isLatest: true
       ),
       KageAction(
@@ -268,13 +268,18 @@ enum DemoSessionCatalog {
   }
 
   private static func previewResumeCommand(for action: KageAction) -> String {
-    previewResumeCommand(agent: action.targetAgent ?? action.agent, sessionId: action.sessionId ?? "demo-session")
+    let session = demoSessions.first { $0.sessionId == action.sessionId }
+    return previewResumeCommand(
+      agent: action.targetAgent ?? action.agent,
+      sessionId: action.sessionId ?? "demo-session",
+      cwd: session?.cwd ?? defaultProjectPath
+    )
   }
 
-  private static func previewResumeCommand(agent: String, sessionId: String) -> String {
+  private static func previewResumeCommand(agent: String, sessionId: String, cwd: String) -> String {
     switch agent {
     case "claude":
-      return "claude --resume \(sessionId)"
+      return "cd \(cwd) && claude --resume \(sessionId)"
     case "codex":
       return "codex resume \(sessionId)"
     case "qodercli":

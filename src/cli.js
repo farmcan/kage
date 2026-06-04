@@ -15,6 +15,7 @@ import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./c
 import { searchSessions } from "./core/search.js";
 import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
 import { compactSessionText } from "./core/session-labels.js";
+import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
 
 const shorthandAgents = ["c", "x", "q", "qw"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
@@ -566,7 +567,7 @@ function commandForAgent(agent) {
 
 function nativeResumeExample(agent) {
   if (agent === "claude") {
-    return "claude --resume <session-id>";
+    return "cd <cwd> && claude --resume <session-id>";
   }
   if (agent === "codex") {
     return "codex resume <session-id>";
@@ -579,7 +580,7 @@ function nativeResumeExample(agent) {
 
 function nativeForkExample(agent) {
   if (agent === "claude") {
-    return "claude --resume <session-id> --fork-session";
+    return "cd <cwd> && claude --resume <session-id> --fork-session";
   }
   if (agent === "codex") {
     return "codex fork <session-id>";
@@ -835,7 +836,7 @@ function formatExportPreview({ exported, installPlan, hints = [] }) {
 function buildNativeForkHints({ exported }) {
   if (exported.sourceAgent === "claude" && exported.targetAgent === "claude") {
     return [
-      `Claude Code supports native forks now: claude --resume ${exported.session.sessionId} --fork-session`,
+      `Claude Code supports native forks now: ${buildClaudeResumeCommand(exported.session.sessionId, exported.session.cwd, ["--fork-session"])}`,
       "Inside Claude Code, use /branch; /fork is an alias.",
     ];
   }
@@ -1279,14 +1280,6 @@ function formatSearchResult(result, asJson) {
   return `${lines.join("\n")}\n`;
 }
 
-function shellQuote(value) {
-  const text = String(value ?? "");
-  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) {
-    return text;
-  }
-  return `'${text.replace(/'/gu, "'\\''")}'`;
-}
-
 function routeAliasForAgent(agent, suffix) {
   if (agent === "qoderwork") {
     return null;
@@ -1311,13 +1304,13 @@ function routeAliasBetweenAgents(sourceAgent, targetAgent) {
 
 function buildResumeCommandForSession(session) {
   if (session.agent === "claude") {
-    return `claude --resume ${shellQuote(session.sessionId)}`;
+    return buildClaudeResumeCommand(session.sessionId, session.cwd);
   }
   if (session.agent === "codex") {
-    return `codex resume ${shellQuote(session.sessionId)}`;
+    return buildCodexResumeCommand(session.sessionId);
   }
   if (session.agent === "qodercli") {
-    return `qodercli --cwd ${shellQuote(session.cwd)} --resume ${shellQuote(session.sessionId)}`;
+    return buildQoderResumeCommand(session.sessionId, session.cwd);
   }
   return null;
 }

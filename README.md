@@ -155,7 +155,7 @@ Fork the current Claude session into a new Claude session:
 kage c2c
 ```
 
-For same-agent forks, KAGE also prints first-party guidance when the agent already has native support. For example, `c2c` points to `claude --resume <source-session-id> --fork-session`, and `x2x` points to `codex fork <source-session-id>`.
+For same-agent forks, KAGE also prints first-party guidance when the agent already has native support. For example, `c2c` points to `cd <cwd> && claude --resume <source-session-id> --fork-session`, and `x2x` points to `codex fork <source-session-id>`.
 
 Fork or trim before exporting:
 
@@ -168,15 +168,15 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 | Source | Target | Default Export | Resume Hint |
 |---|---|---|---|
-| `codex` | `claude` | `claude-session` | `claude --resume ...` |
+| `codex` | `claude` | `claude-session` | `cd <cwd> && claude --resume ...` |
 | `claude` | `codex` | `codex-session` | `codex resume ...` |
-| `claude` | `claude` | `claude-session` fork | `claude --resume ...` |
+| `claude` | `claude` | `claude-session` fork | `cd <cwd> && claude --resume ...` |
 | `codex` | `codex` | `codex-session` fork | `codex resume ...` |
 | `qodercli` | `codex` | `codex-session` | `codex resume ...` |
-| `qodercli` | `claude` | `claude-session` | `claude --resume ...` |
+| `qodercli` | `claude` | `claude-session` | `cd <cwd> && claude --resume ...` |
 | `qodercli` | `qodercli` | `qoder-session` fork | `qodercli --cwd ... --resume ...` |
 | `qoderwork` | `codex` | `codex-session` | `codex resume ...` |
-| `qoderwork` | `claude` | `claude-session` | `claude --resume ...` |
+| `qoderwork` | `claude` | `claude-session` | `cd <cwd> && claude --resume ...` |
 | `qoderwork` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 | `codex` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
 | `claude` | `qodercli` | `qoder-session` | `qodercli --cwd ... --resume ...` |
@@ -258,7 +258,7 @@ For example, start from a Claude session:
 
 ```text
 Resume this session with:
-claude --resume b3b958d7-4ac8-41c4-8660-7b7f654737c6
+cd /path/to/project && claude --resume b3b958d7-4ac8-41c4-8660-7b7f654737c6
 ```
 
 Then run:
@@ -534,7 +534,7 @@ When the export is installed there, the CLI prints:
 
 ```text
 Run:
-claude --resume <session-id>
+cd <cwd> && claude --resume <session-id>
 ```
 
 `qoder-session` installs directly into:

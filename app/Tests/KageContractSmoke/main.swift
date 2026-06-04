@@ -322,7 +322,7 @@ do {
       "targetAgent": "claude",
       "sessionId": "session-1",
       "sessionPath": "/Users/test/.codex/sessions/session-1.jsonl",
-      "resumeCommand": "claude --resume session-1",
+      "resumeCommand": "cd /Users/test/project && claude --resume session-1",
       "outputPath": "/Users/test/.claude/projects/project/session-1.jsonl",
       "paths": ["/Users/test/.claude/projects/project/session-1.jsonl"],
       "stdout": "{\\"mode\\":\\"claude-session\\"}",
@@ -342,7 +342,7 @@ do {
     }
     """
   )
-  try require(runAction.resumeCommand == "claude --resume session-1", "run-action resume command should decode")
+  try require(runAction.resumeCommand == "cd /Users/test/project && claude --resume session-1", "run-action resume command should decode")
   try require(runAction.outputPath?.hasSuffix("session-1.jsonl") == true, "run-action output path should decode")
 } catch {
   fputs("KAGE contract smoke failed: \(error)\n", stderr)
