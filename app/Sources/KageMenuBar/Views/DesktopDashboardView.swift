@@ -92,7 +92,10 @@ struct DesktopDashboardView: View {
   }
 
   private var sidebar: some View {
-    VStack(alignment: .leading, spacing: 0) {
+    let groups = sessionGroups
+    let matches = searchMatches
+    let actionLookup = actionsBySession
+    return VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 12) {
         HStack(spacing: 10) {
           Image(systemName: "scope")
@@ -139,7 +142,7 @@ struct DesktopDashboardView: View {
         Text("Projects")
           .font(.headline)
         Spacer()
-        Text("\(sessionGroups.count)")
+        Text("\(groups.count)")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
@@ -147,9 +150,9 @@ struct DesktopDashboardView: View {
       .padding(.vertical, 10)
 
       List(selection: $selectedSessionID) {
-        ForEach(sessionGroups) { group in
+        ForEach(groups) { group in
           Section {
-            sessionRows(for: group)
+            sessionRows(for: group, matches: matches, actionLookup: actionLookup)
           } header: {
             DirectoryGroupHeader(group: group)
           }
@@ -166,6 +169,8 @@ struct DesktopDashboardView: View {
 
   @ViewBuilder
   private var detailPane: some View {
+    let matches = searchMatches
+    let actionLookup = actionsBySession
     if let terminalSession = standaloneTerminalSession {
       DesktopStandaloneTerminalView(
         session: terminalSession,
@@ -206,11 +211,11 @@ struct DesktopDashboardView: View {
     } else if let session = selectedSession {
       DesktopSessionDetailView(
         session: session,
-        match: searchMatches[session.path],
-        actions: actionsBySession[session.path] ?? [],
+        match: matches[session.path],
+        actions: actionLookup[session.path] ?? [],
         actionResult: actionResult(for: session),
         actionMessage: poller.actionMessage,
-        primaryResumeAction: primaryResumeAction(for: session),
+        primaryResumeAction: primaryResumeAction(for: session, in: actionLookup),
         terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
         isDemoSession: isDemoSession(session),
         isOpening: autoOpeningActionID != nil,
@@ -599,17 +604,21 @@ struct DesktopDashboardView: View {
   }
 
   @ViewBuilder
-  private func sessionRows(for group: DirectorySessionGroup) -> some View {
+  private func sessionRows(
+    for group: DirectorySessionGroup,
+    matches: [String: SearchMatch],
+    actionLookup: [String: [KageAction]]
+  ) -> some View {
     if poller.loadsFullHistory && !isSearchActive {
       ForEach(group.monthGroups) { month in
         if month.isCurrentMonth {
           ForEach(month.sessions, id: \.path) { session in
-            sessionRow(session)
+            sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
           }
         } else {
           DisclosureGroup(isExpanded: monthExpansionBinding(group: group, month: month)) {
             ForEach(month.sessions, id: \.path) { session in
-              sessionRow(session)
+              sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
             }
           } label: {
             MonthGroupHeader(month: month)
@@ -618,16 +627,21 @@ struct DesktopDashboardView: View {
       }
     } else {
       ForEach(group.sessions, id: \.path) { session in
-        sessionRow(session)
+        sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
       }
     }
   }
 
-  private func sessionRow(_ session: AgentSession) -> some View {
-    DesktopSessionListRow(session: session, match: searchMatches[session.path])
+  private func sessionRow(
+    _ session: AgentSession,
+    match: SearchMatch?,
+    actionLookup: [String: [KageAction]]
+  ) -> some View {
+    DesktopSessionListRow(session: session, match: match)
+      .equatable()
       .tag(sessionKey(session))
       .contextMenu {
-        if let resumeAction = primaryResumeAction(for: session) {
+        if let resumeAction = primaryResumeAction(for: session, in: actionLookup) {
           Button {
             runAndOpenAction(resumeAction)
           } label: {
@@ -643,7 +657,7 @@ struct DesktopDashboardView: View {
         }
       }
       .onTapGesture(count: 2) {
-        if let resumeAction = primaryResumeAction(for: session) {
+        if let resumeAction = primaryResumeAction(for: session, in: actionLookup) {
           runAndOpenAction(resumeAction)
         }
       }
@@ -912,8 +926,8 @@ struct DesktopDashboardView: View {
     }
   }
 
-  private func primaryResumeAction(for session: AgentSession) -> KageAction? {
-    actionsBySession[session.path]?.first { $0.type == "resume" }
+  private func primaryResumeAction(for session: AgentSession, in actionLookup: [String: [KageAction]]? = nil) -> KageAction? {
+    (actionLookup ?? actionsBySession)[session.path]?.first { $0.type == "resume" }
   }
 
   private func actionResult(for session: AgentSession) -> RunActionResponse? {
@@ -965,9 +979,13 @@ struct DesktopDashboardView: View {
   }
 }
 
-private struct DesktopSessionListRow: View {
+private struct DesktopSessionListRow: View, Equatable {
   let session: AgentSession
   let match: SearchMatch?
+
+  nonisolated static func == (lhs: DesktopSessionListRow, rhs: DesktopSessionListRow) -> Bool {
+    lhs.session == rhs.session && lhs.match == rhs.match
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -1001,12 +1019,7 @@ private struct DesktopSessionListRow: View {
   }
 
   private var relativeUpdatedAt: String {
-    guard let updatedAt = session.updatedAt else {
-      return "unknown"
-    }
-    let isoFormatter = ISO8601DateFormatter()
-    isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    guard let date = isoFormatter.date(from: updatedAt) else {
+    guard let date = parseSessionDate(session.updatedAt) else {
       return "unknown"
     }
     let formatter = RelativeDateTimeFormatter()
@@ -1018,36 +1031,33 @@ private struct DesktopSessionListRow: View {
 private struct DirectorySessionGroup: Identifiable {
   let cwd: String
   let sessions: [AgentSession]
+  let displayName: String
+  let parentPath: String
+  let lastUpdated: Date
+  let monthGroups: [MonthSessionGroup]
+  let agentCounts: [(agent: String, label: String, count: Int)]
 
   var id: String {
     cwd
   }
 
-  var displayName: String {
-    URL(fileURLWithPath: cwd).lastPathComponent.isEmpty ? cwd : URL(fileURLWithPath: cwd).lastPathComponent
-  }
-
-  var parentPath: String {
-    URL(fileURLWithPath: cwd).deletingLastPathComponent().path
-  }
-
-  var lastUpdated: Date {
-    sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
-  }
-
-  var monthGroups: [MonthSessionGroup] {
+  init(cwd: String, sessions: [AgentSession]) {
+    self.cwd = cwd
+    self.sessions = sessions
+    let url = URL(fileURLWithPath: cwd)
+    self.displayName = url.lastPathComponent.isEmpty ? cwd : url.lastPathComponent
+    self.parentPath = url.deletingLastPathComponent().path
+    self.lastUpdated = sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
     let grouped = Dictionary(grouping: sessions, by: monthBucket)
-    return grouped.map { _, sessions in
+    self.monthGroups = grouped.map { _, sessions in
       MonthSessionGroup(sessions: sessions.sorted(by: isNewer))
     }
     .sorted { lhs, rhs in
       lhs.sortDate > rhs.sortDate
     }
-  }
 
-  var agentCounts: [(agent: String, label: String, count: Int)] {
-    let grouped = Dictionary(grouping: sessions, by: \.agent)
-    return grouped.map { agent, sessions in
+    let agentGroups = Dictionary(grouping: sessions, by: \.agent)
+    self.agentCounts = agentGroups.map { agent, sessions in
       (agent: agent, label: sessions.first?.agentLabel ?? agent, count: sessions.count)
     }
     .sorted { lhs, rhs in
@@ -1061,29 +1071,24 @@ private struct DirectorySessionGroup: Identifiable {
 
 private struct MonthSessionGroup: Identifiable {
   let sessions: [AgentSession]
+  let id: String
+  let label: String
+  let sortDate: Date
+  let isCurrentMonth: Bool
 
-  var id: String {
-    monthBucket(sessions.first)
-  }
-
-  var label: String {
-    guard let date = sessions.compactMap({ parseSessionDate($0.updatedAt) }).max() else {
-      return "Unknown date"
+  init(sessions: [AgentSession]) {
+    self.sessions = sessions
+    self.id = monthBucket(sessions.first)
+    self.sortDate = sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
+    if sortDate == .distantPast {
+      self.label = "Unknown date"
+      self.isCurrentMonth = false
+    } else {
+      let formatter = DateFormatter()
+      formatter.dateFormat = "MMMM yyyy"
+      self.label = formatter.string(from: sortDate)
+      self.isCurrentMonth = Calendar.current.isDate(sortDate, equalTo: Date(), toGranularity: .month)
     }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMMM yyyy"
-    return formatter.string(from: date)
-  }
-
-  var sortDate: Date {
-    sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
-  }
-
-  var isCurrentMonth: Bool {
-    guard sortDate != .distantPast else {
-      return false
-    }
-    return Calendar.current.isDate(sortDate, equalTo: Date(), toGranularity: .month)
   }
 }
 
