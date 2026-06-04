@@ -19,6 +19,7 @@ struct DesktopDashboardView: View {
   @State private var demoIncludeSubdirectories = false
   @State private var demoSearchResponse: SearchResponse?
   @State private var expandedMonthIDs = Set<String>()
+  @State private var derivedState = DashboardDerivedState.empty
 
   var body: some View {
     NavigationSplitView {
@@ -46,13 +47,31 @@ struct DesktopDashboardView: View {
       }
     }
     .onAppear {
+      rebuildDerivedState()
       if !isDemoMode {
         refresh()
       }
-      ensureSelection()
     }
-    .onChange(of: visibleSessions) { _, _ in
-      ensureSelection()
+    .task(id: derivedStateSignature) {
+      rebuildDerivedState()
+    }
+    .onReceive(poller.$sessionsResponse) { _ in
+      guard !isDemoMode else {
+        return
+      }
+      rebuildDerivedState()
+    }
+    .onReceive(poller.$actionsResponse) { _ in
+      guard !isDemoMode else {
+        return
+      }
+      rebuildDerivedState()
+    }
+    .onReceive(poller.$searchResponse) { _ in
+      guard !isDemoMode else {
+        return
+      }
+      rebuildDerivedState()
     }
     .onChange(of: selectedSessionID) { _, newValue in
       guard newValue != nil else {
@@ -64,9 +83,11 @@ struct DesktopDashboardView: View {
       }
     }
     .onChange(of: searchText) { _, newValue in
+      rebuildDerivedState()
       scheduleSearch(newValue)
     }
     .onChange(of: activeSelectedAgent) { _, _ in
+      rebuildDerivedState()
       if isSearchActive {
         searchNow(searchText)
       }
@@ -84,7 +105,7 @@ struct DesktopDashboardView: View {
         selectedSessionID = nil
         refresh()
       }
-      ensureSelection()
+      rebuildDerivedState()
     }
     .onDisappear {
       searchTask?.cancel()
@@ -92,9 +113,11 @@ struct DesktopDashboardView: View {
   }
 
   private var sidebar: some View {
-    let groups = sessionGroups
-    let matches = searchMatches
-    let actionLookup = actionsBySession
+    let state = renderingState
+    let groups = state.sessionGroups
+    let matches = state.searchMatches
+    let actionLookup = state.actionsBySession
+    let rowModels = state.rowModelsByPath
     return VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 12) {
         HStack(spacing: 10) {
@@ -152,7 +175,7 @@ struct DesktopDashboardView: View {
       List(selection: $selectedSessionID) {
         ForEach(groups) { group in
           Section {
-            sessionRows(for: group, matches: matches, actionLookup: actionLookup)
+            sessionRows(for: group, matches: matches, actionLookup: actionLookup, rowModels: rowModels)
           } header: {
             DirectoryGroupHeader(group: group)
           }
@@ -495,7 +518,7 @@ struct DesktopDashboardView: View {
           if isSearchActive {
             searchNow(searchText)
           }
-          ensureSelection()
+          rebuildDerivedState()
         } else {
           appState.includeSubdirectories = enabled
           refresh()
@@ -505,39 +528,18 @@ struct DesktopDashboardView: View {
   }
 
   private var visibleSessions: [AgentSession] {
-    if isSearchActive, let searchResponse = activeSearchResponse {
-      return searchResponse.results.map(\.agentSession)
-    }
-
-    let agentFiltered = activeSelectedAgent == "all"
-      ? scopedSessions
-      : scopedSessions.filter { $0.agent == activeSelectedAgent }
-
-    let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmedSearch.isEmpty else {
-      return agentFiltered
-    }
-
-    return agentFiltered.filter { session in
-      searchableText(for: session).localizedCaseInsensitiveContains(trimmedSearch)
-    }
+    renderingState.visibleSessions
   }
 
   private var sessionGroups: [DirectorySessionGroup] {
-    let grouped = Dictionary(grouping: visibleSessions, by: \.cwd)
-    return grouped.map { cwd, sessions in
-      DirectorySessionGroup(cwd: cwd, sessions: sessions.sorted(by: isNewer))
-    }
-    .sorted { lhs, rhs in
-      if lhs.lastUpdated != rhs.lastUpdated {
-        return lhs.lastUpdated > rhs.lastUpdated
-      }
-      return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-    }
+    renderingState.sessionGroups
   }
 
   private var selectedSession: AgentSession? {
-    visibleSessions.first { sessionKey($0) == selectedSessionID }
+    guard let selectedSessionID else {
+      return nil
+    }
+    return renderingState.sessionsByKey[selectedSessionID]
   }
 
   private var isSearchActive: Bool {
@@ -549,21 +551,11 @@ struct DesktopDashboardView: View {
   }
 
   private var searchMatches: [String: SearchMatch] {
-    Dictionary(
-      uniqueKeysWithValues: activeSearchResponse?.results.compactMap { result in
-        guard let match = result.match else {
-          return nil
-        }
-        return (result.path, match)
-      } ?? []
-    )
+    renderingState.searchMatches
   }
 
   private var actionsBySession: [String: [KageAction]] {
-    Dictionary(
-      grouping: activeActionsResponse?.actions.filter { $0.sessionId != nil } ?? [],
-      by: { action in action.sessionPath ?? "\(action.agent):\(action.sessionId ?? "")" }
-    )
+    renderingState.actionsBySession
   }
 
   private var emptyStateTitle: String {
@@ -607,18 +599,19 @@ struct DesktopDashboardView: View {
   private func sessionRows(
     for group: DirectorySessionGroup,
     matches: [String: SearchMatch],
-    actionLookup: [String: [KageAction]]
+    actionLookup: [String: [KageAction]],
+    rowModels: [String: DesktopSessionRowModel]
   ) -> some View {
     if poller.loadsFullHistory && !isSearchActive {
       ForEach(group.monthGroups) { month in
         if month.isCurrentMonth {
           ForEach(month.sessions, id: \.path) { session in
-            sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
+            sessionRow(session, rowModel: rowModels[session.path], match: matches[session.path], actionLookup: actionLookup)
           }
         } else {
           DisclosureGroup(isExpanded: monthExpansionBinding(group: group, month: month)) {
             ForEach(month.sessions, id: \.path) { session in
-              sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
+              sessionRow(session, rowModel: rowModels[session.path], match: matches[session.path], actionLookup: actionLookup)
             }
           } label: {
             MonthGroupHeader(month: month)
@@ -627,17 +620,20 @@ struct DesktopDashboardView: View {
       }
     } else {
       ForEach(group.sessions, id: \.path) { session in
-        sessionRow(session, match: matches[session.path], actionLookup: actionLookup)
+        sessionRow(session, rowModel: rowModels[session.path], match: matches[session.path], actionLookup: actionLookup)
       }
     }
   }
 
   private func sessionRow(
     _ session: AgentSession,
+    rowModel: DesktopSessionRowModel?,
     match: SearchMatch?,
     actionLookup: [String: [KageAction]]
   ) -> some View {
-    DesktopSessionListRow(session: session, match: match)
+    DesktopSessionListRow(
+      model: rowModel ?? DesktopSessionRowModel.fallback(session: session, match: match)
+    )
       .equatable()
       .tag(sessionKey(session))
       .contextMenu {
@@ -690,21 +686,20 @@ struct DesktopDashboardView: View {
       : appState.watchedDirectory
   }
 
-  private func searchableText(for session: AgentSession) -> String {
-    ([session.agentLabel, session.displayTitle, session.sessionId, session.cwd, session.path] + session.recentUserMessages)
-      .joined(separator: "\n")
+  private func ensureSelection() {
+    ensureSelection(in: renderingState)
   }
 
-  private func ensureSelection() {
+  private func ensureSelection(in state: DashboardDerivedState) {
     if pendingNewSession != nil || standaloneTerminalSession != nil {
       selectedSessionID = nil
       return
     }
 
-    if let selectedSessionID, visibleSessions.contains(where: { sessionKey($0) == selectedSessionID }) {
+    if let selectedSessionID, state.sessionsByKey[selectedSessionID] != nil {
       return
     }
-    selectedSessionID = visibleSessions.first.map(sessionKey)
+    selectedSessionID = state.visibleSessions.first.map(sessionKey)
   }
 
   private func scheduleSearch(_ query: String) {
@@ -713,7 +708,7 @@ struct DesktopDashboardView: View {
     guard !trimmedQuery.isEmpty else {
       demoSearchResponse = nil
       poller.clearSearch()
-      ensureSelection()
+      rebuildDerivedState()
       return
     }
 
@@ -723,7 +718,7 @@ struct DesktopDashboardView: View {
         selectedAgent: activeSelectedAgent,
         includeSubdirectories: activeIncludeSubdirectories
       )
-      ensureSelection()
+      rebuildDerivedState()
       return
     }
 
@@ -733,7 +728,6 @@ struct DesktopDashboardView: View {
         return
       }
       await poller.search(query: trimmedQuery, appState: appState)
-      ensureSelection()
     }
   }
 
@@ -748,13 +742,12 @@ struct DesktopDashboardView: View {
           selectedAgent: activeSelectedAgent,
           includeSubdirectories: activeIncludeSubdirectories
         )
-      ensureSelection()
+      rebuildDerivedState()
       return
     }
 
     Task {
       await poller.search(query: query, appState: appState)
-      ensureSelection()
     }
   }
 
@@ -769,6 +762,7 @@ struct DesktopDashboardView: View {
       if isSearchActive {
         await poller.search(query: searchText, appState: appState)
       }
+      rebuildDerivedState()
     }
   }
 
@@ -901,6 +895,45 @@ struct DesktopDashboardView: View {
     isDemoMode = false
   }
 
+  private func rebuildDerivedState() {
+    let signature = derivedStateSignature
+    let state = makeDerivedState(signature: signature)
+    derivedState = state
+    ensureSelection(in: state)
+  }
+
+  private var renderingState: DashboardDerivedState {
+    let signature = derivedStateSignature
+    if derivedState.signature == signature {
+      return derivedState
+    }
+    return makeDerivedState(signature: signature)
+  }
+
+  private var derivedStateSignature: DashboardDerivedStateSignature {
+    DashboardDerivedStateSignature(
+      isDemoMode: isDemoMode,
+      sessions: scopedSessions,
+      actions: activeActionsResponse?.actions ?? [],
+      searchResponse: activeSearchResponse,
+      selectedAgent: activeSelectedAgent,
+      includeSubdirectories: activeIncludeSubdirectories,
+      searchText: searchText
+    )
+  }
+
+  private func makeDerivedState(signature: DashboardDerivedStateSignature) -> DashboardDerivedState {
+    DashboardDerivedState(
+      signature: signature,
+      sessions: scopedSessions,
+      searchResponse: activeSearchResponse,
+      actionsResponse: activeActionsResponse,
+      selectedAgent: activeSelectedAgent,
+      includeSubdirectories: activeIncludeSubdirectories,
+      searchText: searchText
+    )
+  }
+
   private func ensureDemoAgentIsVisible() {
     guard isDemoMode, demoSelectedAgent != "all" else {
       return
@@ -927,7 +960,11 @@ struct DesktopDashboardView: View {
   }
 
   private func primaryResumeAction(for session: AgentSession, in actionLookup: [String: [KageAction]]? = nil) -> KageAction? {
-    (actionLookup ?? actionsBySession)[session.path]?.first { $0.type == "resume" }
+    let state = renderingState
+    if actionLookup == nil, let action = state.primaryResumeActions[session.path] {
+      return action
+    }
+    return (actionLookup ?? state.actionsBySession)[session.path]?.first { $0.type == "resume" }
   }
 
   private func actionResult(for session: AgentSession) -> RunActionResponse? {
@@ -960,7 +997,7 @@ struct DesktopDashboardView: View {
   }
 
   private func sessionKey(_ session: AgentSession) -> String {
-    "\(session.agent):\(session.sessionId):\(session.path)"
+    dashboardSessionKey(session)
   }
 
   private func agentLabel(_ agent: String?) -> String {
@@ -979,52 +1016,412 @@ struct DesktopDashboardView: View {
   }
 }
 
+private struct DashboardDerivedStateSignature: Equatable {
+  static let empty = DashboardDerivedStateSignature(
+    isDemoMode: false,
+    sessionsCount: 0,
+    firstSessionPath: nil,
+    firstSessionUpdatedAt: nil,
+    lastSessionPath: nil,
+    lastSessionUpdatedAt: nil,
+    actionsCount: 0,
+    firstActionID: nil,
+    lastActionID: nil,
+    searchQuery: nil,
+    searchResultsCount: 0,
+    firstSearchPath: nil,
+    lastSearchPath: nil,
+    selectedAgent: "all",
+    includeSubdirectories: false,
+    searchText: ""
+  )
+
+  let isDemoMode: Bool
+  let sessionsCount: Int
+  let firstSessionPath: String?
+  let firstSessionUpdatedAt: String?
+  let lastSessionPath: String?
+  let lastSessionUpdatedAt: String?
+  let actionsCount: Int
+  let firstActionID: String?
+  let lastActionID: String?
+  let searchQuery: String?
+  let searchResultsCount: Int
+  let firstSearchPath: String?
+  let lastSearchPath: String?
+  let selectedAgent: String
+  let includeSubdirectories: Bool
+  let searchText: String
+
+  init(
+    isDemoMode: Bool,
+    sessions: [AgentSession],
+    actions: [KageAction],
+    searchResponse: SearchResponse?,
+    selectedAgent: String,
+    includeSubdirectories: Bool,
+    searchText: String
+  ) {
+    self.init(
+      isDemoMode: isDemoMode,
+      sessionsCount: sessions.count,
+      firstSessionPath: sessions.first?.path,
+      firstSessionUpdatedAt: sessions.first?.updatedAt,
+      lastSessionPath: sessions.last?.path,
+      lastSessionUpdatedAt: sessions.last?.updatedAt,
+      actionsCount: actions.count,
+      firstActionID: actions.first?.id,
+      lastActionID: actions.last?.id,
+      searchQuery: searchResponse?.query,
+      searchResultsCount: searchResponse?.results.count ?? 0,
+      firstSearchPath: searchResponse?.results.first?.path,
+      lastSearchPath: searchResponse?.results.last?.path,
+      selectedAgent: selectedAgent,
+      includeSubdirectories: includeSubdirectories,
+      searchText: searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    )
+  }
+
+  private init(
+    isDemoMode: Bool,
+    sessionsCount: Int,
+    firstSessionPath: String?,
+    firstSessionUpdatedAt: String?,
+    lastSessionPath: String?,
+    lastSessionUpdatedAt: String?,
+    actionsCount: Int,
+    firstActionID: String?,
+    lastActionID: String?,
+    searchQuery: String?,
+    searchResultsCount: Int,
+    firstSearchPath: String?,
+    lastSearchPath: String?,
+    selectedAgent: String,
+    includeSubdirectories: Bool,
+    searchText: String
+  ) {
+    self.isDemoMode = isDemoMode
+    self.sessionsCount = sessionsCount
+    self.firstSessionPath = firstSessionPath
+    self.firstSessionUpdatedAt = firstSessionUpdatedAt
+    self.lastSessionPath = lastSessionPath
+    self.lastSessionUpdatedAt = lastSessionUpdatedAt
+    self.actionsCount = actionsCount
+    self.firstActionID = firstActionID
+    self.lastActionID = lastActionID
+    self.searchQuery = searchQuery
+    self.searchResultsCount = searchResultsCount
+    self.firstSearchPath = firstSearchPath
+    self.lastSearchPath = lastSearchPath
+    self.selectedAgent = selectedAgent
+    self.includeSubdirectories = includeSubdirectories
+    self.searchText = searchText
+  }
+}
+
+private struct DashboardDerivedState {
+  static let empty = DashboardDerivedState(
+    signature: .empty,
+    visibleSessions: [],
+    sessionGroups: [],
+    sessionsByKey: [:],
+    searchMatches: [:],
+    actionsBySession: [:],
+    primaryResumeActions: [:],
+    rowModelsByPath: [:]
+  )
+
+  let signature: DashboardDerivedStateSignature
+  let visibleSessions: [AgentSession]
+  let sessionGroups: [DirectorySessionGroup]
+  let sessionsByKey: [String: AgentSession]
+  let searchMatches: [String: SearchMatch]
+  let actionsBySession: [String: [KageAction]]
+  let primaryResumeActions: [String: KageAction]
+  let rowModelsByPath: [String: DesktopSessionRowModel]
+
+  init(
+    signature: DashboardDerivedStateSignature,
+    sessions: [AgentSession],
+    searchResponse: SearchResponse?,
+    actionsResponse: ActionsResponse?,
+    selectedAgent: String,
+    includeSubdirectories: Bool,
+    searchText: String
+  ) {
+    let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let matchingSearchResults = DashboardDerivedState.matchingSearchResults(
+      from: searchResponse,
+      trimmedSearch: trimmedSearch,
+      selectedAgent: selectedAgent,
+      includeSubdirectories: includeSubdirectories
+    )
+    let visibleSessions = DashboardDerivedState.visibleSessions(
+      from: sessions,
+      matchingSearchResults: matchingSearchResults,
+      selectedAgent: selectedAgent,
+      trimmedSearch: trimmedSearch
+    )
+    let searchMatches = DashboardDerivedState.searchMatches(from: matchingSearchResults)
+    let dateLookup = DashboardDerivedState.dateLookup(for: visibleSessions)
+    let actionsBySession = DashboardDerivedState.actionsBySession(from: actionsResponse)
+    let rowModelsByPath = DashboardDerivedState.rowModels(
+      for: visibleSessions,
+      dateLookup: dateLookup,
+      matches: searchMatches
+    )
+    var sessionsByKey = [String: AgentSession]()
+    sessionsByKey.reserveCapacity(visibleSessions.count)
+    for session in visibleSessions {
+      sessionsByKey[dashboardSessionKey(session)] = session
+    }
+
+    self.signature = signature
+    self.visibleSessions = visibleSessions
+    self.sessionGroups = DashboardDerivedState.sessionGroups(
+      for: visibleSessions,
+      dateLookup: dateLookup
+    )
+    self.sessionsByKey = sessionsByKey
+    self.searchMatches = searchMatches
+    self.actionsBySession = actionsBySession
+    self.primaryResumeActions = DashboardDerivedState.primaryResumeActions(from: actionsBySession)
+    self.rowModelsByPath = rowModelsByPath
+  }
+
+  private init(
+    signature: DashboardDerivedStateSignature,
+    visibleSessions: [AgentSession],
+    sessionGroups: [DirectorySessionGroup],
+    sessionsByKey: [String: AgentSession],
+    searchMatches: [String: SearchMatch],
+    actionsBySession: [String: [KageAction]],
+    primaryResumeActions: [String: KageAction],
+    rowModelsByPath: [String: DesktopSessionRowModel]
+  ) {
+    self.signature = signature
+    self.visibleSessions = visibleSessions
+    self.sessionGroups = sessionGroups
+    self.sessionsByKey = sessionsByKey
+    self.searchMatches = searchMatches
+    self.actionsBySession = actionsBySession
+    self.primaryResumeActions = primaryResumeActions
+    self.rowModelsByPath = rowModelsByPath
+  }
+
+  private static func matchingSearchResults(
+    from searchResponse: SearchResponse?,
+    trimmedSearch: String,
+    selectedAgent: String,
+    includeSubdirectories: Bool
+  ) -> [SearchSessionResult]? {
+    guard
+      !trimmedSearch.isEmpty,
+      let searchResponse,
+      searchResponse.query == trimmedSearch
+    else {
+      return nil
+    }
+
+    let expectedAgent = selectedAgent == "all" ? nil : selectedAgent
+    guard
+      searchResponse.filters.agent == expectedAgent,
+      searchResponse.filters.includeSubdirs == includeSubdirectories
+    else {
+      return nil
+    }
+
+    return searchResponse.results
+  }
+
+  private static func visibleSessions(
+    from sessions: [AgentSession],
+    matchingSearchResults: [SearchSessionResult]?,
+    selectedAgent: String,
+    trimmedSearch: String
+  ) -> [AgentSession] {
+    if let matchingSearchResults {
+      return matchingSearchResults.map(\.agentSession)
+    }
+
+    let agentFiltered = selectedAgent == "all"
+      ? sessions
+      : sessions.filter { $0.agent == selectedAgent }
+
+    guard !trimmedSearch.isEmpty else {
+      return agentFiltered
+    }
+
+    return agentFiltered.filter { session in
+      searchableSessionText(for: session).localizedCaseInsensitiveContains(trimmedSearch)
+    }
+  }
+
+  private static func searchMatches(from results: [SearchSessionResult]?) -> [String: SearchMatch] {
+    var matches = [String: SearchMatch]()
+    for result in results ?? [] {
+      if let match = result.match {
+        matches[result.path] = match
+      }
+    }
+    return matches
+  }
+
+  private static func dateLookup(for sessions: [AgentSession]) -> [String: Date] {
+    var dates = [String: Date]()
+    dates.reserveCapacity(sessions.count)
+    for session in sessions {
+      dates[session.path] = parseSessionDate(session.updatedAt) ?? .distantPast
+    }
+    return dates
+  }
+
+  private static func actionsBySession(from response: ActionsResponse?) -> [String: [KageAction]] {
+    Dictionary(
+      grouping: response?.actions.filter { $0.sessionId != nil } ?? [],
+      by: { action in action.sessionPath ?? "\(action.agent):\(action.sessionId ?? "")" }
+    )
+  }
+
+  private static func primaryResumeActions(from actionsBySession: [String: [KageAction]]) -> [String: KageAction] {
+    var actions = [String: KageAction]()
+    for (sessionPath, sessionActions) in actionsBySession {
+      if let action = sessionActions.first(where: { $0.type == "resume" }) {
+        actions[sessionPath] = action
+      }
+    }
+    return actions
+  }
+
+  private static func rowModels(
+    for sessions: [AgentSession],
+    dateLookup: [String: Date],
+    matches: [String: SearchMatch]
+  ) -> [String: DesktopSessionRowModel] {
+    let now = Date()
+    let relativeFormatter = RelativeDateTimeFormatter()
+    relativeFormatter.unitsStyle = .abbreviated
+    var models = [String: DesktopSessionRowModel]()
+    models.reserveCapacity(sessions.count)
+
+    for session in sessions {
+      models[session.path] = DesktopSessionRowModel(
+        session: session,
+        updatedDate: dateLookup[session.path],
+        match: matches[session.path],
+        now: now,
+        relativeFormatter: relativeFormatter
+      )
+    }
+
+    return models
+  }
+
+  private static func sessionGroups(
+    for sessions: [AgentSession],
+    dateLookup: [String: Date]
+  ) -> [DirectorySessionGroup] {
+    let calendar = Calendar.current
+    let monthFormatter = DateFormatter()
+    monthFormatter.dateFormat = "MMMM yyyy"
+    let grouped = Dictionary(grouping: sessions, by: \.cwd)
+
+    return grouped.map { cwd, sessions in
+      DirectorySessionGroup(
+        cwd: cwd,
+        sessions: sortSessions(sessions, dateLookup: dateLookup),
+        dateLookup: dateLookup,
+        calendar: calendar,
+        monthFormatter: monthFormatter
+      )
+    }
+    .sorted { lhs, rhs in
+      if lhs.lastUpdated != rhs.lastUpdated {
+        return lhs.lastUpdated > rhs.lastUpdated
+      }
+      return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+    }
+  }
+}
+
+private struct DesktopSessionRowModel: Equatable {
+  let id: String
+  let agent: String
+  let agentLabel: String
+  let displayTitle: String
+  let cwd: String
+  let relativeUpdatedAt: String
+  let matchText: String?
+
+  init(
+    session: AgentSession,
+    updatedDate: Date?,
+    match: SearchMatch?,
+    now: Date,
+    relativeFormatter: RelativeDateTimeFormatter
+  ) {
+    self.id = dashboardSessionKey(session)
+    self.agent = session.agent
+    self.agentLabel = session.agentLabel
+    self.displayTitle = session.displayTitle
+    self.cwd = session.cwd
+    if let updatedDate, updatedDate != .distantPast {
+      self.relativeUpdatedAt = relativeFormatter.localizedString(for: updatedDate, relativeTo: now)
+    } else {
+      self.relativeUpdatedAt = "unknown"
+    }
+    self.matchText = match?.text
+  }
+
+  static func fallback(session: AgentSession, match: SearchMatch?) -> DesktopSessionRowModel {
+    let relativeFormatter = RelativeDateTimeFormatter()
+    relativeFormatter.unitsStyle = .abbreviated
+    return DesktopSessionRowModel(
+      session: session,
+      updatedDate: parseSessionDate(session.updatedAt),
+      match: match,
+      now: Date(),
+      relativeFormatter: relativeFormatter
+    )
+  }
+}
+
 private struct DesktopSessionListRow: View, Equatable {
-  let session: AgentSession
-  let match: SearchMatch?
+  let model: DesktopSessionRowModel
 
   nonisolated static func == (lhs: DesktopSessionListRow, rhs: DesktopSessionListRow) -> Bool {
-    lhs.session == rhs.session && lhs.match == rhs.match
+    lhs.model == rhs.model
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
-        AgentBadge(agent: session.agent, label: session.agentLabel, size: .small)
+        AgentBadge(agent: model.agent, label: model.agentLabel, size: .small)
         Spacer()
-        Text(relativeUpdatedAt)
+        Text(model.relativeUpdatedAt)
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
 
-      Text(session.displayTitle)
+      Text(model.displayTitle)
         .font(.callout)
         .fontWeight(.medium)
         .lineLimit(2)
 
-      Text(session.cwd)
+      Text(model.cwd)
         .font(.caption2)
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
 
-      if let match {
-        Text(match.text)
+      if let matchText = model.matchText {
+        Text(matchText)
           .font(.caption2)
           .foregroundStyle(.secondary)
           .lineLimit(2)
       }
     }
     .padding(.vertical, 8)
-  }
-
-  private var relativeUpdatedAt: String {
-    guard let date = parseSessionDate(session.updatedAt) else {
-      return "unknown"
-    }
-    let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .abbreviated
-    return formatter.localizedString(for: date, relativeTo: Date())
   }
 }
 
@@ -1041,16 +1438,29 @@ private struct DirectorySessionGroup: Identifiable {
     cwd
   }
 
-  init(cwd: String, sessions: [AgentSession]) {
+  init(
+    cwd: String,
+    sessions: [AgentSession],
+    dateLookup: [String: Date],
+    calendar: Calendar,
+    monthFormatter: DateFormatter
+  ) {
     self.cwd = cwd
     self.sessions = sessions
     let url = URL(fileURLWithPath: cwd)
     self.displayName = url.lastPathComponent.isEmpty ? cwd : url.lastPathComponent
     self.parentPath = url.deletingLastPathComponent().path
-    self.lastUpdated = sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
-    let grouped = Dictionary(grouping: sessions, by: monthBucket)
+    self.lastUpdated = sessions.map { sessionDate($0, dateLookup: dateLookup) }.max() ?? .distantPast
+    let grouped = Dictionary(grouping: sessions) { session in
+      monthBucket(session, dateLookup: dateLookup, calendar: calendar)
+    }
     self.monthGroups = grouped.map { _, sessions in
-      MonthSessionGroup(sessions: sessions.sorted(by: isNewer))
+      MonthSessionGroup(
+        sessions: sortSessions(sessions, dateLookup: dateLookup),
+        dateLookup: dateLookup,
+        calendar: calendar,
+        formatter: monthFormatter
+      )
     }
     .sorted { lhs, rhs in
       lhs.sortDate > rhs.sortDate
@@ -1076,18 +1486,21 @@ private struct MonthSessionGroup: Identifiable {
   let sortDate: Date
   let isCurrentMonth: Bool
 
-  init(sessions: [AgentSession]) {
+  init(
+    sessions: [AgentSession],
+    dateLookup: [String: Date],
+    calendar: Calendar,
+    formatter: DateFormatter
+  ) {
     self.sessions = sessions
-    self.id = monthBucket(sessions.first)
-    self.sortDate = sessions.compactMap { parseSessionDate($0.updatedAt) }.max() ?? .distantPast
+    self.id = monthBucket(sessions.first, dateLookup: dateLookup, calendar: calendar)
+    self.sortDate = sessions.map { sessionDate($0, dateLookup: dateLookup) }.max() ?? .distantPast
     if sortDate == .distantPast {
       self.label = "Unknown date"
       self.isCurrentMonth = false
     } else {
-      let formatter = DateFormatter()
-      formatter.dateFormat = "MMMM yyyy"
       self.label = formatter.string(from: sortDate)
-      self.isCurrentMonth = Calendar.current.isDate(sortDate, equalTo: Date(), toGranularity: .month)
+      self.isCurrentMonth = calendar.isDate(sortDate, equalTo: Date(), toGranularity: .month)
     }
   }
 }
@@ -1149,6 +1562,25 @@ private func isNewer(_ lhs: AgentSession, _ rhs: AgentSession) -> Bool {
   return lhs.displayTitle.localizedCaseInsensitiveCompare(rhs.displayTitle) == .orderedAscending
 }
 
+private func dashboardSessionKey(_ session: AgentSession) -> String {
+  "\(session.agent):\(session.sessionId):\(session.path)"
+}
+
+private func sortSessions(_ sessions: [AgentSession], dateLookup: [String: Date]) -> [AgentSession] {
+  sessions.sorted { lhs, rhs in
+    let lhsDate = sessionDate(lhs, dateLookup: dateLookup)
+    let rhsDate = sessionDate(rhs, dateLookup: dateLookup)
+    if lhsDate != rhsDate {
+      return lhsDate > rhsDate
+    }
+    return lhs.displayTitle.localizedCaseInsensitiveCompare(rhs.displayTitle) == .orderedAscending
+  }
+}
+
+private func sessionDate(_ session: AgentSession, dateLookup: [String: Date]) -> Date {
+  dateLookup[session.path] ?? parseSessionDate(session.updatedAt) ?? .distantPast
+}
+
 private func parseSessionDate(_ value: String?) -> Date? {
   guard let value else {
     return nil
@@ -1164,12 +1596,33 @@ private func parseSessionDate(_ value: String?) -> Date? {
   return formatter.date(from: value)
 }
 
+private func monthBucket(
+  _ session: AgentSession?,
+  dateLookup: [String: Date],
+  calendar: Calendar
+) -> String {
+  guard let session else {
+    return "unknown"
+  }
+  let date = sessionDate(session, dateLookup: dateLookup)
+  guard date != .distantPast else {
+    return "unknown"
+  }
+  let components = calendar.dateComponents([.year, .month], from: date)
+  return String(format: "%04d-%02d", components.year ?? 0, components.month ?? 0)
+}
+
 private func monthBucket(_ session: AgentSession?) -> String {
   guard let date = parseSessionDate(session?.updatedAt) else {
     return "unknown"
   }
   let components = Calendar.current.dateComponents([.year, .month], from: date)
   return String(format: "%04d-%02d", components.year ?? 0, components.month ?? 0)
+}
+
+private func searchableSessionText(for session: AgentSession) -> String {
+  ([session.agentLabel, session.displayTitle, session.sessionId, session.cwd, session.path] + session.recentUserMessages)
+    .joined(separator: "\n")
 }
 
 private enum AgentBadgeSize {

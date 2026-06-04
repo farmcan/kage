@@ -96,8 +96,8 @@ final class SessionPoller: ObservableObject {
 
       notifyNewSessions(resolvedSessions.sessions, appState: appState, notifications: notifications)
 
-      sessionsResponse = resolvedSessions
       actionsResponse = resolvedActions
+      sessionsResponse = resolvedSessions
 
       if beginDoctorRefreshIfNeeded() {
         Task { [weak self] in

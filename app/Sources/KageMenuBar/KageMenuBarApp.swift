@@ -6,13 +6,6 @@ struct KageMenuBarApp: App {
   @NSApplicationDelegateAdaptor(KageAppDelegate.self) private var appDelegate
   @StateObject private var model = KageAppModel.shared
 
-  init() {
-    Task { @MainActor in
-      try? await Task.sleep(nanoseconds: 300_000_000)
-      KageWindowPresenter.shared.showDashboard()
-    }
-  }
-
   var body: some Scene {
     MenuBarExtra {
       MainMenuView()
@@ -47,11 +40,18 @@ final class KageAppModel: ObservableObject {
   let appState = AppState()
   let poller = SessionPoller()
   let notifications = NotificationManager()
+
+  private init() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+      KageWindowPresenter.shared.showDashboard()
+    }
+  }
 }
 
 @MainActor
 final class KageAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    NSApp.setActivationPolicy(.regular)
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
       KageWindowPresenter.shared.showDashboard()
     }
