@@ -29,6 +29,9 @@ struct MenuBarLabelView: View {
     if poller.errorMessage != nil {
       return "exclamationmark.triangle"
     }
+    if poller.isRefreshing || poller.processActivity.isActive {
+      return "arrow.triangle.2.circlepath"
+    }
     if poller.doctorResult?.ok == false {
       return "bolt.slash"
     }

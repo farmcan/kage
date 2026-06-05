@@ -301,15 +301,11 @@ struct DesktopDashboardView: View {
         }
       )
     } else if poller.isRefreshing && visibleSessions.isEmpty {
-      VStack(spacing: 14) {
-        ProgressView()
-          .controlSize(.large)
-        Text("Loading sessions...")
-          .font(.headline)
-        Text("KAGE is scanning local Codex, Claude Code, QoderCLI, and QoderWork transcripts.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
+      DesktopProcessStateView(
+        activity: poller.processActivity,
+        fallbackLabel: "Scanning local sessions...",
+        fallbackDetail: "KAGE is scanning local Codex, Claude Code, QoderCLI, and QoderWork transcripts."
+      )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(Color(nsColor: .textBackgroundColor))
     } else if let session = selectedSession {
@@ -319,6 +315,7 @@ struct DesktopDashboardView: View {
         actions: actionLookup[session.path] ?? [],
         actionResult: actionResult(for: session),
         actionMessage: poller.actionMessage,
+        processActivity: poller.processActivity,
         primaryResumeAction: primaryResumeAction(for: session, in: actionLookup),
         terminalSession: terminalSession?.sessionPath == session.path ? terminalSession : nil,
         isDemoSession: isDemoSession(session),
@@ -490,6 +487,10 @@ struct DesktopDashboardView: View {
           .font(.caption)
           .foregroundStyle(.orange)
           .lineLimit(2)
+      }
+
+      if !isDemoMode, poller.processActivity.isVisible {
+        DesktopProcessActivityLine(activity: poller.processActivity, compact: true)
       }
 
       if isDemoMode {
@@ -1900,6 +1901,165 @@ private func agentIconName(_ agent: String?) -> String {
   }
 }
 
+private struct DesktopProcessStateView: View {
+  let activity: ProcessActivity
+  let fallbackLabel: String
+  let fallbackDetail: String
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 3.2)) { context in
+      VStack(spacing: 14) {
+        if activity.isActive {
+          ProgressView()
+            .controlSize(.large)
+            .tint(activityTint(activity))
+        } else {
+          Image(systemName: activity.isVisible ? activity.symbolName : "rectangle.stack")
+            .font(.largeTitle)
+            .foregroundStyle(activityTint(activity))
+        }
+
+        Text(activity.isVisible ? activity.displayLabel(at: context.date) : fallbackLabel)
+          .font(.headline)
+          .contentTransition(.opacity)
+
+        Text(activity.detail ?? fallbackDetail)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: 440)
+      }
+      .padding(24)
+    }
+  }
+}
+
+private struct DesktopProcessActivityLine: View {
+  let activity: ProcessActivity
+  var compact = false
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 3.2)) { context in
+      HStack(alignment: .top, spacing: compact ? 7 : 10) {
+        if activity.isActive {
+          ProgressView()
+            .controlSize(compact ? .mini : .small)
+            .tint(activityTint(activity))
+        } else {
+          Image(systemName: activity.symbolName)
+            .foregroundStyle(activityTint(activity))
+        }
+
+        VStack(alignment: .leading, spacing: compact ? 1 : 3) {
+          Text(activity.displayLabel(at: context.date))
+            .font(compact ? .caption : .callout.weight(.medium))
+            .foregroundStyle(activity.kind == .failed ? .orange : .primary)
+            .contentTransition(.opacity)
+
+          if let detail = activity.detail, !detail.isEmpty {
+            Text(detail)
+              .font(compact ? .caption2 : .caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(compact ? 1 : 2)
+              .truncationMode(.middle)
+          }
+        }
+      }
+      .padding(compact ? 0 : 10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background {
+        if !compact {
+          RoundedRectangle(cornerRadius: 8)
+            .fill(activityTint(activity).opacity(0.08))
+        }
+      }
+      .overlay {
+        if !compact {
+          RoundedRectangle(cornerRadius: 8)
+            .stroke(activityTint(activity).opacity(0.18))
+        }
+      }
+    }
+  }
+}
+
+private struct DesktopSessionFreshnessView: View {
+  let session: AgentSession
+
+  var body: some View {
+    if let updatedAt = parseSessionDate(session.updatedAt) {
+      TimelineView(.periodic(from: .now, by: 3.2)) { context in
+        if context.date.timeIntervalSince(updatedAt) <= 180 {
+          HStack(spacing: 7) {
+            Image(systemName: "waveform")
+              .foregroundStyle(agentTint(session.agent))
+            Text("\(shortAgentLabel(session.agent)) is \(SpinnerVerbCatalog.verb(at: context.date).lowercased())...")
+              .font(.caption)
+              .foregroundStyle(.primary)
+              .contentTransition(.opacity)
+            Text("Updated \(relativeActivityLabel(from: updatedAt, now: context.date))")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .background(
+            RoundedRectangle(cornerRadius: 8)
+              .fill(agentTint(session.agent).opacity(0.09))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .stroke(agentTint(session.agent).opacity(0.18))
+          )
+        }
+      }
+    }
+  }
+}
+
+private func activityTint(_ activity: ProcessActivity) -> Color {
+  switch activity.kind {
+  case .failed:
+    return .orange
+  case .completed:
+    return .green
+  case .runningAction:
+    return .accentColor
+  case .searching:
+    return .blue
+  case .checkingHealth:
+    return .purple
+  case .refreshing:
+    return .secondary
+  case .idle:
+    return .secondary
+  }
+}
+
+private func shortAgentLabel(_ agent: String) -> String {
+  switch agent {
+  case "claude":
+    return "Claude"
+  case "codex":
+    return "Codex"
+  case "qodercli", "qoderwork":
+    return "Qoder"
+  default:
+    return "Agent"
+  }
+}
+
+private func relativeActivityLabel(from date: Date, now: Date) -> String {
+  let seconds = max(0, Int(now.timeIntervalSince(date)))
+  if seconds < 10 {
+    return "just now"
+  }
+  if seconds < 60 {
+    return "\(seconds)s ago"
+  }
+  return "\(seconds / 60)m ago"
+}
+
 private struct DesktopSessionDetailView: View {
   @State private var isContextExpanded = false
 
@@ -1908,6 +2068,7 @@ private struct DesktopSessionDetailView: View {
   let actions: [KageAction]
   let actionResult: RunActionResponse?
   let actionMessage: String?
+  let processActivity: ProcessActivity
   let primaryResumeAction: KageAction?
   let terminalSession: EmbeddedTerminalSession?
   let isDemoSession: Bool
@@ -1924,6 +2085,10 @@ private struct DesktopSessionDetailView: View {
 
       if isDemoSession {
         DemoModeNotice()
+      }
+
+      if processActivity.isActive {
+        DesktopProcessActivityLine(activity: processActivity, compact: false)
       }
 
       if let actionResult, shouldShowResultCard(actionResult) {
@@ -2014,6 +2179,8 @@ private struct DesktopSessionDetailView: View {
         .lineLimit(1)
         .truncationMode(.middle)
         .textSelection(.enabled)
+
+      DesktopSessionFreshnessView(session: session)
     }
   }
 

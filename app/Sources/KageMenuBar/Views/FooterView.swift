@@ -22,6 +22,10 @@ struct FooterView: View {
           .lineLimit(2)
       }
 
+      if poller.processActivity.isVisible {
+        FooterProcessActivityLine(activity: poller.processActivity)
+      }
+
       if let cwd = poller.sessionsResponse?.cwd {
         Text(cwd)
           .font(.caption2)
@@ -78,4 +82,37 @@ struct FooterView: View {
 private struct FooterWarning: Identifiable {
   let id = UUID()
   let message: String
+}
+
+private struct FooterProcessActivityLine: View {
+  let activity: ProcessActivity
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 3.2)) { context in
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        if activity.isActive {
+          ProgressView()
+            .controlSize(.mini)
+        } else {
+          Image(systemName: activity.symbolName)
+            .foregroundStyle(activity.kind == .failed ? .orange : .secondary)
+        }
+
+        VStack(alignment: .leading, spacing: 1) {
+          Text(activity.displayLabel(at: context.date))
+            .font(.caption)
+            .lineLimit(1)
+            .contentTransition(.opacity)
+
+          if let detail = activity.detail, !detail.isEmpty {
+            Text(detail)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+          }
+        }
+      }
+    }
+  }
 }

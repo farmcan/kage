@@ -15,6 +15,7 @@ final class SessionPoller: ObservableObject {
   @Published var actionMessage: String?
   @Published var actionResult: RunActionResponse?
   @Published var loadsFullHistory = false
+  @Published var processActivity = ProcessActivity.idle
 
   private let cli = KageCLI()
   private var task: Task<Void, Never>?
@@ -70,6 +71,11 @@ final class SessionPoller: ObservableObject {
     }
 
     isRefreshing = true
+    processActivity = .scanning(
+      directory: watchedDirectory,
+      includeSubdirectories: includeSubdirectories,
+      fullHistory: loadsFullHistory
+    )
     errorMessage = nil
     defer {
       if generation == refreshGeneration {
@@ -98,6 +104,7 @@ final class SessionPoller: ObservableObject {
 
       actionsResponse = resolvedActions
       sessionsResponse = resolvedSessions
+      processActivity = .found(count: resolvedSessions.sessions.count)
 
       if beginDoctorRefreshIfNeeded() {
         Task { [weak self] in
@@ -109,6 +116,7 @@ final class SessionPoller: ObservableObject {
         return
       }
       errorMessage = error.localizedDescription
+      processActivity = .failed(error.localizedDescription)
     }
   }
 
@@ -123,6 +131,7 @@ final class SessionPoller: ObservableObject {
   func runAction(_ action: KageAction, appState: AppState, notifications: NotificationManager) async {
     actionMessage = nil
     actionResult = nil
+    processActivity = .running(action: action)
     do {
       let result = try await cli.runAction(
         action,
@@ -130,10 +139,12 @@ final class SessionPoller: ObservableObject {
         includeSubdirectories: appState.includeSubdirectories
       )
       actionResult = result
+      processActivity = .completedAction(action)
       actionMessage = result.resumeCommand == nil ? "Ran \(action.label)" : nil
       await refresh(appState: appState, notifications: notifications)
     } catch {
       actionMessage = error.localizedDescription
+      processActivity = .failed(error.localizedDescription)
     }
   }
 
@@ -147,6 +158,7 @@ final class SessionPoller: ObservableObject {
     }
 
     isSearching = true
+    processActivity = .searching(query: trimmedQuery)
     searchErrorMessage = nil
     defer {
       isSearching = false
@@ -154,7 +166,7 @@ final class SessionPoller: ObservableObject {
 
     do {
       let since = loadsFullHistory ? nil : recentHistorySince
-      searchResponse = try await cli.search(
+      let resolvedSearchResponse = try await cli.search(
         cwd: appState.watchedDirectory,
         query: trimmedQuery,
         agent: appState.selectedAgent,
@@ -162,8 +174,11 @@ final class SessionPoller: ObservableObject {
         since: since,
         limit: searchResultLimit
       )
+      searchResponse = resolvedSearchResponse
+      processActivity = .searchComplete(count: resolvedSearchResponse.results.count)
     } catch {
       searchErrorMessage = error.localizedDescription
+      processActivity = .failed(error.localizedDescription)
     }
   }
 
@@ -212,6 +227,7 @@ final class SessionPoller: ObservableObject {
   }
 
   private func refreshDoctor(cwd: String, generation: Int) async {
+    processActivity = .checkingHealth()
     defer {
       doctorRefreshInFlight = false
     }
@@ -223,11 +239,13 @@ final class SessionPoller: ObservableObject {
       }
       doctorResult = result
       lastDoctorRefresh = Date()
+      processActivity = .found(count: sessionsResponse?.sessions.count ?? 0)
     } catch {
       guard generation == refreshGeneration else {
         return
       }
       errorMessage = error.localizedDescription
+      processActivity = .failed(error.localizedDescription)
     }
   }
 }
