@@ -16,6 +16,7 @@ import { searchSessions } from "./core/search.js";
 import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
 import { compactSessionText } from "./core/session-labels.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
+import { startServeCommand } from "./serve/index.js";
 
 const shorthandAgents = ["c", "x", "q", "qw"];
 const supportedRouteAliasList = Object.keys(routeAliases).join(", ");
@@ -29,6 +30,7 @@ const helpText = `Usage:
   kage search [query] [--agent ${agentUsage}] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
   kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
   kage run-action <id> [--include-subdirs] [--json]
+  kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
   kage <agent>
@@ -78,6 +80,9 @@ Options:
   --limit <n>
   --project <path>
   --include-subdirs
+  --port <number>
+  --host <address>
+  --password <pin>
   --stdout
   --json
   --version
@@ -90,6 +95,7 @@ const completionCommands = [
   "search",
   "actions",
   "run-action",
+  "serve",
   "clean",
   "completions",
   ...supportedAgents,
@@ -115,6 +121,9 @@ const completionOptions = [
   "--limit",
   "--project",
   "--include-subdirs",
+  "--port",
+  "--host",
+  "--password",
   "--stdout",
   "--json",
   "--confirm",
@@ -209,6 +218,10 @@ function parseArgs(argv) {
     includeSubdirs: false,
     actions: false,
     runActionId: null,
+    serve: false,
+    servePort: null,
+    serveHost: null,
+    servePassword: null,
     clean: false,
     cleanConfirm: false,
     cleanOlderThan: null,
@@ -299,6 +312,15 @@ function parseArgs(argv) {
         i += 1;
       } else if (arg === "--include-subdirs") {
         args.includeSubdirs = true;
+      } else if (arg === "--port") {
+        args.servePort = parsePositiveInteger(readOptionValue(argv, i, arg), arg);
+        i += 1;
+      } else if (arg === "--host") {
+        args.serveHost = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--password") {
+        args.servePassword = readOptionValue(argv, i, arg, { allowOptionValue: true });
+        i += 1;
       } else if (arg === "--stdout") {
         args.stdout = true;
       } else if (arg === "--json") {
@@ -324,6 +346,9 @@ function parseArgs(argv) {
   const [first, second] = positional;
   if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
     return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
+  }
+  if ((args.servePort || args.serveHost || args.servePassword) && first !== "serve") {
+    return { ...args, error: "--port, --host, and --password are only supported with kage serve" };
   }
   if ((args.since || args.until || args.limit) && !["sessions", "search", "actions", "desktop-state"].includes(first)) {
     return {
@@ -389,6 +414,12 @@ function parseArgs(argv) {
       return { ...args, error: "Usage: kage run-action <id> [--include-subdirs] [--json]" };
     }
     return { ...args, runActionId: second };
+  }
+  if (first === "serve") {
+    if (second) {
+      return { ...args, error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>]" };
+    }
+    return { ...args, serve: true };
   }
   if (first === "clean") {
     if (second) {
@@ -764,6 +795,9 @@ complete -c kage -l since -r
 complete -c kage -l until -r
 complete -c kage -l project -r
 complete -c kage -l include-subdirs
+complete -c kage -l port -r
+complete -c kage -l host -r
+complete -c kage -l password -r
 complete -c kage -l preview
 complete -c kage -l run
 complete -c kage -l older-than -r
@@ -1593,6 +1627,14 @@ async function main() {
   }
   if (args.runActionId) {
     await runAction(args);
+    return;
+  }
+  if (args.serve) {
+    await startServeCommand({
+      port: args.servePort ?? undefined,
+      host: args.serveHost ?? undefined,
+      password: args.servePassword,
+    });
     return;
   }
   if (args.clean) {

@@ -41,6 +41,13 @@ The embedded terminal launches commands through `/bin/zsh -lc` with a Homebrew/n
 Use the `Terminal.app` button when a high-volume interactive session feels better in the native
 macOS terminal.
 
+For phone or tablet reading, the CLI can also serve the same local session inventory through a
+small web viewer:
+
+```bash
+kage serve --port 9876
+```
+
 If the selected directory has no sessions yet, click `Explore Demo` in the empty state. Demo mode uses built-in sanitized sessions and safe preview actions, so it does not read, write, or upload private transcripts.
 
 Package a local DMG:

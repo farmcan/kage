@@ -172,22 +172,103 @@ struct DesktopDashboardView: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 10)
 
-      List(selection: $selectedSessionID) {
-        ForEach(groups) { group in
-          Section {
-            sessionRows(for: group, matches: matches, actionLookup: actionLookup, rowModels: rowModels)
-          } header: {
-            DirectoryGroupHeader(group: group)
+      if groups.isEmpty {
+        sidebarEmptyState
+      } else {
+        List(selection: $selectedSessionID) {
+          ForEach(groups) { group in
+            Section {
+              sessionRows(for: group, matches: matches, actionLookup: actionLookup, rowModels: rowModels)
+            } header: {
+              DirectoryGroupHeader(group: group)
+            }
           }
         }
+        .listStyle(.sidebar)
       }
-      .listStyle(.sidebar)
 
       Divider()
 
       statusFooter
         .padding(12)
     }
+  }
+
+  private var sidebarEmptyState: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Spacer(minLength: 12)
+
+      Image(systemName: isSearchActive ? "magnifyingglass" : "rectangle.stack")
+        .font(.title2)
+        .foregroundStyle(.secondary)
+
+      VStack(alignment: .leading, spacing: 6) {
+        Text(sidebarEmptyTitle)
+          .font(.headline)
+        Text(sidebarEmptyDescription)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      VStack(alignment: .leading, spacing: 8) {
+        if activeSelectedAgent != "all" {
+          Button {
+            selectedAgentBinding.wrappedValue = "all"
+            if isSearchActive {
+              searchNow(searchText)
+            }
+          } label: {
+            Label("Back to All", systemImage: "person.3")
+          }
+        }
+
+        if isSearchActive {
+          Button {
+            searchText = ""
+            poller.clearSearch()
+          } label: {
+            Label("Clear Search", systemImage: "xmark.circle")
+          }
+        }
+
+        Button {
+          refresh()
+        } label: {
+          Label("Refresh", systemImage: "arrow.clockwise")
+        }
+
+        newSessionMenu
+      }
+      .controlSize(.small)
+
+      Spacer()
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private var sidebarEmptyTitle: String {
+    if isSearchActive {
+      return "No matches"
+    }
+    if activeSelectedAgent != "all" {
+      return "No \(agentLabel(activeSelectedAgent)) sessions"
+    }
+    return "No sessions"
+  }
+
+  private var sidebarEmptyDescription: String {
+    if isSearchActive, activeSelectedAgent != "all" {
+      return "No \(agentLabel(activeSelectedAgent)) sessions match this search. Try all agents or clear the search."
+    }
+    if isSearchActive {
+      return "No sessions match this search in the current project."
+    }
+    if activeSelectedAgent != "all" {
+      return "This project has no \(agentLabel(activeSelectedAgent)) sessions yet. Go back to All or start a new session."
+    }
+    return "Start or resume an agent session in this project, then refresh."
   }
 
   @ViewBuilder

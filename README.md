@@ -83,6 +83,14 @@ kage sessions --include-subdirs
 kage search "auth"
 ```
 
+Open a phone-friendly local web viewer:
+
+```bash
+kage serve --port 9876
+```
+
+Then open the printed LAN URL from a phone or tablet on the same trusted network. Add `--password <pin>` if you want a simple shared secret for the viewer.
+
 Bridge a useful session:
 
 ```bash
@@ -375,6 +383,13 @@ kage sessions
 kage sessions --agent claude --json
 kage sessions --include-subdirs
 kage sessions --since 90d --limit 120 --json
+```
+
+Serve a mobile-friendly session viewer over your LAN:
+
+```bash
+kage serve
+kage serve --port 9876 --password 1234
 ```
 
 Generate menu-bar friendly actions and run one:

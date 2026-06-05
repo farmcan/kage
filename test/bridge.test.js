@@ -11,6 +11,7 @@ import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
 import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
+import { createKageServeServer } from "../src/serve/index.js";
 import {
   buildStoryPayload,
   detectAgent,
@@ -781,6 +782,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /kage search \[query\]/);
   assert.match(result.stdout, /kage actions \[--since 90d\]/);
   assert.match(result.stdout, /kage run-action <id> \[--include-subdirs\] \[--json\]/);
+  assert.match(result.stdout, /kage serve \[--port 9876\]/);
   assert.match(result.stdout, /kage clean \[--confirm\] \[--older-than 7d\] \[--json\]/);
   assert.match(result.stdout, /kage completions bash\|zsh\|fish/);
   assert.match(result.stdout, /kage <route-alias> \[options\]/);
@@ -790,8 +792,66 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /--preview/);
   assert.match(result.stdout, /--run/);
   assert.match(result.stdout, /--include-subdirs/);
+  assert.match(result.stdout, /--port <number>/);
   assert.match(result.stdout, /--limit <n>/);
   assert.match(result.stdout, /--version/);
+});
+
+test("serve API returns structured transcript blocks", async () => {
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const sessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
+    const url = new URL(`http://127.0.0.1:${port}/api/transcript`);
+    url.searchParams.set("path", sessionPath);
+    url.searchParams.set("agent", "codex");
+    const response = await fetch(url);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.mode, "transcript");
+    assert.equal(payload.agent, "codex");
+    assert.equal(payload.messages[0].blocks[0].type, "text");
+    assert.equal(typeof payload.messages[0].blocks[0].content, "string");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve password mode loads the page and protects APIs", async () => {
+  const server = createKageServeServer({ cwd: __dirname, password: "1234" });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const root = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(root.status, 200);
+    assert.match(await root.text(), /const passwordRequired = true/);
+
+    const unauthorized = await fetch(`http://127.0.0.1:${port}/api/doctor`);
+    assert.equal(unauthorized.status, 401);
+
+    const authorized = await fetch(`http://127.0.0.1:${port}/api/doctor`, {
+      headers: { Authorization: "Bearer 1234" },
+    });
+    assert.equal(authorized.status, 200);
+    assert.equal((await authorized.json()).mode, "doctor");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("cli shows help with no arguments", async () => {
