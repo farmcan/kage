@@ -1,15 +1,15 @@
 :root {
-  color-scheme: dark;
-  --bg: #0f1215;
-  --bg-2: #14171b;
-  --panel: #191d22;
-  --panel-2: #20252b;
-  --panel-3: #15191e;
-  --text: #f3f5f7;
-  --muted: #a0a8b0;
-  --dim: #6f7882;
-  --line: #313842;
-  --line-soft: #262c34;
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --bg-2: #eef1f4;
+  --panel: #ffffff;
+  --panel-2: #f3f5f7;
+  --panel-3: #f8fafc;
+  --text: #17202a;
+  --muted: #5f6b76;
+  --dim: #89939d;
+  --line: #dfe5ea;
+  --line-soft: #edf1f4;
   --codex: #3b82f6;
   --qoder: #15a074;
   --claude: #cf7654;
@@ -23,19 +23,19 @@
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg: #f7f8fa;
-  --bg-2: #eef1f4;
-  --panel: #ffffff;
-  --panel-2: #f3f5f7;
-  --panel-3: #f8fafc;
-  --text: #17202a;
-  --muted: #5f6b76;
-  --dim: #89939d;
-  --line: #dfe5ea;
-  --line-soft: #edf1f4;
-  --shadow: 0 22px 60px rgba(26, 34, 40, 0.1);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1215;
+  --bg-2: #14171b;
+  --panel: #191d22;
+  --panel-2: #20252b;
+  --panel-3: #15191e;
+  --text: #f3f5f7;
+  --muted: #a0a8b0;
+  --dim: #6f7882;
+  --line: #313842;
+  --line-soft: #262c34;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -1492,4 +1492,169 @@ textarea:disabled {
   .agent-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.app-shell.mock-mobile .topbar {
+  padding-inline: 12px;
+}
+
+.app-shell.mock-mobile .brand-copy h1 {
+  font-size: 17px;
+}
+
+.app-shell.mock-mobile .status-pill {
+  display: none;
+}
+
+.app-shell.mock-mobile .workspace {
+  height: auto;
+  min-height: calc(100vh - 82px);
+  padding: 10px;
+  grid-template-columns: 1fr;
+}
+
+.app-shell.mock-mobile .sidebar,
+.app-shell.mock-mobile .conversation-panel,
+.app-shell.mock-mobile .dispatch-panel {
+  height: calc(100vh - 82px);
+}
+
+.app-shell.mock-mobile .dispatch-panel {
+  order: 1;
+}
+
+.app-shell.mock-mobile .sidebar {
+  order: 2;
+}
+
+.app-shell.mock-mobile .conversation-panel {
+  order: 3;
+}
+
+.app-shell.mock-mobile .workspace.detail-open .conversation-panel {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.app-shell.mock-mobile .workspace.detail-open .conversation-composer {
+  display: block;
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel-2) 82%, transparent);
+}
+
+.app-shell.mock-mobile .compact-composer {
+  overflow: visible;
+}
+
+.app-shell.mock-mobile .compact-composer .composer-head {
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 172px);
+  align-items: center;
+}
+
+.app-shell.mock-mobile .compact-composer .composer-head span,
+.app-shell.mock-mobile .workspace.detail-open .sidebar,
+.app-shell.mock-mobile .workspace.detail-open .dispatch-panel {
+  display: none;
+}
+
+.app-shell.mock-mobile .workspace:not(.detail-open) .conversation-panel {
+  display: none;
+}
+
+.app-shell.mock-mobile .conversation-head {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.app-shell.mock-mobile .back-button {
+  display: inline-flex;
+}
+
+.app-shell.mock-mobile .stat-strip {
+  padding-inline: 12px;
+}
+
+.app-shell.mock-mobile .message-card {
+  --message-left: 10px;
+  --message-right: auto;
+  --message-width: calc(100% - 20px);
+  max-width: calc(100% - 20px);
+}
+
+.app-shell.mock-mobile .message-card.user {
+  --message-left: auto;
+  --message-right: 10px;
+  --message-width: fit-content;
+  max-width: calc(100% - 34px);
+}
+
+.app-shell.mock-mobile .message-card.assistant {
+  --message-width: calc(100% - 24px);
+}
+
+.app-shell.mock-mobile .message-card.tool {
+  --message-left: 18px;
+  --message-width: calc(100% - 36px);
+  max-width: calc(100% - 36px);
+}
+
+.app-shell.mock-mobile .composer-row,
+.app-shell.mock-mobile .composer-copy {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.app-shell.mock-mobile .send-mode-tabs,
+.app-shell.mock-mobile .agent-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell.mock-mobile .agent-picker {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell.mock-mobile .dispatch-board {
+  grid-template-columns: 1fr;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.app-shell.mock-mobile .send-button,
+.app-shell.mock-mobile .composer button,
+.app-shell.mock-mobile .agent-tab,
+.app-shell.mock-mobile .primary-button,
+.app-shell.mock-mobile .icon-button {
+  min-height: 44px;
+}
+
+.app-shell.mock-mobile .dispatch-panel .composer-copy {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.app-shell.mock-mobile .dispatch-panel .composer-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell.mock-mobile .dispatch-panel .composer-copy button {
+  min-height: 36px;
+}
+
+.app-shell.mock-mobile .top-actions {
+  gap: 6px;
+}
+
+.app-shell.mock-mobile .primary-button {
+  padding-inline: 10px;
+}
+
+.app-shell.mock-mobile .brand-copy span {
+  max-width: 170px;
+}
+
+.app-shell.mock-mobile .agent-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }

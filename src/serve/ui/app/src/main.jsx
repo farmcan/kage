@@ -36,6 +36,8 @@ const config = {
   sendEnabled: false,
   ...(window.__KAGE_CONFIG__ || {}),
 };
+const query = new URLSearchParams(window.location.search);
+const isMockMobile = query.has("mobile") || query.has("mock-mobile") || query.get("v") === "mobile";
 
 const agentMeta = {
   claude: { label: "Claude", short: "Claude", color: "var(--claude)" },
@@ -121,7 +123,7 @@ function initialPassword() {
 
 const useStore = create((set, get) => ({
   password: initialPassword(),
-  theme: localStorage.getItem("kageServeTheme") || "dark",
+  theme: localStorage.getItem("kageServeTheme") || "light",
   sessions: [],
   agents: [],
   selectedAgent: "all",
@@ -399,7 +401,7 @@ function App() {
 
   return (
     <Tooltip.Provider delayDuration={220}>
-      <div className="app-shell">
+      <div className={cls("app-shell", isMockMobile && "mock-mobile")}>
         <TopBar />
         <main className={cls("workspace", detailOpen && "detail-open")}>
           <Sidebar />
