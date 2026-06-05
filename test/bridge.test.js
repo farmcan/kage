@@ -896,16 +896,16 @@ test("serve send command builder uses native non-interactive resume commands", (
   assert.throws(() => buildAgentSendCommand({ agent: "qoderwork", sessionId: "id", cwd: __dirname, message: "hello" }), /read-only/);
 });
 
-test("runAgentSend returns after handing the prompt to the CLI", async () => {
+test("runAgentSend waits for CLI completion and captures output", async () => {
   const binDir = await makeTempDir("kage-send-bin");
   const marker = path.join(binDir, "marker.txt");
   const codexPath = path.join(binDir, "codex");
   await writeExecutable(
     codexPath,
     `#!/bin/sh
-cat >/dev/null
-printf started > "$KAGE_SEND_MARKER"
-sleep 5
+input=$(cat)
+printf "%s" "$input" > "$KAGE_SEND_MARKER"
+printf "agent response: %s" "$input"
 `,
   );
 
@@ -918,32 +918,18 @@ sleep 5
   try {
     const startedAt = Date.now();
     result = await runAgentSend({ agent: "codex", cwd: binDir, message: "background dispatch" }, { timeoutMs: 2_000 });
-    assert.equal(result.status, "started");
+    assert.equal(result.status, "completed");
     assert.equal(result.command, "codex");
     assert.equal(result.target, "new");
     assert.equal(result.cwd, binDir);
     assert.equal(typeof result.pid, "number");
-    assert.ok(Date.now() - startedAt < 900, "send should return before the fake CLI exits");
+    assert.ok(Date.now() - startedAt < 1_500, "send should complete promptly after the fake CLI exits");
+    assert.equal(result.stdout, "agent response: background dispatch");
+    assert.equal(result.stderr, "");
 
-    let markerText = "";
-    for (let index = 0; index < 20; index += 1) {
-      try {
-        markerText = await fs.readFile(marker, "utf8");
-      } catch {
-        markerText = "";
-      }
-      if (markerText.includes("started")) break;
-      await new Promise((resolve) => setTimeout(resolve, 75));
-    }
-    assert.equal(markerText, "started");
+    const markerText = await fs.readFile(marker, "utf8");
+    assert.equal(markerText, "background dispatch");
   } finally {
-    if (result?.pid) {
-      try {
-        process.kill(-result.pid, "SIGTERM");
-      } catch {
-        // The fake CLI may already have exited on a fast system.
-      }
-    }
     if (oldPath === undefined) {
       delete process.env.PATH;
     } else {
@@ -953,6 +939,62 @@ sleep 5
       delete process.env.KAGE_SEND_MARKER;
     } else {
       process.env.KAGE_SEND_MARKER = oldMarker;
+    }
+  }
+});
+
+test("runAgentSend reports CLI failures and timeout cleanup", async () => {
+  const failBinDir = await makeTempDir("kage-send-fail-bin");
+  await writeExecutable(
+    path.join(failBinDir, "codex"),
+    `#!/bin/sh
+cat >/dev/null
+printf "rate limit reached" >&2
+exit 7
+`,
+  );
+
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${failBinDir}${path.delimiter}${oldPath || ""}`;
+  try {
+    await assert.rejects(
+      () => runAgentSend({ agent: "codex", cwd: failBinDir, message: "will fail" }, { timeoutMs: 2_000 }),
+      (error) => {
+        assert.match(error.message, /rate limit reached/);
+        assert.equal(error.result.status, "failed");
+        assert.equal(error.result.code, 7);
+        assert.equal(error.result.stderr, "rate limit reached");
+        return true;
+      },
+    );
+  } finally {
+    if (oldPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = oldPath;
+    }
+  }
+
+  const slowBinDir = await makeTempDir("kage-send-slow-bin");
+  await writeExecutable(
+    path.join(slowBinDir, "codex"),
+    `#!/bin/sh
+cat >/dev/null
+sleep 5
+`,
+  );
+
+  process.env.PATH = `${slowBinDir}${path.delimiter}${oldPath || ""}`;
+  try {
+    await assert.rejects(
+      () => runAgentSend({ agent: "codex", cwd: slowBinDir, message: "will timeout" }, { timeoutMs: 100 }),
+      /did not finish within/,
+    );
+  } finally {
+    if (oldPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = oldPath;
     }
   }
 });
@@ -1442,6 +1484,57 @@ test("serve send API is enabled by default", async () => {
         fallbackCwd: __dirname,
       },
     ]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve send API rejects concurrent sends to the same target", async () => {
+  let releaseSend;
+  let firstSendStartedResolve;
+  const firstSendStarted = new Promise((resolve) => {
+    firstSendStartedResolve = resolve;
+  });
+
+  const server = createKageServeServer({
+    cwd: __dirname,
+    sendRunner: async (payload) => {
+      firstSendStartedResolve(payload);
+      await new Promise((release) => {
+        releaseSend = release;
+      });
+      return { ok: true, target: "session", command: "fake", cwd: payload.cwd, status: "completed" };
+    },
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const firstResponsePromise = fetch(`http://127.0.0.1:${port}/api/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "claude", sessionId: "same-session", cwd: __dirname, message: "first" }),
+    });
+    const firstPayload = await firstSendStarted;
+    assert.equal(firstPayload.message, "first");
+
+    const secondResponse = await fetch(`http://127.0.0.1:${port}/api/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "claude", sessionId: "same-session", cwd: __dirname, message: "second" }),
+    });
+    assert.equal(secondResponse.status, 409);
+    assert.match((await secondResponse.json()).error, /already running/);
+
+    releaseSend();
+    const firstResponse = await firstResponsePromise;
+    assert.equal(firstResponse.status, 200);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

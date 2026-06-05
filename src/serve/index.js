@@ -245,6 +245,16 @@ function kageScopeArgs(url, { includeJson = true } = {}) {
   return args;
 }
 
+function sendTargetKey(body, fallbackCwd) {
+  const agent = String(body.agent ?? "").trim() || "unknown";
+  const sessionId = String(body.sessionId ?? "").trim();
+  if (sessionId) {
+    return `${agent}:session:${sessionId}`;
+  }
+  const cwd = String(body.cwd ?? fallbackCwd ?? "").trim() || ".";
+  return `${agent}:new:${cwd}`;
+}
+
 function applyWorkspaceContext(payload, workspace, options = {}) {
   if (!payload || typeof payload !== "object") {
     return payload;
@@ -353,14 +363,37 @@ async function handleSend(request, response, options) {
     jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
     return;
   }
-  const result = await options.sendRunner({
-    agent: body.agent,
-    sessionId: body.sessionId,
-    cwd: body.cwd,
-    message: body.message,
-    fallbackCwd: options.cwd,
-  });
-  jsonResponse(response, 200, { mode: "send", ...result });
+  const targetKey = sendTargetKey(body, options.cwd);
+  if (options.sendInflight.has(targetKey)) {
+    jsonResponse(response, 409, {
+      mode: "send",
+      status: "busy",
+      error: "A send is already running for this target. Wait for it to finish before sending another prompt.",
+      targetKey,
+    });
+    return;
+  }
+  options.sendInflight.set(targetKey, { startedAt: Date.now() });
+  try {
+    const result = await options.sendRunner({
+      agent: body.agent,
+      sessionId: body.sessionId,
+      cwd: body.cwd,
+      message: body.message,
+      fallbackCwd: options.cwd,
+    });
+    jsonResponse(response, 200, { mode: "send", targetKey, ...result });
+  } catch (error) {
+    jsonResponse(response, 500, {
+      mode: "send",
+      status: "failed",
+      error: error.message,
+      targetKey,
+      ...(error.result ? { result: error.result } : {}),
+    });
+  } finally {
+    options.sendInflight.delete(targetKey);
+  }
 }
 
 async function handleStream(response, url, options) {
@@ -431,6 +464,7 @@ export function createKageServeServer(options = {}) {
     password: options.password ?? null,
     allowSend: options.allowSend !== false,
     sendRunner: options.sendRunner ?? runAgentSend,
+    sendInflight: new Map(),
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };
 

@@ -199,6 +199,7 @@ const useStore = create((set, get) => ({
   selectedPath: null,
   selectedSession: null,
   transcript: null,
+  pendingTranscriptMessages: [],
   messageFilter: "all",
   live: false,
   activityUpdatedAt: 0,
@@ -344,6 +345,7 @@ function addPendingTranscriptMessage(message) {
     role: "user",
     blocks: [{ type: "text", content }],
     _pending: true,
+    _pendingContent: content,
   };
   const state = useStore.getState();
   if (!state.transcript) {
@@ -354,9 +356,83 @@ function addPendingTranscriptMessage(message) {
       ...state.transcript,
       messages: [...(state.transcript.messages || []), pendingMessage],
     },
+    pendingTranscriptMessages: [...(state.pendingTranscriptMessages || []), pendingMessage],
     activityUpdatedAt: Date.now(),
   });
   return pendingMessage.id;
+}
+
+function blockText(block) {
+  if (!block) return "";
+  if (typeof block === "string") return block;
+  if (typeof block.content === "string") return block.content;
+  if (typeof block.text === "string") return block.text;
+  if (typeof block.input === "string") return block.input;
+  return "";
+}
+
+function messageText(message) {
+  return (message?.blocks || []).map(blockText).filter(Boolean).join("\n");
+}
+
+function transcriptContainsText(transcript, content) {
+  const needle = String(content ?? "").trim();
+  if (!needle) return true;
+  return (transcript?.messages || []).some((message) => messageText(message).includes(needle));
+}
+
+function withPendingTranscriptMessages(transcript) {
+  const state = useStore.getState();
+  const pending = state.pendingTranscriptMessages || [];
+  if (!transcript || pending.length === 0) {
+    return { transcript, pendingTranscriptMessages: pending };
+  }
+  const remainingPending = pending.filter((message) => !transcriptContainsText(transcript, message._pendingContent || messageText(message)));
+  if (remainingPending.length === 0) {
+    return { transcript, pendingTranscriptMessages: [] };
+  }
+  return {
+    transcript: {
+      ...transcript,
+      messages: [...(transcript.messages || []), ...remainingPending],
+    },
+    pendingTranscriptMessages: remainingPending,
+  };
+}
+
+function appendLocalTranscriptMessage({ role = "assistant", content, idPrefix = "local-send-output" }) {
+  const text = String(content ?? "").trim();
+  if (!text) return;
+  const state = useStore.getState();
+  if (!state.transcript) return;
+  useStore.setState({
+    transcript: {
+      ...state.transcript,
+      messages: [
+        ...(state.transcript.messages || []),
+        {
+          id: `${idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          role,
+          blocks: [{ type: "text", content: text }],
+          _localSendOutput: true,
+        },
+      ],
+    },
+    activityUpdatedAt: Date.now(),
+  });
+}
+
+function clearLocalSendErrors() {
+  const state = useStore.getState();
+  if (!state.transcript) return;
+  const messages = (state.transcript.messages || []).filter((message) => !message?._localSendError);
+  if (messages.length === (state.transcript.messages || []).length) return;
+  useStore.setState({
+    transcript: {
+      ...state.transcript,
+      messages,
+    },
+  });
 }
 
 function dropPendingMessage(messageId, { withError = false } = {}) {
@@ -365,6 +441,7 @@ function dropPendingMessage(messageId, { withError = false } = {}) {
     return;
   }
   const messages = (state.transcript.messages || []).filter((message) => message?.id !== messageId);
+  const pendingTranscriptMessages = (state.pendingTranscriptMessages || []).filter((message) => message?.id !== messageId);
   const finalMessages = withError
     ? [
         ...messages,
@@ -372,6 +449,7 @@ function dropPendingMessage(messageId, { withError = false } = {}) {
           id: `pending-error-${messageId}`,
           role: "system",
           blocks: [{ type: "text", content: "Previous send did not complete; please retry." }],
+          _localSendError: true,
         },
       ]
     : messages;
@@ -380,6 +458,7 @@ function dropPendingMessage(messageId, { withError = false } = {}) {
       ...state.transcript,
       messages: finalMessages,
     },
+    pendingTranscriptMessages,
     error: withError ? "Send failed; your draft has not been sent." : state.error,
   });
   if (withError) {
@@ -712,6 +791,12 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       : null;
     const selectedSession = restoredSession || preservedSession;
     const selectedPath = selectedSession ? selectedSession.path : null;
+    const keepCurrentStream = Boolean(
+      selectedSession
+      && preserveSelection
+      && previousState.selectedPath === selectedSession.path
+      && previousState.stream,
+    );
     useStore.setState({
       sessions,
       agents: data.agents || [],
@@ -721,14 +806,16 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       selectedWorkspace,
       selectedPath: selectedPath,
       selectedSession: selectedSession || null,
-      transcript: selectedSession && preservedSession ? previousState.transcript : null,
+      transcript: keepCurrentStream ? previousState.transcript : null,
       loading: false,
       loadingMessage: "",
       error: "",
     });
 
     if (selectedSession) {
-      await selectSession(selectedSession, { openDetail: false });
+      if (!keepCurrentStream) {
+        await selectSession(selectedSession, { openDetail: false });
+      }
     } else {
       const latest = pickLatestSession(sessions);
       if (latest) {
@@ -750,6 +837,7 @@ function switchWorkspace(nextWorkspace) {
     selectedPath: null,
     selectedSession: null,
     transcript: null,
+    pendingTranscriptMessages: [],
     loadingMessage: "Switching workspace...",
     error: "",
   });
@@ -764,6 +852,7 @@ async function selectSession(session, { openDetail = true } = {}) {
     selectedPath: session.path,
     selectedSession: session,
     transcript: null,
+    pendingTranscriptMessages: [],
     messageFilter: "all",
     live: false,
     activityUpdatedAt: Date.now(),
@@ -777,12 +866,20 @@ async function selectSession(session, { openDetail = true } = {}) {
   let seenFirstTranscript = false;
   useStore.setState({ stream });
   stream.addEventListener("transcript", (event) => {
-    const transcript = JSON.parse(event.data);
+    let transcript;
+    try {
+      transcript = JSON.parse(event.data);
+    } catch {
+      useStore.setState({ error: "Could not decode transcript update; keeping the current view.", loadingMessage: "" });
+      return;
+    }
     const firstTranscript = !seenFirstTranscript;
     seenFirstTranscript = true;
     const updatedAtMs = Date.parse(transcript.updatedAt || session.updatedAt || 0);
+    const merged = withPendingTranscriptMessages(transcript);
     useStore.setState({
-      transcript,
+      transcript: merged.transcript,
+      pendingTranscriptMessages: merged.pendingTranscriptMessages,
       live: true,
       activityUpdatedAt: firstTranscript && !Number.isNaN(updatedAtMs) ? updatedAtMs : Date.now(),
       loadingMessage: "",
@@ -791,7 +888,8 @@ async function selectSession(session, { openDetail = true } = {}) {
   stream.addEventListener("error", async () => {
     try {
       const transcript = await api(`/api/transcript?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`);
-      useStore.setState({ transcript, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
+      const merged = withPendingTranscriptMessages(transcript);
+      useStore.setState({ transcript: merged.transcript, pendingTranscriptMessages: merged.pendingTranscriptMessages, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
     } catch (error) {
       useStore.setState({ error: error.message, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
     }
@@ -1585,6 +1683,7 @@ function MessageViewport({ transcript, transcriptIndex, activity, agent, agentLa
                 <div className="message-meta">
                   {roleIcon(message.role, agent)}
                   <span className="message-sender">{roleLabel(message.role, agent, agentLabel)}</span>
+                  {message._pending && <span className="message-pending-label">Waiting for transcript</span>}
                 </div>
                 <span className="message-index">#{absoluteIndex}</span>
               </div>
@@ -1663,6 +1762,7 @@ function Composer({ session, compact = false }) {
   const [mode, setMode] = useState("new");
   const [targetAgent, setTargetAgent] = useState("codex");
   const [targetCwd, setTargetCwd] = useState("");
+  const submittingRef = useRef(false);
   const sendState = useStore((state) => state.sendState);
   const rootCwd = useStore((state) => state.cwd);
   const sessions = useStore((state) => state.sessions);
@@ -1703,7 +1803,14 @@ function Composer({ session, compact = false }) {
   async function submit(event) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || disabled) return;
+    if (
+      !message
+      || disabled
+      || submittingRef.current
+      || useStore.getState().sendState === "sending"
+    ) {
+      return;
+    }
     const payload = {
       agent: effectiveAgent,
       cwd: effectiveCwd,
@@ -1714,21 +1821,22 @@ function Composer({ session, compact = false }) {
       await copyText(sendCommand(payload), "Send command copied");
       return;
     }
+    submittingRef.current = true;
+    useStore.setState({ sendState: "sending", activityUpdatedAt: Date.now() });
     setDraft("");
     const pendingId = effectiveMode === "reply" && sessionId ? addPendingTranscriptMessage(payload.message) : null;
-    useStore.setState({ sendState: "sending" });
     (async () => {
       try {
-        await api("/api/send", {
+        const result = await api("/api/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (pendingId) {
-          dropPendingMessage(pendingId);
+        clearLocalSendErrors();
+        if (result.stdout && effectiveMode === "reply") {
+          appendLocalTranscriptMessage({ role: "assistant", content: result.stdout });
         }
-        useStore.getState().showToast(effectiveMode === "reply" ? "Message sent to session" : "New session prompt sent");
-        useStore.setState({ sendState: "idle" });
+        useStore.getState().showToast(effectiveMode === "reply" ? "Agent finished processing the prompt" : "New session prompt completed");
         void loadSessions({
           preserveSelection: true,
           silentLoading: true,
@@ -1741,6 +1849,7 @@ function Composer({ session, compact = false }) {
         }
         useStore.getState().showToast(error.message);
       } finally {
+        submittingRef.current = false;
         useStore.setState({ sendState: "idle" });
       }
     })().catch(() => {});

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 
 const supportedSendAgents = new Set(["claude", "codex", "qodercli"]);
+const maxCapturedOutputBytes = 512 * 1024;
 
 function requireText(value, name) {
   const text = String(value ?? "").trim();
@@ -23,6 +24,29 @@ function existingCwd(cwd, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function appendBounded(current, chunk, maxBytes = maxCapturedOutputBytes) {
+  const next = `${current}${chunk}`;
+  if (Buffer.byteLength(next, "utf8") <= maxBytes) {
+    return { text: next, truncated: false };
+  }
+  const buffer = Buffer.from(next, "utf8");
+  return {
+    text: buffer.subarray(buffer.length - maxBytes).toString("utf8"),
+    truncated: true,
+  };
+}
+
+function sendErrorMessage(commandPlan, { code, signal, stdout, stderr, timedOut, timeoutMs }) {
+  const detail = stderr.trim() || stdout.trim();
+  if (timedOut) {
+    return `${commandPlan.command} did not finish within ${Math.round(timeoutMs / 1000)}s${detail ? `: ${detail}` : ""}`;
+  }
+  if (signal) {
+    return `${commandPlan.command} exited after signal ${signal}${detail ? `: ${detail}` : ""}`;
+  }
+  return `${commandPlan.command} exited with ${code}${detail ? `: ${detail}` : ""}`;
 }
 
 export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallbackCwd = process.cwd() } = {}) {
@@ -69,22 +93,42 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
   const commandPlan = buildAgentSendCommand(input);
   return new Promise((resolve, reject) => {
     let settled = false;
+    let timedOut = false;
+    let stdout = "";
+    let stderr = "";
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
+    const startedAt = Date.now();
+    let hardKillTimer = null;
     const child = spawn(commandPlan.command, commandPlan.args, {
       cwd: commandPlan.cwd,
       env: process.env,
-      detached: true,
-      stdio: ["pipe", "ignore", "ignore"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const timer = setTimeout(() => {
       if (settled) {
         return;
       }
-      settled = true;
+      timedOut = true;
       child.kill("SIGTERM");
-      reject(new Error(`${commandPlan.command} did not start within ${Math.round(timeoutMs / 1000)}s`));
+      hardKillTimer = setTimeout(() => {
+        if (!settled) {
+          child.kill("SIGKILL");
+        }
+      }, 2500);
     }, timeoutMs);
 
+    child.stdout.on("data", (chunk) => {
+      const next = appendBounded(stdout, chunk);
+      stdout = next.text;
+      stdoutTruncated = stdoutTruncated || next.truncated;
+    });
+    child.stderr.on("data", (chunk) => {
+      const next = appendBounded(stderr, chunk);
+      stderr = next.text;
+      stderrTruncated = stderrTruncated || next.truncated;
+    });
     child.stdin.on("error", () => {
       // The child may exit quickly after accepting the prompt; the serve UI has
       // already handed the task off, so avoid surfacing an incidental pipe error.
@@ -93,22 +137,11 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
       if (settled) {
         return;
       }
-      settled = true;
-      clearTimeout(timer);
       if (commandPlan.stdin !== null) {
         child.stdin.end(commandPlan.stdin);
       } else {
         child.stdin.end();
       }
-      child.unref();
-      resolve({
-        ok: true,
-        command: commandPlan.command,
-        target: commandPlan.target,
-        cwd: commandPlan.cwd,
-        pid: child.pid,
-        status: "started",
-      });
     });
     child.on("error", (error) => {
       if (settled) {
@@ -116,7 +149,38 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
       }
       settled = true;
       clearTimeout(timer);
+      clearTimeout(hardKillTimer);
       reject(new Error(error.code === "ENOENT" ? `${commandPlan.command} command not found` : error.message));
+    });
+    child.on("close", (code, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(hardKillTimer);
+      const result = {
+        ok: code === 0 && !signal && !timedOut,
+        command: commandPlan.command,
+        target: commandPlan.target,
+        cwd: commandPlan.cwd,
+        pid: child.pid,
+        status: code === 0 && !signal && !timedOut ? "completed" : "failed",
+        code,
+        signal,
+        durationMs: Date.now() - startedAt,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        stdoutTruncated,
+        stderrTruncated,
+      };
+      if (result.ok) {
+        resolve(result);
+        return;
+      }
+      const error = new Error(sendErrorMessage(commandPlan, { code, signal, stdout, stderr, timedOut, timeoutMs }));
+      error.result = result;
+      reject(error);
     });
   });
 }
