@@ -44,7 +44,7 @@ export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallback
   if (normalizedAgent === "claude") {
     return {
       command: "claude",
-      args: [...(normalizedSessionId ? ["--resume", normalizedSessionId] : []), "--print", normalizedMessage],
+      args: [...(normalizedSessionId ? ["-r", normalizedSessionId] : []), "-p", normalizedMessage],
       cwd: workingDirectory,
       stdin: null,
       target,
@@ -63,7 +63,7 @@ export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallback
 
   return {
     command: "qodercli",
-    args: ["--cwd", workingDirectory, ...(normalizedSessionId ? ["--resume", normalizedSessionId] : []), "--print", normalizedMessage],
+    args: ["-w", workingDirectory, ...(normalizedSessionId ? ["-r", normalizedSessionId] : []), "-p", normalizedMessage],
     cwd: workingDirectory,
     stdin: null,
     target,

@@ -128,15 +128,29 @@ function resumeCommand(session) {
 function sendCommand({ agent, sessionId, cwd, message }) {
   const cd = cwd ? `cd ${shellQuote(cwd)} && ` : "";
   if (agent === "claude") {
-    return `${cd}claude ${sessionId ? `--resume ${shellQuote(sessionId)} ` : ""}--print ${shellQuote(message)}`;
+    return `${cd}claude ${sessionId ? `-r ${shellQuote(sessionId)} ` : ""}-p ${shellQuote(message)}`;
   }
   if (agent === "codex") {
     return `${cd}printf %s ${shellQuote(message)} | codex exec ${sessionId ? `resume ${shellQuote(sessionId)} ` : ""}-`;
   }
   if (agent === "qodercli") {
-    return `qodercli --cwd ${shellQuote(cwd || ".")} ${sessionId ? `--resume ${shellQuote(sessionId)} ` : ""}--print ${shellQuote(message)}`;
+    return `qodercli -w ${shellQuote(cwd || ".")} ${sessionId ? `-r ${shellQuote(sessionId)} ` : ""}-p ${shellQuote(message)}`;
   }
   return "";
+}
+
+function sendPrimitiveLabel(agent) {
+  if (agent === "claude") return "claude -p";
+  if (agent === "codex") return "codex exec -";
+  if (agent === "qodercli") return "qodercli -p";
+  return agent;
+}
+
+function compactDate(value) {
+  if (!value) return "unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 async function copyText(text, label = "Copied") {
@@ -554,6 +568,8 @@ function Composer({ session }) {
   const [targetCwd, setTargetCwd] = useState("");
   const sendState = useStore((state) => state.sendState);
   const rootCwd = useStore((state) => state.cwd);
+  const sessions = useStore((state) => state.sessions);
+  const selectedPath = useStore((state) => state.selectedPath);
   const canReply = Boolean(session && sendAgents.includes(session.agent));
   const effectiveMode = mode === "reply" && canReply ? "reply" : "new";
   const effectiveAgent = effectiveMode === "reply" ? session.agent : targetAgent;
@@ -573,6 +589,19 @@ function Composer({ session }) {
       setMode("new");
     }
   }, [session?.path, session?.agent, session?.cwd, rootCwd]);
+
+  function selectNewTarget(agent) {
+    setMode("new");
+    setTargetAgent(agent);
+    setTargetCwd(targetCwd.trim() || rootCwd || session?.cwd || "");
+  }
+
+  async function selectReplyTarget(nextSession) {
+    setMode("reply");
+    setTargetAgent(nextSession.agent);
+    setTargetCwd(nextSession.cwd || rootCwd || "");
+    await selectSession(nextSession, { openDetail: true });
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -623,28 +652,15 @@ function Composer({ session }) {
           </Tabs.List>
         </Tabs.Root>
       </div>
-      <div className="target-panel">
-        {effectiveMode === "reply" ? (
-          <div className="target-summary">
-            <AgentBadge agent={effectiveAgent} />
-            <span>Session {session?.sessionId || "unknown"}</span>
-          </div>
-        ) : (
-          <div className="agent-picker" role="group" aria-label="Choose agent for new prompt">
-            {sendAgents.map((agent) => (
-              <button
-                key={agent}
-                className={cls("agent-choice", targetAgent === agent && "active")}
-                type="button"
-                onClick={() => setTargetAgent(agent)}
-                style={{ "--agent-color": agentMeta[agent].color }}
-              >
-                <span />
-                {agentMeta[agent].label}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="target-panel board-target-panel">
+        <DispatchBoard
+          sessions={sessions}
+          selectedPath={selectedPath}
+          mode={effectiveMode}
+          targetAgent={targetAgent}
+          onNewTarget={selectNewTarget}
+          onReplyTarget={selectReplyTarget}
+        />
         <label className="cwd-field">
           <span>cwd</span>
           <input value={targetCwd} onChange={(event) => setTargetCwd(event.target.value)} placeholder={rootCwd || "/path/to/project"} />
@@ -675,6 +691,58 @@ function Composer({ session }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget, onReplyTarget }) {
+  const groupedSessions = useMemo(
+    () =>
+      sendAgents.map((agent) => ({
+        agent,
+        sessions: sessions
+          .filter((session) => session.agent === agent)
+          .sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0))
+          .slice(0, 2),
+      })),
+    [sessions],
+  );
+
+  return (
+    <div className="dispatch-board" aria-label="Agent dispatch board">
+      {groupedSessions.map(({ agent, sessions: agentSessions }) => {
+        const meta = agentMeta[agent];
+        return (
+          <section key={agent} className="dispatch-column" style={{ "--agent-color": meta.color }}>
+            <div className="dispatch-column-head">
+              <AgentBadge agent={agent} />
+              <code>{sendPrimitiveLabel(agent)}</code>
+            </div>
+            <button
+              className={cls("dispatch-card", "new", mode === "new" && targetAgent === agent && "active")}
+              type="button"
+              aria-label={`New ${meta.label} session`}
+              onClick={() => onNewTarget(agent)}
+            >
+              <strong>New session</strong>
+              <span>Start from cwd</span>
+            </button>
+            {agentSessions.map((session) => (
+              <button
+                key={`${session.agent}:${session.path}`}
+                className={cls("dispatch-card", selectedPath === session.path && mode === "reply" && "active")}
+                type="button"
+                aria-label={`Reply to ${meta.label} ${session.shortTitle || session.title || "session"}`}
+                onClick={() => onReplyTarget(session)}
+              >
+                <strong>{session.shortTitle || session.title || "(untitled)"}</strong>
+                <span>{session.cwd || ""}</span>
+                <small>{compactDate(session.updatedAt)}</small>
+              </button>
+            ))}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 

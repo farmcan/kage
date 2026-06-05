@@ -809,7 +809,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "claude",
-      args: ["--resume", "claude-session", "--print", "hello claude"],
+      args: ["-r", "claude-session", "-p", "hello claude"],
       cwd: __dirname,
       stdin: null,
       target: "session",
@@ -824,7 +824,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "claude",
-      args: ["--print", "new claude"],
+      args: ["-p", "new claude"],
       cwd: __dirname,
       stdin: null,
       target: "new",
@@ -871,7 +871,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "qodercli",
-      args: ["--cwd", __dirname, "--resume", "qoder-session", "--print", "hello qoder"],
+      args: ["-w", __dirname, "-r", "qoder-session", "-p", "hello qoder"],
       cwd: __dirname,
       stdin: null,
       target: "session",
@@ -886,7 +886,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "qodercli",
-      args: ["--cwd", __dirname, "--print", "new qoder"],
+      args: ["-w", __dirname, "-p", "new qoder"],
       cwd: __dirname,
       stdin: null,
       target: "new",
