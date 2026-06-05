@@ -43,10 +43,20 @@ The Pages site should be lighter than the README:
 - one terminal demo
 - one visual app screenshot or GIF once available
 - two CTAs: GitHub repo and releases
+- one "why star" section that explains the memory-layer advantage
 - current workflows, not historical implementation plans
 - a clear boundary that `kage serve` is local/LAN-first while hosted Remote Link is only a future optional direction
 
 Do not duplicate the entire README. The site should help someone decide whether to click GitHub.
+
+Maintain the homepage as the product changes:
+
+- When a feature ships, update the hero proof chips and the workflow section before adding roadmap copy.
+- When a release ships, update the DMG link, latest-version chip, project-status copy, and release CTA together.
+- When screenshots change, refresh the Pages hero or first proof section before touching lower-page details.
+- When remote access changes, keep the copy explicit about local/LAN-first behavior versus optional relay behavior.
+- When a capability is only planned, phrase it as a direction in Project status, not as a shipped workflow.
+- After each homepage edit, open the page locally, capture a desktop or narrow-window screenshot, and verify the app preview is not clipped.
 
 ## Releases
 
