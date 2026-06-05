@@ -2088,10 +2088,29 @@ private struct DesktopSessionDetailView: View {
       Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 18, verticalSpacing: 8) {
         metadataRow("Session", session.sessionId)
         metadataRow("Updated", formattedUpdatedAt)
+        if let lineage = session.lineage {
+          metadataRow(lineageKindLabel(lineage), lineageParentLabel(lineage))
+          if let parentPath = lineage.parentSessionPath, !parentPath.isEmpty {
+            metadataRow("Parent file", parentPath)
+          }
+        }
         metadataRow("File", session.path)
       }
     }
     .textSelection(.enabled)
+  }
+
+  private func lineageKindLabel(_ lineage: SessionLineage) -> String {
+    lineage.forkType == "bridge" ? "Bridged from" : "Forked from"
+  }
+
+  private func lineageParentLabel(_ lineage: SessionLineage) -> String {
+    let agent = agentLabel(lineage.parentAgent)
+    let sessionId = lineage.parentSessionId.flatMap { $0.isEmpty ? nil : $0 } ?? "unknown session"
+    if let title = lineage.parentTitle, !title.isEmpty {
+      return "\(agent) \(title) (\(sessionId))"
+    }
+    return "\(agent) \(sessionId)"
   }
 
   private var recentMessagesSection: some View {

@@ -1378,6 +1378,16 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(forkPayload.targetAgent, "claude");
   assert.match(forkPayload.resumeCommand, new RegExp(`^cd ${currentDir} && claude --resume [0-9a-f-]{36}$`, "u"));
   assert.match(forkPayload.outputPath, /\.claude\/projects\/.*\/[0-9a-f-]{36}\.jsonl$/u);
+
+  const refreshedSessions = await spawnCli(["sessions", "--agent", "claude", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome },
+  });
+  const refreshedPayload = JSON.parse(refreshedSessions.stdout);
+  const forkedSession = refreshedPayload.sessions.find((session) => session.path === forkPayload.outputPath);
+  assert.equal(forkedSession.lineage.forkType, "fork");
+  assert.equal(forkedSession.lineage.parentAgent, "claude");
+  assert.equal(forkedSession.lineage.parentSessionId, "claude-action");
 });
 
 test("cli actions expose QoderWork as replay and bridge source only", async () => {
@@ -1527,6 +1537,15 @@ test("cli supports c2c as a Claude fork export", async () => {
   assert.match(payload.sessionId, /^[0-9a-f-]{36}$/);
   assert.notEqual(payload.sessionId, "claude-session");
   assert.equal(payload.resumeCommand, `cd /workspace/claude-demo && claude --resume ${payload.sessionId}`);
+  assert.equal(payload.lineagePath, `${payload.outputPath}.kage-lineage.json`);
+  const lineage = JSON.parse(await fs.readFile(payload.lineagePath, "utf8"));
+  assert.equal(lineage.forkType, "fork");
+  assert.equal(lineage.parentAgent, "claude");
+  assert.equal(lineage.parentSessionId, "claude-session");
+  assert.equal(lineage.parentSessionPath, sessionPath);
+  assert.equal(lineage.childAgent, "claude");
+  assert.equal(lineage.childSessionId, payload.sessionId);
+  assert.equal(lineage.childSessionPath, payload.outputPath);
   assert.deepEqual(payload.hints, [
     "Claude Code supports native forks now: cd /workspace/claude-demo && claude --resume claude-session --fork-session",
     "Inside Claude Code, use /branch; /fork is an alias.",
@@ -1983,6 +2002,11 @@ test("cli installs default Codex exports into the real Codex session directory",
     payload.outputPath,
     path.join(fakeHome, ".codex", "sessions", "2026", "03", "20", payload.fileName),
   );
+  assert.equal(payload.lineagePath, `${payload.outputPath}.kage-lineage.json`);
+  const lineage = JSON.parse(await fs.readFile(payload.lineagePath, "utf8"));
+  assert.equal(lineage.forkType, "bridge");
+  assert.equal(lineage.parentAgent, "claude");
+  assert.equal(lineage.childAgent, "codex");
 });
 
 test("cli overwrites default Codex exports for the same source session", async () => {
@@ -2000,7 +2024,7 @@ test("cli overwrites default Codex exports for the same source session", async (
   const secondPayload = JSON.parse(second.stdout);
   assert.equal(firstPayload.outputPath, secondPayload.outputPath);
   assert.equal(firstPayload.fileName, "rollout-claude-session.jsonl");
-  assert.equal((await fs.readdir(path.dirname(firstPayload.outputPath))).length, 1);
+  assert.equal((await fs.readdir(path.dirname(firstPayload.outputPath))).length, 2);
 });
 
 test("cli installs default Claude exports into the real Claude session directory", async () => {
@@ -2063,6 +2087,7 @@ test("cli can emit machine-readable json for qodercli session exports", async ()
   assert.equal(payload.mode, "qoder-session");
   assert.equal(payload.outputPath, exportPath);
   assert.match(payload.sidecarPath, /-session\.json$/);
+  assert.equal(payload.lineagePath, `${exportPath}.kage-lineage.json`);
 });
 
 test("cli auto-creates missing output directories for exports", async () => {
@@ -2082,6 +2107,7 @@ test("cli auto-creates missing output directories for exports", async () => {
   assert.equal(result.code, 0);
   assert.equal(path.dirname(payload.outputPath), outDir);
   assert.equal(await fs.readFile(payload.outputPath, "utf8").then(Boolean), true);
+  assert.equal(await fs.readFile(payload.lineagePath, "utf8").then(Boolean), true);
 });
 
 test("cli can resolve a session by session id", async () => {

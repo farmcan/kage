@@ -22,6 +22,40 @@ public struct SessionsResponse: Decodable, Sendable {
   }
 }
 
+public struct SessionLineage: Decodable, Hashable, Sendable {
+  public let forkType: String?
+  public let forkTimestamp: String?
+  public let parentAgent: String?
+  public let parentSessionId: String?
+  public let parentSessionPath: String?
+  public let parentTitle: String?
+  public let childAgent: String?
+  public let childSessionId: String?
+  public let childSessionPath: String?
+
+  public init(
+    forkType: String?,
+    forkTimestamp: String?,
+    parentAgent: String?,
+    parentSessionId: String?,
+    parentSessionPath: String?,
+    parentTitle: String?,
+    childAgent: String?,
+    childSessionId: String?,
+    childSessionPath: String?
+  ) {
+    self.forkType = forkType
+    self.forkTimestamp = forkTimestamp
+    self.parentAgent = parentAgent
+    self.parentSessionId = parentSessionId
+    self.parentSessionPath = parentSessionPath
+    self.parentTitle = parentTitle
+    self.childAgent = childAgent
+    self.childSessionId = childSessionId
+    self.childSessionPath = childSessionPath
+  }
+}
+
 public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
   public let agent: String
   public let agentLabel: String
@@ -32,6 +66,7 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
   public let cwd: String
   public let path: String
   public let recentUserMessages: [String]
+  public let lineage: SessionLineage?
 
   public init(
     agent: String,
@@ -42,7 +77,8 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     updatedAt: String?,
     cwd: String,
     path: String,
-    recentUserMessages: [String]
+    recentUserMessages: [String],
+    lineage: SessionLineage? = nil
   ) {
     self.agent = agent
     self.agentLabel = agentLabel
@@ -53,6 +89,7 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     self.cwd = cwd
     self.path = path
     self.recentUserMessages = recentUserMessages
+    self.lineage = lineage
   }
 
   public var displayTitle: String {

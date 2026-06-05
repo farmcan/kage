@@ -11,6 +11,7 @@ import { findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
 import { sameOrSubpath, samePath, walk } from "./core/files.js";
 import { resolveInstallPlan } from "./core/install.js";
+import { readLineageMetadata } from "./core/lineage.js";
 import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./core/routing.js";
 import { searchSessions } from "./core/search.js";
 import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
@@ -1148,16 +1149,18 @@ async function buildSessionCandidates(args, options = {}) {
         continue;
       }
 
+      const summaryPath = summary.sessionPath ?? sessionPath;
       candidates.push({
         agent: resolvedAgent,
         agentLabel: formatSessionLabel(resolvedAgent),
-        sessionPath: summary.sessionPath ?? sessionPath,
+        sessionPath: summaryPath,
         sessionId: summary.sessionId,
         cwd: summary.cwd,
         updatedAt: summary.updatedAt,
         title: summary.title,
         shortTitle: summary.shortTitle,
         recentUserMessages: summary.recentUserMessages ?? [],
+        lineage: await readLineageMetadata(summaryPath),
       });
 
       if (args.limit && candidates.length >= args.limit) {
@@ -1184,6 +1187,7 @@ function toSessionPayload(candidate) {
     cwd: candidate.cwd,
     path: candidate.sessionPath,
     recentUserMessages: candidate.recentUserMessages,
+    lineage: candidate.lineage ?? null,
   };
 }
 
@@ -1523,6 +1527,7 @@ async function runAction(args) {
     const resumeCommand = delegatedResult?.resumeCommand ?? (action.type === "resume" ? action.command : null);
     const outputPath = delegatedResult?.outputPath ?? null;
     const sidecarPath = delegatedResult?.sidecarPath ?? null;
+    const lineagePath = delegatedResult?.lineagePath ?? null;
     const paths = delegatedResult?.paths ?? [];
     process.stdout.write(
       `${JSON.stringify(
@@ -1540,6 +1545,7 @@ async function runAction(args) {
           ...(resumeCommand ? { resumeCommand } : {}),
           ...(outputPath ? { outputPath } : {}),
           ...(sidecarPath ? { sidecarPath } : {}),
+          ...(lineagePath ? { lineagePath } : {}),
           paths,
           ...(delegatedResult ? { result: delegatedResult } : {}),
           stdout: output.stdout,
@@ -1720,6 +1726,7 @@ async function main() {
 
   const mainFile = installPlan.files.find((file) => file.key === "main") ?? installPlan.files[0];
   const sidecarFile = installPlan.files.find((file) => file.key === "sidecar");
+  const lineageFile = installPlan.files.find((file) => file.key === "lineage");
   emitResult(
     {
       mode: exported.mode,
@@ -1730,6 +1737,7 @@ async function main() {
       ...(mainFile ? { fileName: mainFile.fileName } : {}),
       ...(mainFile ? { outputPath: mainFile.path } : {}),
       ...(sidecarFile ? { sidecarPath: sidecarFile.path } : {}),
+      ...(lineageFile ? { lineagePath: lineageFile.path } : {}),
       ...(installPlan.resumeCommand ? { resumeCommand: installPlan.resumeCommand } : {}),
       ...(hints.length > 0 ? { hints } : {}),
       paths: installPlan.files.map((file) => file.path),

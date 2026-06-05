@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { getDefaultRoot, normalizeAgent } from "./agents.js";
+import { buildLineageFile } from "./lineage.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./resume-commands.js";
 
 function datePartsFromTimestamp(timestamp) {
@@ -46,54 +47,66 @@ function replaceExtension(filePath, pattern, replacement, fallbackSuffix) {
   return `${filePath}${fallbackSuffix}`;
 }
 
+function withLineage(plan, exported) {
+  const mainFile = plan.files.find((file) => file.key === "main") ?? plan.files[0];
+  const lineageFile = buildLineageFile({ exported, outputPath: mainFile?.path });
+  if (!lineageFile) {
+    return plan;
+  }
+  return {
+    ...plan,
+    files: [...plan.files, lineageFile],
+  };
+}
+
 export function resolveInstallPlan({ args, exported, targetAgent }) {
   if (args.out) {
     if (exported.mode === "qoder-session") {
-      return {
+      return withLineage({
         files: [
           withPath(exported.files[0], args.out),
           withPath(exported.files[1], replaceExtension(args.out, /\.jsonl$/u, "-session.json", "-session.json")),
         ],
         resumeCommand: null,
-      };
+      }, exported);
     }
 
-    return { files: [withPath(exported.files[0], args.out)], resumeCommand: null };
+    return withLineage({ files: [withPath(exported.files[0], args.out)], resumeCommand: null }, exported);
   }
 
   if (args.outputDir) {
     const files = exported.files.map((file) => withPath(file, path.join(args.outputDir, file.fileName)));
-    return {
+    return withLineage({
       files,
       resumeCommand: null,
-    };
+    }, exported);
   }
 
   if (exported.mode === "codex-session" && normalizeAgent(targetAgent) === "codex") {
     const outputPath = resolveCodexInstallPath(exported.files[0].fileName, exported.timestamp);
-    return {
+    return withLineage({
       files: [withPath(exported.files[0], outputPath)],
       resumeCommand: buildCodexResumeCommand(exported.sessionId),
-    };
+    }, exported);
   }
 
   if (exported.mode === "claude-session" && normalizeAgent(targetAgent) === "claude") {
     const outputPath = resolveClaudeInstallPath(exported.projectKey, exported.files[0].fileName);
-    return {
+    return withLineage({
       files: [withPath(exported.files[0], outputPath)],
       resumeCommand: buildClaudeResumeCommand(exported.sessionId, exported.session?.cwd),
-    };
+    }, exported);
   }
 
   if (exported.mode === "qoder-session" && normalizeAgent(targetAgent) === "qodercli") {
-    return {
+    return withLineage({
       files: exported.files.map((file) => withPath(file, resolveQoderInstallPath(exported.projectKey, file.fileName))),
       resumeCommand: buildQoderResumeCommand(exported.sessionId, exported.workingDir),
-    };
+    }, exported);
   }
 
-  return {
+  return withLineage({
     files: exported.files.map((file) => withPath(file, resolveDefaultTmpPath(file.fileName))),
     resumeCommand: null,
-  };
+  }, exported);
 }
