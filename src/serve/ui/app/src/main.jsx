@@ -280,6 +280,7 @@ function App() {
         <main className={cls("workspace", detailOpen && "detail-open")}>
           <Sidebar />
           <Conversation />
+          <DispatchPanel />
         </main>
         <Toast />
       </div>
@@ -300,8 +301,8 @@ function TopBar() {
           <Sparkles size={17} />
         </div>
         <div className="brand-copy">
-          <h1>KAGE Sessions</h1>
-          <span>{sessions.length ? `${sessions.length} sessions in ${cwd || "current project"}` : "Local-first agent memory"}</span>
+          <h1>KAGE Dispatch</h1>
+          <span>{sessions.length ? `${sessions.length} sessions routed from ${cwd || "current project"}` : "Local agent command center"}</span>
         </div>
       </div>
       <div className="top-actions">
@@ -461,8 +462,52 @@ function Conversation() {
       )}
 
       {error ? <div className="empty-state error">{error}</div> : <MessageViewport transcript={transcript} />}
-      <Composer session={selectedSession} />
+      {selectedSession && (
+        <div className="conversation-composer">
+          <Composer session={selectedSession} compact />
+        </div>
+      )}
     </section>
+  );
+}
+
+function DispatchPanel() {
+  const selectedSession = useStore((state) => state.selectedSession);
+  const sessions = useStore((state) => state.sessions);
+  const cwd = useStore((state) => state.cwd);
+  const sendableSessions = sessions.filter((session) => sendAgents.includes(session.agent)).length;
+  const detectedAgents = new Set(sessions.map((session) => session.agent).filter((agent) => sendAgents.includes(agent))).size;
+
+  return (
+    <aside className="dispatch-panel">
+      <div className="dispatch-console-head">
+        <div className="panel-kicker">
+          <Terminal size={14} />
+          Dispatch Console
+        </div>
+        <strong>Assign prompts to local agents</strong>
+        <span>{config.sendEnabled ? "Direct send is enabled for this local runtime." : "Copy mode is active until serve starts with --allow-send."}</span>
+      </div>
+      <div className="dispatch-metrics" aria-label="Dispatch runtime summary">
+        <div>
+          <span>Runtime</span>
+          <strong>Local</strong>
+        </div>
+        <div>
+          <span>Agents</span>
+          <strong>{detectedAgents}/3</strong>
+        </div>
+        <div>
+          <span>Targets</span>
+          <strong>{sendableSessions}</strong>
+        </div>
+      </div>
+      <div className="runtime-path">
+        <span>workspace</span>
+        <code>{cwd || "current project"}</code>
+      </div>
+      <Composer session={selectedSession} />
+    </aside>
   );
 }
 
@@ -561,7 +606,7 @@ function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false 
   );
 }
 
-function Composer({ session }) {
+function Composer({ session, compact = false }) {
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("new");
   const [targetAgent, setTargetAgent] = useState("codex");
@@ -635,7 +680,7 @@ function Composer({ session }) {
   }
 
   return (
-    <form className="composer" onSubmit={submit}>
+    <form className={cls("composer", compact && "compact-composer")} onSubmit={submit}>
       <div className="composer-head">
         <div>
           <strong>Send a prompt</strong>
@@ -652,37 +697,41 @@ function Composer({ session }) {
           </Tabs.List>
         </Tabs.Root>
       </div>
-      <div className="target-panel board-target-panel">
-        <DispatchBoard
-          sessions={sessions}
-          selectedPath={selectedPath}
-          mode={effectiveMode}
-          targetAgent={targetAgent}
-          onNewTarget={selectNewTarget}
-          onReplyTarget={selectReplyTarget}
-        />
-        <label className="cwd-field">
-          <span>cwd</span>
-          <input value={targetCwd} onChange={(event) => setTargetCwd(event.target.value)} placeholder={rootCwd || "/path/to/project"} />
-        </label>
-      </div>
-      <div className="composer-copy">
-        {config.sendEnabled ? (
-          <span>
-            <Check size={14} />
-            Direct send can reply or start a new local CLI session
-          </span>
-        ) : (
-          <span>
-            <Lock size={14} />
-            Restart with <code>--allow-send</code> for direct send
-          </span>
-        )}
-        <button type="button" onClick={() => copyText(resumeCommand(session), "Resume command copied")} disabled={!session}>
-          <Copy size={15} />
-          Copy resume
-        </button>
-      </div>
+      {!compact && (
+        <>
+          <div className="target-panel board-target-panel">
+            <DispatchBoard
+              sessions={sessions}
+              selectedPath={selectedPath}
+              mode={effectiveMode}
+              targetAgent={targetAgent}
+              onNewTarget={selectNewTarget}
+              onReplyTarget={selectReplyTarget}
+            />
+            <label className="cwd-field">
+              <span>cwd</span>
+              <input value={targetCwd} onChange={(event) => setTargetCwd(event.target.value)} placeholder={rootCwd || "/path/to/project"} />
+            </label>
+          </div>
+          <div className="composer-copy">
+            {config.sendEnabled ? (
+              <span>
+                <Check size={14} />
+                Direct send can reply or start a new local CLI session
+              </span>
+            ) : (
+              <span>
+                <Lock size={14} />
+                Restart with <code>--allow-send</code> for direct send
+              </span>
+            )}
+            <button type="button" onClick={() => copyText(resumeCommand(session), "Resume command copied")} disabled={!session}>
+              <Copy size={15} />
+              Copy resume
+            </button>
+          </div>
+        </>
+      )}
       <div className="composer-row">
         <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write any prompt for the selected target" rows={2} />
         <button className="send-button" type="submit" disabled={!draft.trim() || disabled}>
@@ -702,7 +751,7 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
         sessions: sessions
           .filter((session) => session.agent === agent)
           .sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0))
-          .slice(0, 2),
+          .slice(0, 1),
       })),
     [sessions],
   );

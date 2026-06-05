@@ -47,10 +47,7 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 22% -12%, color-mix(in srgb, var(--codex) 18%, transparent), transparent 32rem),
-    radial-gradient(circle at 94% 8%, color-mix(in srgb, var(--qoder) 16%, transparent), transparent 28rem),
-    linear-gradient(140deg, var(--bg), var(--bg-2));
+  background: linear-gradient(180deg, var(--bg), var(--bg-2));
   color: var(--text);
   font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -81,7 +78,7 @@ button {
   justify-content: space-between;
   gap: 14px;
   padding: max(12px, env(safe-area-inset-top)) 18px 12px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
   backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--line);
 }
@@ -93,7 +90,8 @@ button {
 .message-role,
 .disclosure-trigger span,
 .status-pill,
-.live-pill {
+.live-pill,
+.panel-kicker {
   display: flex;
   align-items: center;
 }
@@ -218,18 +216,19 @@ button {
 }
 
 .workspace {
-  width: min(1320px, 100%);
+  width: min(1600px, 100%);
   height: calc(100vh - 66px);
   margin: 0 auto;
   min-height: 0;
-  padding: 16px;
+  padding: 12px;
   display: grid;
-  grid-template-columns: minmax(310px, 410px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(350px, 430px);
+  gap: 12px;
 }
 
 .sidebar,
-.conversation-panel {
+.conversation-panel,
+.dispatch-panel {
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -241,7 +240,8 @@ button {
 }
 
 .sidebar,
-.conversation-panel {
+.conversation-panel,
+.dispatch-panel {
   display: grid;
 }
 
@@ -369,7 +369,89 @@ button {
 }
 
 .conversation-panel {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.conversation-composer {
+  display: none;
+  min-width: 0;
+}
+
+.dispatch-panel {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+.dispatch-console-head {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.dispatch-console-head strong {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.dispatch-console-head span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.panel-kicker {
+  gap: 7px;
+  color: var(--codex);
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.dispatch-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dispatch-metrics div,
+.runtime-path {
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--panel-3);
+}
+
+.dispatch-metrics div {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.dispatch-metrics span,
+.runtime-path span {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.dispatch-metrics strong {
+  font-size: 14px;
+}
+
+.runtime-path {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+}
+
+.runtime-path code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .conversation-head {
@@ -541,17 +623,16 @@ button {
 
 .composer {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel-2) 72%, transparent);
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  background: transparent;
 }
 
 .composer-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  gap: 6px;
 }
 
 .composer-head > div:first-child {
@@ -580,7 +661,8 @@ button {
 
 .send-mode-tabs,
 .agent-picker {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 6px;
 }
@@ -595,7 +677,8 @@ button {
 }
 
 .send-mode-tab {
-  min-width: 72px;
+  min-width: 0;
+  min-height: 34px;
 }
 
 .send-mode-tab[data-state="active"] {
@@ -606,8 +689,7 @@ button {
 
 .target-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -683,7 +765,9 @@ button {
 }
 
 .composer-copy {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
   font-size: 12px;
 }
@@ -712,26 +796,25 @@ button {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+  overflow: visible;
 }
 
 .dispatch-column {
   min-width: 0;
   display: grid;
-  gap: 7px;
+  gap: 5px;
   align-content: start;
   border: 1px solid color-mix(in srgb, var(--agent-color) 28%, var(--line));
   border-radius: var(--radius);
-  padding: 8px;
-  background: color-mix(in srgb, var(--agent-color) 8%, var(--panel-3));
+  padding: 5px;
+  background: color-mix(in srgb, var(--agent-color) 5%, var(--panel-3));
 }
 
 .dispatch-column-head {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  gap: 3px;
 }
 
 .dispatch-column-head code {
@@ -740,19 +823,19 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .dispatch-card {
   width: 100%;
-  min-height: 54px;
+  min-height: 38px;
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px 8px !important;
   align-items: center;
   justify-items: start;
   border-color: color-mix(in srgb, var(--agent-color) 20%, var(--line));
-  padding: 8px !important;
+  padding: 5px !important;
   color: var(--text);
   background: color-mix(in srgb, var(--panel) 84%, transparent);
   text-align: left;
@@ -780,7 +863,7 @@ button {
 .dispatch-card strong {
   grid-column: 1;
   grid-row: 1;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .dispatch-card span,
@@ -801,14 +884,18 @@ button {
 }
 
 .composer-row {
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
 }
 
 .composer textarea {
   min-width: 0;
   width: 100%;
-  min-height: 52px;
-  max-height: 160px;
+  height: 50px;
+  min-height: 44px;
+  max-height: 180px;
   resize: vertical;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -824,7 +911,8 @@ button {
 }
 
 .send-button {
-  min-width: 98px;
+  min-width: 104px;
+  min-height: 44px !important;
   border-color: transparent !important;
   color: white;
   background: linear-gradient(135deg, var(--qoder), color-mix(in srgb, var(--codex) 58%, var(--qoder))) !important;
@@ -908,16 +996,56 @@ textarea:disabled {
   }
 
   .workspace {
+    height: auto;
+    min-height: calc(100vh - 82px);
     padding: 10px;
     grid-template-columns: 1fr;
   }
 
   .sidebar,
-  .conversation-panel {
+  .conversation-panel,
+  .dispatch-panel {
     height: calc(100vh - 82px);
   }
 
-  .workspace.detail-open .sidebar {
+  .dispatch-panel {
+    order: 1;
+  }
+
+  .sidebar {
+    order: 2;
+  }
+
+  .conversation-panel {
+    order: 3;
+  }
+
+  .workspace.detail-open .conversation-panel {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .workspace.detail-open .conversation-composer {
+    display: block;
+    border-top: 1px solid var(--line);
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel-2) 82%, transparent);
+  }
+
+  .compact-composer {
+    overflow: visible;
+  }
+
+  .compact-composer .composer-head {
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 172px);
+    align-items: center;
+  }
+
+  .compact-composer .composer-head span {
+    display: none;
+  }
+
+  .workspace.detail-open .sidebar,
+  .workspace.detail-open .dispatch-panel {
     display: none;
   }
 
@@ -944,8 +1072,6 @@ textarea:disabled {
     width: calc(100% - 20px);
   }
 
-  .composer-head,
-  .target-panel,
   .composer-row,
   .composer-copy {
     display: grid;
@@ -964,7 +1090,7 @@ textarea:disabled {
 
   .dispatch-board {
     grid-template-columns: 1fr;
-    max-height: 240px;
+    max-height: 220px;
     overflow: auto;
   }
 
