@@ -38,7 +38,7 @@ const config = {
 };
 const query = new URLSearchParams(window.location.search);
 const isMockMobile = query.has("mobile") || query.has("mock-mobile") || query.get("v") === "mobile";
-const THEME_STORAGE_KEY = "kageServeTheme";
+const THEME_STORAGE_KEY = "kageServeTheme.v2";
 const PASSWORD_STORAGE_KEY = "kageServePassword";
 const DEFAULT_THEME = "light";
 
@@ -103,6 +103,23 @@ const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 const workspaceQueryParams = ["workspace", "cwd"];
 const sessionQueryParams = ["session", "path"];
 const ALL_WORKSPACES_QUERY = "1";
+const ACTIVITY_IDLE_AFTER_MS = 7000;
+const ACTIVITY_VERB_INTERVAL_MS = 3200;
+const SPINNER_VERBS = [
+  "Thinking",
+  "Pondering",
+  "Considering",
+  "Deliberating",
+  "Contemplating",
+  "Crafting",
+  "Composing",
+  "Generating",
+  "Processing",
+  "Working",
+  "Mulling",
+  "Forming",
+  "Architecting",
+];
 
 function initialWorkspaceFromQuery() {
   if (query.get("all") === ALL_WORKSPACES_QUERY) {
@@ -184,7 +201,9 @@ const useStore = create((set, get) => ({
   transcript: null,
   messageFilter: "all",
   live: false,
+  activityUpdatedAt: 0,
   loading: false,
+  loadingMessage: "",
   stream: null,
   detailOpen: false,
   toast: "",
@@ -295,6 +314,7 @@ function sessionApiUrl(workspace) {
 
 async function loadProjects() {
   try {
+    useStore.setState({ loadingMessage: "Scanning local agent roots..." });
     const data = await api("/api/projects");
     const projects = Array.isArray(data.workspaces) ? data.workspaces.map(normalizeWorkspace).filter(Boolean) : [];
     useStore.setState({
@@ -334,6 +354,7 @@ function addPendingTranscriptMessage(message) {
       ...state.transcript,
       messages: [...(state.transcript.messages || []), pendingMessage],
     },
+    activityUpdatedAt: Date.now(),
   });
   return pendingMessage.id;
 }
@@ -453,6 +474,175 @@ function compactDate(value) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function elapsedLabel(startedAt, now = Date.now()) {
+  if (!startedAt) return "";
+  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  if (seconds < 1) return "now";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 10) return `${minutes}m ${remainingSeconds}s`;
+  return `${minutes}m`;
+}
+
+function toolInputPreview(input) {
+  if (input == null) return "";
+  if (typeof input === "string") return input;
+  if (typeof input === "object") {
+    const command = input.command || input.cmd || input.pattern || input.path || input.file_path;
+    if (command) return String(command);
+  }
+  try {
+    return JSON.stringify(input);
+  } catch {
+    return "";
+  }
+}
+
+function latestMessageBlock(messages = []) {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    const blocks = message?.blocks || [];
+    for (let blockIndex = blocks.length - 1; blockIndex >= 0; blockIndex -= 1) {
+      const block = blocks[blockIndex];
+      if (block) {
+        return { message, block };
+      }
+    }
+  }
+  return null;
+}
+
+function deriveConversationActivity({ selectedSession, transcript, live, sendState, error, activityUpdatedAt, now, verb }) {
+  if (!selectedSession) {
+    return {
+      tone: "idle",
+      label: "Select a session",
+      detail: "Pick a transcript to inspect local agent activity.",
+      active: false,
+    };
+  }
+  if (error) {
+    return {
+      tone: "error",
+      label: "Transcript stream needs attention",
+      detail: error,
+      active: false,
+    };
+  }
+  if (!transcript) {
+    return {
+      tone: "active",
+      label: "Connecting to transcript stream...",
+      detail: `Reading ${conversationAgentLabel(selectedSession.agent, selectedSession.agentLabel)} session file`,
+      active: true,
+      startedAt: activityUpdatedAt || now,
+    };
+  }
+  if (sendState === "sending") {
+    return {
+      tone: "active",
+      label: "Starting agent command...",
+      detail: "Handing your prompt to the local CLI in the background.",
+      active: true,
+      startedAt: activityUpdatedAt || now,
+    };
+  }
+
+  const messages = transcript.messages || [];
+  const latest = latestMessageBlock(messages);
+  const recent = live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS;
+  const block = latest?.block;
+  const role = latest?.message?.role;
+
+  if (recent && latest?.message?._pending) {
+    return {
+      tone: "active",
+      label: "Sending prompt...",
+      detail: "Waiting for the agent transcript to acknowledge the message.",
+      active: true,
+      startedAt: activityUpdatedAt,
+    };
+  }
+  if (recent && block?.type === "tool_use") {
+    const preview = toolInputPreview(block.input);
+    return {
+      tone: "tool",
+      label: `Running: ${block.name || "tool"}...`,
+      detail: preview ? preview.slice(0, 140) : "Tool call started from the latest transcript update.",
+      active: true,
+      startedAt: activityUpdatedAt,
+    };
+  }
+  if (recent && block?.type === "tool_result") {
+    return {
+      tone: "tool",
+      label: "Reviewing tool result...",
+      detail: "The agent received command output and is deciding the next step.",
+      active: true,
+      startedAt: activityUpdatedAt,
+    };
+  }
+  if (recent && block?.type === "thinking") {
+    return {
+      tone: "active",
+      label: `${verb}...`,
+      detail: "Reasoning block updated in the transcript.",
+      active: true,
+      startedAt: activityUpdatedAt,
+    };
+  }
+  if (recent && block?.type === "text" && role === "assistant") {
+    return {
+      tone: "active",
+      label: "Composing response...",
+      detail: "New assistant text arrived from the session file.",
+      active: true,
+      startedAt: activityUpdatedAt,
+    };
+  }
+  if (!live) {
+    return {
+      tone: "offline",
+      label: "Stream offline",
+      detail: "Showing the latest transcript snapshot from disk.",
+      active: false,
+    };
+  }
+  return {
+    tone: "idle",
+    label: "Waiting for input",
+    detail: messages.length ? `${messages.length} transcript messages loaded.` : "No transcript messages yet.",
+    active: false,
+    startedAt: activityUpdatedAt,
+  };
+}
+
+function useIntervalNow(enabled, intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!enabled) {
+      setNow(Date.now());
+      return undefined;
+    }
+    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [enabled, intervalMs]);
+  return now;
+}
+
+function useRotatingVerb(enabled) {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const timer = window.setInterval(() => {
+      setIndex((current) => current + 1);
+    }, ACTIVITY_VERB_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+  return SPINNER_VERBS[index % SPINNER_VERBS.length];
+}
+
 async function copyText(text, label = "Copied") {
   if (!text) return;
   try {
@@ -497,11 +687,16 @@ function lineageLabel(session) {
 
 async function loadSessions({ preserveSelection = false, silentLoading = false, workspaceOverride } = {}) {
   const previousState = useStore.getState();
+  const requestWorkspace = normalizeWorkspace(workspaceOverride || previousState.selectedWorkspace);
+  const scopeLabel = isAllWorkspaces(requestWorkspace)
+    ? "all local workspaces"
+    : requestWorkspace
+      ? groupLabelForWorkspace(requestWorkspace)
+      : "current workspace";
   if (!silentLoading) {
-    useStore.setState({ loading: true, error: "" });
+    useStore.setState({ loading: true, loadingMessage: `Scanning sessions in ${scopeLabel}...`, error: "" });
   }
   try {
-    const requestWorkspace = normalizeWorkspace(workspaceOverride || previousState.selectedWorkspace);
     const data = await api(sessionApiUrl(requestWorkspace));
     const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
     const sessions = rawSessions
@@ -528,6 +723,7 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       selectedSession: selectedSession || null,
       transcript: selectedSession && preservedSession ? previousState.transcript : null,
       loading: false,
+      loadingMessage: "",
       error: "",
     });
 
@@ -540,7 +736,7 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       }
     }
   } catch (error) {
-    useStore.setState({ loading: false, error: error.message });
+    useStore.setState({ loading: false, loadingMessage: "", error: error.message });
   }
 }
 
@@ -554,6 +750,7 @@ function switchWorkspace(nextWorkspace) {
     selectedPath: null,
     selectedSession: null,
     transcript: null,
+    loadingMessage: "Switching workspace...",
     error: "",
   });
   return loadSessions({ preserveSelection: false });
@@ -569,22 +766,34 @@ async function selectSession(session, { openDetail = true } = {}) {
     transcript: null,
     messageFilter: "all",
     live: false,
+    activityUpdatedAt: Date.now(),
+    loadingMessage: `Connecting to ${session.agentLabel || session.agent} transcript...`,
     detailOpen: openDetail,
     error: "",
   });
 
   const streamPath = `/api/stream?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`;
   const stream = new EventSource(authUrl(streamPath));
+  let seenFirstTranscript = false;
   useStore.setState({ stream });
   stream.addEventListener("transcript", (event) => {
-    useStore.setState({ transcript: JSON.parse(event.data), live: true });
+    const transcript = JSON.parse(event.data);
+    const firstTranscript = !seenFirstTranscript;
+    seenFirstTranscript = true;
+    const updatedAtMs = Date.parse(transcript.updatedAt || session.updatedAt || 0);
+    useStore.setState({
+      transcript,
+      live: true,
+      activityUpdatedAt: firstTranscript && !Number.isNaN(updatedAtMs) ? updatedAtMs : Date.now(),
+      loadingMessage: "",
+    });
   });
   stream.addEventListener("error", async () => {
     try {
       const transcript = await api(`/api/transcript?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`);
-      useStore.setState({ transcript, live: false });
+      useStore.setState({ transcript, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
     } catch (error) {
-      useStore.setState({ error: error.message, live: false });
+      useStore.setState({ error: error.message, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
     }
   });
 }
@@ -758,6 +967,7 @@ function TopBar() {
   const projects = useStore((state) => state.projects);
   const workspaces = useStore((state) => state.workspaces);
   const loading = useStore((state) => state.loading);
+  const loadingMessage = useStore((state) => state.loadingMessage);
   const selectedWorkspace = useStore((state) => state.selectedWorkspace);
   const workspaceOptions = useMemo(
     () =>
@@ -791,7 +1001,7 @@ function TopBar() {
         <div className="brand-copy">
           <h1>KAGE Dispatch</h1>
           <span>
-            {sessions.length ? `${sessions.length} sessions in ${workspaceSummary}` : "Local agent command center"}
+            {loading ? loadingMessage || "Refreshing session index..." : sessions.length ? `${sessions.length} sessions in ${workspaceSummary}` : "Local agent command center"}
           </span>
         </div>
       </div>
@@ -915,10 +1125,10 @@ function Sidebar() {
   );
 }
 
-const SessionListItem = memo(function SessionListItem({ session, isActive, onSelectSession }) {
+const SessionListItem = memo(function SessionListItem({ session, isActive, isStreaming, activityLabel, onSelectSession }) {
   return (
     <button
-      className={cls("session-card", isActive && "active")}
+      className={cls("session-card", isActive && "active", isStreaming && "streaming")}
       style={agentColorStyle(session.agent)}
       type="button"
       onClick={() => onSelectSession(session)}
@@ -926,6 +1136,12 @@ const SessionListItem = memo(function SessionListItem({ session, isActive, onSel
       <AgentBadge agent={session.agent} label={session.agentLabel} />
       <strong>{sessionDisplayTitle(session)}</strong>
       <span>{session.cwd || ""}</span>
+      {isStreaming && (
+        <small className="session-live-line">
+          <span className="status-dot pulse" />
+          Active — {activityLabel}
+        </small>
+      )}
       {lineageLabel(session) && <small>{lineageLabel(session)}</small>}
     </button>
   );
@@ -936,6 +1152,8 @@ const SessionListGroup = memo(function SessionListGroup({
   isCollapsed,
   visibleCount,
   selectedPath,
+  activePath,
+  activityLabel,
   onToggleGroup,
   onLoadMore,
   onSelectSession,
@@ -965,6 +1183,8 @@ const SessionListGroup = memo(function SessionListGroup({
             key={`${session.agent}:${session.path}`}
             session={session}
             isActive={selectedPath === session.path}
+            isStreaming={activePath === session.path}
+            activityLabel={activityLabel}
             onSelectSession={onSelectSession}
           />
         ))}
@@ -979,8 +1199,12 @@ const SessionListGroup = memo(function SessionListGroup({
 
 function SessionList({ sessions }) {
   const selectedPath = useStore((state) => state.selectedPath);
+  const live = useStore((state) => state.live);
+  const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [visibleGroupSizes, setVisibleGroupSizes] = useState(new Map());
+  const now = useIntervalNow(Boolean(selectedPath && live), 1000);
+  const activePath = selectedPath && live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS ? selectedPath : null;
   const groupedSessions = useMemo(() => {
     const groups = new Map();
     for (const session of sessions) {
@@ -1066,6 +1290,8 @@ function SessionList({ sessions }) {
             isCollapsed={isCollapsed}
             visibleCount={visibleCount}
             selectedPath={selectedPath}
+            activePath={activePath}
+            activityLabel={activePath ? elapsedLabel(activityUpdatedAt, now) : ""}
             onToggleGroup={toggleGroup}
             onLoadMore={loadMoreSessions}
             onSelectSession={selectSessionByPath}
@@ -1093,6 +1319,24 @@ function Conversation() {
   const setMessageFilter = useStore((state) => state.setMessageFilter);
   const live = useStore((state) => state.live);
   const error = useStore((state) => state.error);
+  const sendState = useStore((state) => state.sendState);
+  const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
+  const now = useIntervalNow(Boolean(selectedSession), 1000);
+  const verb = useRotatingVerb(Boolean(selectedSession && live));
+  const activity = useMemo(
+    () =>
+      deriveConversationActivity({
+        selectedSession,
+        transcript,
+        live,
+        sendState,
+        error,
+        activityUpdatedAt,
+        now,
+        verb,
+      }),
+    [selectedSession, transcript, live, sendState, error, activityUpdatedAt, now, verb],
+  );
   const transcriptIndex = useTranscriptIndex(transcript);
   const stats = transcriptIndex.counts;
   const statCounts = {
@@ -1159,6 +1403,7 @@ function Conversation() {
           <MessageViewport
             transcript={transcript}
             transcriptIndex={transcriptIndex}
+            activity={activity}
             agent={selectedSession?.agent}
             agentLabel={selectedSession?.agentLabel}
             filter={messageFilter}
@@ -1166,6 +1411,9 @@ function Conversation() {
         )
       ) : (
         <div className="empty-state">Select a session to view transcript messages.</div>
+      )}
+      {selectedSession && (
+        <ConversationStatusBar activity={activity} now={now} />
       )}
       {selectedSession && (
         <div className="conversation-composer">
@@ -1218,7 +1466,31 @@ function DispatchPanel() {
   );
 }
 
-function MessageViewport({ transcript, transcriptIndex, agent, agentLabel, filter }) {
+function ConversationStatusBar({ activity, now }) {
+  const elapsed = activity?.startedAt ? elapsedLabel(activity.startedAt, now) : "";
+  return (
+    <div className={cls("conversation-status-bar", activity?.tone, activity?.active && "active")}>
+      <span className={cls("status-dot", activity?.active && "pulse")} />
+      <div className="conversation-status-copy">
+        <strong>{activity?.label || "Waiting for input"}</strong>
+        <span>{activity?.detail || "Ready for the next local agent event."}</span>
+      </div>
+      {elapsed && <time>{elapsed}</time>}
+    </div>
+  );
+}
+
+function ProcessEmptyState({ label, detail }) {
+  return (
+    <div className="empty-state process-state">
+      <Loader2 size={18} className="spin" />
+      <strong>{label}</strong>
+      <span>{detail}</span>
+    </div>
+  );
+}
+
+function MessageViewport({ transcript, transcriptIndex, activity, agent, agentLabel, filter }) {
   const parentRef = useRef(null);
   const messages = transcriptIndex?.messages || [];
   const filterIndexes = transcriptIndex?.filterIndexes || {};
@@ -1272,7 +1544,12 @@ function MessageViewport({ transcript, transcriptIndex, agent, agentLabel, filte
   }, [visibleMessageIndexes.length, windowStart]);
 
   if (transcript == null) {
-    return <div className="empty-state">Loading transcript...</div>;
+    return (
+      <ProcessEmptyState
+        label={activity?.label || "Connecting to transcript stream..."}
+        detail={activity?.detail || "Reading the latest session file from disk."}
+      />
+    );
   }
   if (messages.length === 0) {
     return <div className="empty-state">No transcript messages yet.</div>;

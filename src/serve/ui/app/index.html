@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#101316" />
+    <meta name="theme-color" content="#f7f8fa" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>KAGE Dispatch</title>
     <style>
@@ -22,12 +22,28 @@
         display: grid;
         place-items: center;
         text-align: center;
-        color: #a0a8b0;
-        background: linear-gradient(180deg, #0f1215, #14171b);
+        color: #5f6b76;
+        background: linear-gradient(180deg, #f7f8fa, #eef1f4);
         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
     </style>
     <script>
+      (function () {
+        const themeStorageKey = "kageServeTheme.v2";
+        const theme = (() => {
+          try {
+            return localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
+          } catch {
+            return "light";
+          }
+        })();
+        document.documentElement.dataset.theme = theme;
+        const themeColor = theme === "dark" ? "#101316" : "#f7f8fa";
+        const themeColorMeta = document.querySelector("meta[name='theme-color']");
+        if (themeColorMeta) {
+          themeColorMeta.setAttribute("content", themeColor);
+        }
+      })();
       window.__KAGE_CONFIG__ = {};
     </script>
   </head>
