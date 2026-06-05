@@ -412,7 +412,7 @@ button {
   background: color-mix(in srgb, var(--panel) 94%, transparent);
   box-shadow: var(--shadow);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 12px;
   padding: 12px;
 }
@@ -1796,6 +1796,7 @@ button {
 }
 
 .task-progress.large {
+  grid-column: 1 / -1;
   height: 9px;
 }
 
@@ -1846,23 +1847,20 @@ button {
 
 .task-detail-panel {
   --agent-color: var(--accent);
-  position: fixed;
-  top: 84px;
-  right: 18px;
-  z-index: 20;
-  width: min(420px, calc(100vw - 36px));
-  max-height: calc(100vh - 108px);
-  overflow: auto;
+  min-width: 0;
+  max-height: min(34vh, 360px);
+  overflow: hidden;
   display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(240px, 1.1fr);
   gap: 12px;
   border: 1px solid color-mix(in srgb, var(--agent-color) 34%, var(--line));
   border-radius: var(--radius);
   padding: 14px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  background: color-mix(in srgb, var(--agent-color) 7%, var(--panel));
 }
 
 .task-detail-head {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1870,17 +1868,20 @@ button {
 }
 
 .task-detail-panel > strong {
+  min-width: 0;
   font-size: 17px;
   line-height: 1.25;
 }
 
 .task-detail-panel > span {
+  align-self: start;
   color: var(--muted);
   font-size: 12px;
   text-transform: capitalize;
 }
 
 .task-detail-actions {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
@@ -1900,6 +1901,8 @@ button {
 }
 
 .task-meta {
+  min-width: 0;
+  align-content: start;
   display: grid;
   gap: 8px;
   margin: 0;
@@ -1926,6 +1929,9 @@ button {
 }
 
 .task-log {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
   display: grid;
   gap: 6px;
 }
@@ -2218,6 +2224,15 @@ textarea:disabled {
     grid-template-columns: 1fr;
   }
 
+  .task-detail-panel {
+    max-height: none;
+    grid-template-columns: 1fr;
+  }
+
+  .task-log {
+    max-height: 220px;
+  }
+
   .sidebar,
   .conversation-panel,
   .dispatch-panel {
@@ -2440,6 +2455,15 @@ textarea:disabled {
 
 .app-shell.mock-mobile .task-dispatch-bar {
   grid-template-columns: 1fr;
+}
+
+.app-shell.mock-mobile .task-detail-panel {
+  max-height: none;
+  grid-template-columns: 1fr;
+}
+
+.app-shell.mock-mobile .task-log {
+  max-height: 220px;
 }
 
 .app-shell.mock-mobile .sidebar,

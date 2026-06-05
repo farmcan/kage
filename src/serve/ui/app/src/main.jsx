@@ -538,14 +538,6 @@ function sessionPathFromQuery() {
   return "";
 }
 
-function pickLatestSession(sessions = []) {
-  return sessions.reduce((latest, session) => {
-    if (!latest) return session;
-    if ((session._updatedAtMs || 0) > (latest._updatedAtMs || 0)) return session;
-    return latest;
-  }, null);
-}
-
 function buildSessionSearchText(session) {
   return [
     session.agentLabel,
@@ -909,15 +901,8 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       error: "",
     });
 
-    if (selectedSession) {
-      if (!keepCurrentStream) {
-        await selectSession(selectedSession, { openDetail: false });
-      }
-    } else {
-      const latest = pickLatestSession(sessions);
-      if (latest) {
-        await selectSession(latest, { openDetail: false });
-      }
+    if (selectedSession && !keepCurrentStream) {
+      await selectSession(selectedSession, { openDetail: false });
     }
   } catch (error) {
     useStore.setState({ loading: false, loadingMessage: "", error: error.message });
@@ -1741,11 +1726,11 @@ function TaskBoardPanel() {
         })}
       </div>
 
-      <TaskDispatchBar workspace={dispatchWorkspace} />
-
       {selectedTask && (
         <TaskDetailPanel task={selectedTask} now={now} onClose={() => setSelectedTaskId(null)} />
       )}
+
+      <TaskDispatchBar workspace={dispatchWorkspace} />
     </section>
   );
 }
@@ -1809,7 +1794,6 @@ function TaskDispatchBar({ workspace }) {
       logs: ["Queued locally."],
     };
     useStore.getState().upsertTask(optimisticTask);
-    useStore.getState().setSelectedTaskId(optimisticTask.id);
     setDraft("");
     try {
       const data = await api("/api/dispatch", {
@@ -1820,7 +1804,6 @@ function TaskDispatchBar({ workspace }) {
       if (data.task) {
         useStore.getState().removeTask(optimisticTask.id);
         useStore.getState().upsertTask(data.task);
-        useStore.getState().setSelectedTaskId(data.task.id);
       }
       useStore.getState().showToast("Task dispatched");
       void loadTasks({ silent: true });
@@ -2195,6 +2178,7 @@ function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false 
 function Composer({ session, compact = false }) {
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("new");
+  const [replySessionPath, setReplySessionPath] = useState(null);
   const [targetAgent, setTargetAgent] = useState("codex");
   const [targetCwd, setTargetCwd] = useState("");
   const submittingRef = useRef(false);
@@ -2203,7 +2187,7 @@ function Composer({ session, compact = false }) {
   const sessions = useStore((state) => state.sessions);
   const selectedPath = useStore((state) => state.selectedPath);
   const canReply = Boolean(session && sendAgents.includes(session.agent));
-  const effectiveMode = mode === "reply" && canReply ? "reply" : "new";
+  const effectiveMode = mode === "reply" && canReply && replySessionPath === session?.path ? "reply" : "new";
   const effectiveAgent = effectiveMode === "reply" ? session.agent : targetAgent;
   const effectiveCwd = (targetCwd.trim() || session?.cwd || rootCwd || ".").trim();
   const sessionId = effectiveMode === "reply" ? session?.sessionId : undefined;
@@ -2213,23 +2197,36 @@ function Composer({ session, compact = false }) {
   useEffect(() => {
     const nextCwd = session?.cwd || rootCwd || "";
     setTargetCwd(nextCwd);
-    if (session?.agent && sendAgents.includes(session.agent)) {
-      setTargetAgent(session.agent);
-      setMode("reply");
-    } else {
+    if (!session?.agent || !sendAgents.includes(session.agent)) {
       setTargetAgent("codex");
       setMode("new");
+      setReplySessionPath(null);
     }
   }, [session?.path, session?.agent, session?.cwd, rootCwd]);
 
+  function chooseMode(nextMode) {
+    if (nextMode === "reply") {
+      if (!canReply) return;
+      setMode("reply");
+      setReplySessionPath(session.path);
+      setTargetAgent(session.agent);
+      setTargetCwd(session.cwd || rootCwd || "");
+      return;
+    }
+    setMode("new");
+    setReplySessionPath(null);
+  }
+
   function selectNewTarget(agent) {
     setMode("new");
+    setReplySessionPath(null);
     setTargetAgent(agent);
     setTargetCwd(targetCwd.trim() || rootCwd || session?.cwd || "");
   }
 
   async function selectReplyTarget(nextSession) {
     setMode("reply");
+    setReplySessionPath(nextSession.path);
     setTargetAgent(nextSession.agent);
     setTargetCwd(nextSession.cwd || rootCwd || "");
     await selectSession(nextSession, { openDetail: true });
@@ -2297,7 +2294,7 @@ function Composer({ session, compact = false }) {
           <strong>Send a prompt</strong>
           <span>{effectiveMode === "reply" ? `Replying to ${agentMeta[effectiveAgent]?.label || effectiveAgent}` : "Start a new agent session"}</span>
         </div>
-        <Tabs.Root value={effectiveMode} onValueChange={setMode}>
+        <Tabs.Root value={effectiveMode} onValueChange={chooseMode}>
           <Tabs.List className="send-mode-tabs" aria-label="Choose send target">
             <Tabs.Trigger className="send-mode-tab" value="reply" disabled={!canReply}>
               Reply
