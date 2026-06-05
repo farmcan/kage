@@ -5,12 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readSessionCwd } from "../adapters/sources/index.js";
+import { walk } from "../core/files.js";
 import { readTranscript } from "./transcript.js";
 import { runAgentSend } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
 const defaultPort = 9876;
 const defaultHost = "0.0.0.0";
+const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 
 function cliPath() {
   return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "cli.js");
@@ -60,6 +63,128 @@ function runKageJson(args, { cwd }) {
       }
     });
   });
+}
+
+function workspaceFromSearch(url) {
+  const candidate = url.searchParams.get("workspace") || url.searchParams.get("cwd");
+  if (!candidate) {
+    return null;
+  }
+  const value = candidate.trim();
+  return value.length > 0 ? value : null;
+}
+
+function uniqueWorkspaces(items = []) {
+  const values = new Set();
+  for (const item of items) {
+    if (item) {
+      values.add(item);
+    }
+  }
+  return [...values].sort();
+}
+
+function isAllWorkspaces(value) {
+  return String(value ?? "").trim() === ALL_WORKSPACES_VALUE;
+}
+
+function localAgentRoots() {
+  const home = os.homedir();
+  return {
+    claude: path.join(home, ".claude", "projects"),
+    codex: path.join(home, ".codex", "sessions"),
+    qodercli: path.join(home, ".qoder", "projects"),
+    qoderwork: path.join(home, ".qoderwork", "projects"),
+  };
+}
+
+async function canonicalizeWorkspacePath(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  const resolved = path.resolve(text);
+  try {
+    return await fs.promises.realpath(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+function isSubpath(candidate, ancestor) {
+  const relativePath = path.relative(ancestor, candidate);
+  return !relativePath || (relativePath !== ".." && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath));
+}
+
+async function collectAgentWorkspaces(agent, rootDir) {
+  try {
+    const files = await walk(rootDir);
+    const workspaces = new Set();
+
+    for (const sessionPath of files) {
+      try {
+        const workspace = await readSessionCwd(sessionPath, agent);
+        if (!workspace) {
+          continue;
+        }
+        workspaces.add(await canonicalizeWorkspacePath(workspace));
+      } catch {
+        // Ignore malformed or unreadable session entries.
+      }
+    }
+
+    return { agent, root: rootDir, workspaces: [...workspaces], error: null };
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { agent, root: rootDir, workspaces: [], error: null };
+    }
+    return { agent, root: rootDir, workspaces: [], error: error.message ?? String(error) };
+  }
+}
+
+async function buildProjectsInventory() {
+  const roots = localAgentRoots();
+  const agentRoots = await Promise.all(Object.entries(roots).map(([agent, root]) => collectAgentWorkspaces(agent, root)));
+
+  return {
+    workspaces: uniqueWorkspaces(agentRoots.flatMap((group) => group.workspaces)),
+    agents: agentRoots,
+  };
+}
+
+async function buildProjectsPayload({ workspace, includeSubdirs = true } = {}, options = {}) {
+  const inventory = await buildProjectsInventory();
+  const normalizedWorkspace = workspace ? await canonicalizeWorkspacePath(workspace) : null;
+
+  let workspaceValidation = null;
+  if (normalizedWorkspace) {
+    let valid = false;
+    for (const candidate of inventory.workspaces) {
+      if (includeSubdirs ? isSubpath(candidate, normalizedWorkspace) : candidate === normalizedWorkspace) {
+        valid = true;
+        break;
+      }
+    }
+    workspaceValidation = {
+      requested: normalizedWorkspace,
+      valid,
+      includeSubdirs,
+      ...(valid ? {} : { reason: "The requested workspace does not match any known project." }),
+    };
+  }
+
+  return {
+    mode: "projects",
+    cwd: options.cwd || null,
+    workspaces: inventory.workspaces,
+    selectedWorkspace: normalizedWorkspace,
+    workspaceValidation,
+    errors: inventory.agents.filter((entry) => entry.error).map((entry) => ({
+      agent: entry.agent,
+      root: entry.root,
+      error: entry.error,
+    })),
+  };
 }
 
 function readJsonBody(request, { maxBytes = 64 * 1024 } = {}) {
@@ -120,6 +245,23 @@ function kageScopeArgs(url, { includeJson = true } = {}) {
   return args;
 }
 
+function applyWorkspaceContext(payload, workspace, options = {}) {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+  if (payload.mode !== "sessions") {
+    return payload;
+  }
+
+  const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+  return {
+    ...payload,
+    selectedWorkspace: workspace || payload.cwd,
+    workspaces: uniqueWorkspaces(sessions.map((session) => session.cwd)),
+    cwd: options.cwdOverride ?? (payload.cwd || workspace || null),
+  };
+}
+
 function localNetworkUrls(port) {
   const urls = [];
   for (const addresses of Object.values(os.networkInterfaces())) {
@@ -141,8 +283,30 @@ async function handleApi(request, response, url, options) {
     jsonResponse(response, 200, await runKageJson(["doctor", "--json"], { cwd: options.cwd }));
     return;
   }
+  if (url.pathname === "/api/projects") {
+    const includeSubdirs = url.searchParams.get("includeSubdirs") !== "false";
+    const workspace = workspaceFromSearch(url);
+    jsonResponse(response, 200, await buildProjectsPayload({ workspace, includeSubdirs }, options));
+    return;
+  }
   if (url.pathname === "/api/sessions") {
-    jsonResponse(response, 200, await runKageJson(["sessions", ...kageScopeArgs(url)], { cwd: options.cwd }));
+    const allWorkspaces = url.searchParams.get("all") === "1" || isAllWorkspaces(url.searchParams.get("workspace"));
+    const requestedWorkspace = workspaceFromSearch(url);
+    const workspace = allWorkspaces ? null : requestedWorkspace ?? options.cwd;
+    const sessionsScope = kageScopeArgs(url);
+    if (allWorkspaces && !sessionsScope.includes("--include-subdirs")) {
+      sessionsScope.push("--include-subdirs");
+    }
+    const sessionsPayload = await runKageJson(["sessions", ...sessionsScope], {
+      cwd: allWorkspaces ? "/" : workspace,
+    });
+    jsonResponse(
+      response,
+      200,
+      applyWorkspaceContext(sessionsPayload, allWorkspaces ? ALL_WORKSPACES_VALUE : workspace, {
+        cwdOverride: allWorkspaces ? os.homedir() : null,
+      }),
+    );
     return;
   }
   if (url.pathname === "/api/actions") {

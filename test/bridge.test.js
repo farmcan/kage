@@ -1043,6 +1043,315 @@ test("serve root exposes installable PWA assets", async () => {
   }
 });
 
+test("serve sessions API accepts workspace query and returns workspace context", async () => {
+  const fakeHome = await makeTempDir("serve-sessions-workspace-home");
+  const cwdA = await makeTempDir("serve-sessions-cwd-a");
+  const cwdB = await makeTempDir("serve-sessions-cwd-b");
+  const codexRootA = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  const codexRootB = path.join(fakeHome, ".codex", "sessions", "2026", "07");
+  await fs.mkdir(codexRootA, { recursive: true });
+  await fs.mkdir(codexRootB, { recursive: true });
+
+  await fs.writeFile(
+    path.join(codexRootA, "session-a.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T10:00:00.000Z","type":"session_meta","payload":{"id":"session-a","cwd":"${cwdA}","timestamp":"2026-06-05T10:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"work from a"}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  await fs.writeFile(
+    path.join(codexRootB, "session-b.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T11:00:00.000Z","type":"session_meta","payload":{"id":"session-b","cwd":"${cwdB}","timestamp":"2026-06-05T11:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T11:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"work from b"}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: cwdA });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+  const { port } = server.address();
+  const canonicalA = await canonicalPath(cwdA);
+  const canonicalB = await canonicalPath(cwdB);
+
+    const defaultUrl = new URL(`http://127.0.0.1:${port}/api/sessions`);
+    const defaultResponse = await fetch(defaultUrl);
+    assert.equal(defaultResponse.status, 200);
+    const defaultPayload = await defaultResponse.json();
+    assert.equal(defaultPayload.mode, "sessions");
+    assert.equal(await canonicalPath(defaultPayload.cwd), canonicalA);
+    assert.equal(await canonicalPath(defaultPayload.selectedWorkspace), canonicalA);
+    assert.equal(await canonicalPath(defaultPayload.sessions[0]?.cwd), canonicalA);
+
+    const workspaceBUrl = new URL(`http://127.0.0.1:${port}/api/sessions`);
+    workspaceBUrl.searchParams.set("workspace", cwdB);
+    const workspaceBResponse = await fetch(workspaceBUrl);
+    assert.equal(workspaceBResponse.status, 200);
+    const workspaceBPayload = await workspaceBResponse.json();
+    assert.equal(await canonicalPath(workspaceBPayload.cwd), canonicalB);
+    assert.equal(await canonicalPath(workspaceBPayload.selectedWorkspace), canonicalB);
+    assert.equal(workspaceBPayload.sessions.length, 1);
+    assert.equal(await canonicalPath(workspaceBPayload.sessions[0].cwd), canonicalB);
+    assert.equal(workspaceBPayload.workspaces.length, 1);
+    assert.equal(await canonicalPath(workspaceBPayload.workspaces[0]), canonicalB);
+    assert.deepEqual(await Promise.all((workspaceBPayload.workspaces || []).map((value) => canonicalPath(value))), [canonicalB]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
+test("serve sessions API supports all-workspaces mode", async () => {
+  const fakeHome = await makeTempDir("serve-sessions-all-home");
+  const workspaceA = await makeTempDir("serve-sessions-all-workspace-a");
+  const workspaceB = await makeTempDir("serve-sessions-all-workspace-b");
+  const codexRootA = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  const codexRootB = path.join(fakeHome, ".codex", "sessions", "2026", "07");
+  await fs.mkdir(codexRootA, { recursive: true });
+  await fs.mkdir(codexRootB, { recursive: true });
+
+  await fs.writeFile(
+    path.join(codexRootA, "session-a.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T09:00:00.000Z","type":"session_meta","payload":{"id":"session-a","cwd":"${workspaceA}","timestamp":"2026-06-05T09:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T09:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"from workspace A"}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  await fs.writeFile(
+    path.join(codexRootB, "session-b.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T09:30:00.000Z","type":"session_meta","payload":{"id":"session-b","cwd":"${workspaceB}","timestamp":"2026-06-05T09:30:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T09:30:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"from workspace B"}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: workspaceA });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const url = new URL(`http://127.0.0.1:${port}/api/sessions`);
+    url.searchParams.set("all", "1");
+    const response = await fetch(url);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.mode, "sessions");
+    assert.equal(payload.selectedWorkspace, "__all_workspaces__");
+    assert.equal(payload.sessions.length, 2);
+    assert.equal(await canonicalPath(payload.cwd), await canonicalPath(fakeHome));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
+test("serve sessions API accepts cwd alias and returns matching workspace", async () => {
+  const fakeHome = await makeTempDir("serve-sessions-cwd-alias-home");
+  const cwdAlias = await makeTempDir("serve-sessions-cwd-alias");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    path.join(codexProject, "session-cwd-alias.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T12:00:00.000Z","type":"session_meta","payload":{"id":"session-cwd-alias","cwd":"${cwdAlias}","timestamp":"2026-06-05T12:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T12:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"from cwd alias"}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: cwdAlias });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const canonicalAlias = await canonicalPath(cwdAlias);
+
+    const url = new URL(`http://127.0.0.1:${port}/api/sessions`);
+    url.searchParams.set("cwd", cwdAlias);
+    const response = await fetch(url);
+    assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.mode, "sessions");
+  assert.equal(await canonicalPath(payload.cwd), canonicalAlias);
+  assert.equal(await canonicalPath(payload.selectedWorkspace), canonicalAlias);
+  assert.equal(await canonicalPath(payload.sessions[0]?.cwd), canonicalAlias);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
+test("serve projects API aggregates workspaces across local agent roots", async () => {
+  const fakeHome = await makeTempDir("serve-projects-home");
+  const workspaceA = await makeTempDir("serve-projects-workspace-a");
+  const workspaceB = await makeTempDir("serve-projects-workspace-b");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  const claudeProject = path.join(fakeHome, ".claude", "projects", "-workspace-a");
+  const qoderProject = path.join(fakeHome, ".qoder", "projects", "-workspace-a");
+  const qoderWorkProject = path.join(fakeHome, ".qoderwork", "projects", "-workspace-a");
+
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.mkdir(claudeProject, { recursive: true });
+  await fs.mkdir(qoderProject, { recursive: true });
+  await fs.mkdir(qoderWorkProject, { recursive: true });
+
+  await fs.writeFile(
+    path.join(codexProject, "session-codex.jsonl"),
+    `{"timestamp":"2026-06-05T10:00:00.000Z","type":"session_meta","payload":{"id":"codex","cwd":"${workspaceA}","timestamp":"2026-06-05T10:00:00.000Z"}}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(claudeProject, "session-claude.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"work from claude"},"timestamp":"2026-06-05T11:00:00.000Z","cwd":"${workspaceB}","sessionId":"claude"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(qoderProject, "session-qoder.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"work from qoder"},"timestamp":"2026-06-05T12:00:00.000Z","cwd":"${workspaceA}","sessionId":"qoder"}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(qoderWorkProject, "session-qoderwork.jsonl"),
+    `{"type":"user","message":{"role":"user","content":"work from qoderwork"},"timestamp":"2026-06-05T13:00:00.000Z","cwd":"${workspaceA}","sessionId":"qoderwork"}\n`,
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const url = new URL(`http://127.0.0.1:${port}/api/projects`);
+    const response = await fetch(url);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+
+    assert.equal(payload.mode, "projects");
+    assert.equal(Array.isArray(payload.workspaces), true);
+    const resolvedWorkspaces = await Promise.all((payload.workspaces || []).map((entry) => canonicalPath(entry)));
+    const expected = await Promise.all([workspaceA, workspaceB].map((entry) => canonicalPath(entry)));
+    assert.deepEqual(Array.isArray(payload.errors) ? payload.errors : null, []);
+    assert.deepEqual(resolvedWorkspaces.sort(), expected.sort());
+    assert.equal(payload.selectedWorkspace, null);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
+test("serve projects API validates workspace query and includeSubdirs flag", async () => {
+  const fakeHome = await makeTempDir("serve-projects-validation-home");
+  const workspaceRoot = await makeTempDir("serve-projects-validation-root");
+  const workspaceChild = path.join(workspaceRoot, "child");
+  await fs.mkdir(workspaceChild, { recursive: true });
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    path.join(codexProject, "session-validation.jsonl"),
+    `{"timestamp":"2026-06-05T14:00:00.000Z","type":"session_meta","payload":{"id":"validation","cwd":"${workspaceChild}","timestamp":"2026-06-05T14:00:00.000Z"}}\n`,
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+
+    const includeSubdirsUrl = new URL(`http://127.0.0.1:${port}/api/projects`);
+    includeSubdirsUrl.searchParams.set("workspace", workspaceRoot);
+    const includeSubdirsResponse = await fetch(includeSubdirsUrl);
+    assert.equal(includeSubdirsResponse.status, 200);
+    const includeSubdirsPayload = await includeSubdirsResponse.json();
+    assert.equal(includeSubdirsPayload.workspaceValidation.valid, true);
+    assert.equal(includeSubdirsPayload.workspaceValidation.includeSubdirs, true);
+
+    const strictUrl = new URL(`http://127.0.0.1:${port}/api/projects`);
+    strictUrl.searchParams.set("workspace", workspaceRoot);
+    strictUrl.searchParams.set("includeSubdirs", "false");
+    const strictPayload = await (await fetch(strictUrl)).json();
+    assert.equal(strictPayload.workspaceValidation.valid, false);
+    assert.equal(strictPayload.workspaceValidation.includeSubdirs, false);
+    assert.equal(strictPayload.workspaceValidation.reason, "The requested workspace does not match any known project.");
+
+    const aliasUrl = new URL(`http://127.0.0.1:${port}/api/projects`);
+    aliasUrl.searchParams.set("cwd", workspaceChild);
+    const aliasPayload = await (await fetch(aliasUrl)).json();
+    assert.equal(aliasPayload.workspaceValidation.valid, true);
+    assert.equal(aliasPayload.workspaceValidation.includeSubdirs, true);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
 test("serve password mode loads the page and protects APIs", async () => {
   const server = createKageServeServer({ cwd: __dirname, password: "1234" });
   await new Promise((resolve, reject) => {
