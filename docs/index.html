@@ -18,13 +18,13 @@
         --panel: #141a1f;
         --panel-2: #192229;
         --line: #2a343c;
-        --green: #10a37f;
+        --green: #15a074;
         --gold: #f2b84b;
         --red: #ef6f61;
         --white: #fffdf8;
-        --agent-codex: #3a86ff;
-        --agent-qoder: #10a37f;
-        --agent-claude: #d97757;
+        --agent-codex: #3b82f6;
+        --agent-qoder: #15a074;
+        --agent-claude: #cf7654;
       }
 
       * {
@@ -138,8 +138,22 @@
 
       .hero-scene {
         position: absolute;
-        inset: 28px -170px 28px 50%;
+        inset: 28px 20px 28px 50%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
         opacity: 0.9;
+      }
+
+      .hero-screenshot {
+        display: block;
+        width: min(760px, 48vw);
+        max-width: none;
+        height: auto;
+        border: 1px solid rgba(247, 242, 230, 0.12);
+        border-radius: 18px;
+        background: #f7f8fa;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
       }
 
       .app-window {
@@ -608,7 +622,11 @@
 
       @media (max-width: 1180px) and (min-width: 921px) {
         .hero-scene {
-          inset: 44px -220px 42px 52%;
+          inset: 44px 20px 42px 52%;
+        }
+
+        .hero-screenshot {
+          width: min(650px, 46vw);
         }
 
         .hero-copy {
@@ -650,6 +668,12 @@
           margin: 28px auto 0;
           opacity: 0.86;
           overflow: hidden;
+        }
+
+        .hero-screenshot {
+          width: min(720px, calc(100% - 32px));
+          max-width: calc(100% - 32px);
+          margin: 0 auto;
         }
 
         .app-window {
@@ -740,68 +764,7 @@
     <main id="top">
       <section class="hero" aria-label="KAGE desktop workspace">
         <div class="hero-scene" aria-hidden="true">
-          <div class="app-window">
-            <div class="window-bar">
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="window-title">KAGE local command center</span>
-            </div>
-            <div class="app-grid">
-              <aside class="sidebar">
-                <div class="path-name">kage</div>
-                <div class="path-sub">~/wrksp/kage</div>
-                <div class="tabs">
-                  <span>Sessions</span>
-                  <span>Board</span>
-                  <span>Dispatch</span>
-                </div>
-                <div class="search">Search sessions, tasks, cwd</div>
-                <div class="session-list">
-                  <div class="session-row active">
-                    <div class="agent">Codex</div>
-                    <div class="session-title">Remote link design review</div>
-                    <div class="session-path">~/wrksp/kage</div>
-                  </div>
-                  <div class="session-row">
-                    <div class="agent" style="color: var(--agent-claude)">Claude Code</div>
-                    <div class="session-title">Task board UI fix</div>
-                    <div class="session-path">~/wrksp/kage</div>
-                  </div>
-                  <div class="session-row">
-                    <div class="agent" style="color: var(--agent-qoder)">QoderCLI</div>
-                    <div class="session-title">Replay story export</div>
-                    <div class="session-path">~/wrksp/kage</div>
-                  </div>
-                </div>
-                <div class="history-pill">
-                  <span>Recent 90d / 120 max</span>
-                  <strong>Load Full History</strong>
-                </div>
-              </aside>
-              <section class="detail">
-                <div class="detail-top">
-                  <div class="agent-icon">&gt;_</div>
-                  <div>
-                    <h3>Remote link design review</h3>
-                    <div class="detail-meta">Codex task in ~/wrksp/kage</div>
-                  </div>
-                </div>
-                <div class="detail-actions">
-                  <span class="mini-button primary">Dispatch</span>
-                  <span class="mini-button">Board</span>
-                  <span class="mini-button">New Session</span>
-                  <span class="mini-button">Terminal.app</span>
-                </div>
-                <div class="terminal">
-                  $ kage serve --port 9876 --password 1234<br>
-                  <span class="ok">Mobile-friendly local board ready on your trusted LAN.</span><br><br>
-                  $ kage search "remote link" --since 90d<br>
-                  Continue, New Session, Dispatch, Bridge, Replay
-                </div>
-              </section>
-            </div>
-          </div>
+          <img class="hero-screenshot" src="./assets/screenshots/kage-desktop-preview.svg" alt="">
         </div>
 
         <div class="shell">
@@ -886,13 +849,14 @@
           <div>
             <h2>Current desktop surface</h2>
             <p>
-              The app is centered on the full desktop workspace: recent local sessions, explicit action controls,
-              agent launch commands, process status, and a clear path back to Terminal.app when a noisy session needs it.
+              The current product surface is the local web/desktop workspace: recent local sessions, conversation
+              bubbles, explicit send controls, task board status, and a clear path back to Terminal.app when a noisy
+              session needs it.
             </p>
           </div>
           <div class="media-stack">
-            <img src="./assets/screenshots/kage-desktop-preview.svg" alt="KAGE desktop workspace with recent history controls, new session actions, and embedded terminal">
-            <img src="./assets/screenshots/kage-menubar-preview.svg" alt="KAGE menu bar popover with quick new session and action controls">
+            <img src="./assets/screenshots/kage-desktop-preview.svg" alt="KAGE current light desktop workspace with session list, conversation view, and send controls">
+            <img src="./assets/screenshots/kage-mobile-board-preview.svg" alt="KAGE phone-friendly task board with Codex, Claude, and QoderCLI task cards">
           </div>
         </div>
       </section>

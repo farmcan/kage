@@ -20,8 +20,8 @@
   <path d="M267 267h72" fill="none" stroke="#f7f2e6" stroke-width="24" stroke-linecap="round"/>
 
   <!-- Agent dots, left to right: Codex, QoderCLI/QoderWork, Claude. Keep these hex colors in sync with agentTint(). -->
-  <circle cx="164" cy="360" r="24" fill="#3a86ff"/>
-  <circle cx="256" cy="376" r="24" fill="#10a37f"/>
-  <circle cx="348" cy="360" r="24" fill="#d97757"/>
+  <circle cx="164" cy="360" r="24" fill="#3b82f6"/>
+  <circle cx="256" cy="376" r="24" fill="#15a074"/>
+  <circle cx="348" cy="360" r="24" fill="#cf7654"/>
   <path d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" stroke-width="16" stroke-linecap="round" opacity="0.56"/>
 </svg>

@@ -45,11 +45,11 @@ KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or 
 
 ## Screenshots
 
-![KAGE desktop preview](docs/assets/screenshots/kage-desktop-preview.svg)
+![KAGE current light desktop workspace](docs/assets/screenshots/kage-desktop-preview.svg)
 
-![KAGE menu bar preview](docs/assets/screenshots/kage-menubar-preview.svg)
+![KAGE phone-friendly task board](docs/assets/screenshots/kage-mobile-board-preview.svg)
 
-![KAGE search to action flow](docs/assets/screenshots/kage-demo-flow.svg)
+![KAGE search, chat, dispatch, and bridge flow](docs/assets/screenshots/kage-demo-flow.svg)
 
 ## Try It In 60 Seconds
 

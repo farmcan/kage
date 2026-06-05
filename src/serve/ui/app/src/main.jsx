@@ -181,9 +181,9 @@ function KageLogoIcon() {
       <rect x="168" y="158" width="176" height="126" rx="19" fill="url(#kage-logo-screen)" />
       <path className="kage-logo-prompt" d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
       <path className="kage-logo-cursor" d="M267 267h72" fill="none" stroke="#f7f2e6" strokeWidth="24" strokeLinecap="round" />
-      <circle className="kage-logo-dot kage-logo-dot-blue" cx="164" cy="360" r="24" fill="#3a86ff" />
-      <circle className="kage-logo-dot kage-logo-dot-green" cx="256" cy="376" r="24" fill="#10a37f" />
-      <circle className="kage-logo-dot kage-logo-dot-warm" cx="348" cy="360" r="24" fill="#d97757" />
+      <circle className="kage-logo-dot kage-logo-dot-blue" cx="164" cy="360" r="24" fill="#3b82f6" />
+      <circle className="kage-logo-dot kage-logo-dot-green" cx="256" cy="376" r="24" fill="#15a074" />
+      <circle className="kage-logo-dot kage-logo-dot-warm" cx="348" cy="360" r="24" fill="#cf7654" />
       <path d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" strokeWidth="16" strokeLinecap="round" opacity="0.56" />
     </svg>
   );
