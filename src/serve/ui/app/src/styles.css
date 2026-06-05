@@ -547,6 +547,136 @@ button {
   background: color-mix(in srgb, var(--panel-2) 72%, transparent);
 }
 
+.composer-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.composer-head > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.composer-head strong {
+  font-size: 13px;
+}
+
+.composer-head span,
+.cwd-field span,
+.target-summary,
+.composer-copy {
+  color: var(--muted);
+}
+
+.composer-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.send-mode-tabs,
+.agent-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.send-mode-tab,
+.agent-choice {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.send-mode-tab {
+  min-width: 72px;
+}
+
+.send-mode-tab[data-state="active"] {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.target-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.target-summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.target-summary > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.agent-picker {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.agent-choice {
+  min-height: 36px;
+  white-space: nowrap;
+  color: var(--agent-color);
+}
+
+.agent-choice span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.agent-choice.active {
+  background: color-mix(in srgb, var(--agent-color) 18%, var(--panel));
+  border-color: color-mix(in srgb, var(--agent-color) 48%, var(--line));
+}
+
+.cwd-field {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  background: var(--panel-3);
+}
+
+.cwd-field span {
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.cwd-field input {
+  min-width: 0;
+  min-height: 36px;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+}
+
 .composer-copy {
   justify-content: space-between;
   gap: 10px;
@@ -717,10 +847,22 @@ textarea:disabled {
     width: calc(100% - 20px);
   }
 
+  .composer-head,
+  .target-panel,
   .composer-row,
   .composer-copy {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .send-mode-tabs,
+  .agent-picker {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .send-button,

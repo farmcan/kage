@@ -11,6 +11,11 @@ function requireText(value, name) {
   return text;
 }
 
+function optionalText(value) {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
 function outputTail(text, maxLength = 12_000) {
   const value = String(text ?? "").trim();
   return value.length <= maxLength ? value : value.slice(value.length - maxLength);
@@ -31,33 +36,37 @@ export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallback
     throw new Error(normalizedAgent === "qoderwork" ? "QoderWork is read-only in kage serve" : `Unsupported send agent: ${normalizedAgent}`);
   }
 
-  const normalizedSessionId = requireText(sessionId, "sessionId");
+  const normalizedSessionId = optionalText(sessionId);
   const normalizedMessage = requireText(message, "message");
   const workingDirectory = existingCwd(cwd, fallbackCwd);
+  const target = normalizedSessionId ? "session" : "new";
 
   if (normalizedAgent === "claude") {
     return {
       command: "claude",
-      args: ["--resume", normalizedSessionId, "--print", normalizedMessage],
+      args: [...(normalizedSessionId ? ["--resume", normalizedSessionId] : []), "--print", normalizedMessage],
       cwd: workingDirectory,
       stdin: null,
+      target,
     };
   }
 
   if (normalizedAgent === "codex") {
     return {
       command: "codex",
-      args: ["exec", "resume", normalizedSessionId, "-"],
+      args: normalizedSessionId ? ["exec", "resume", normalizedSessionId, "-"] : ["exec", "-"],
       cwd: workingDirectory,
       stdin: normalizedMessage,
+      target,
     };
   }
 
   return {
     command: "qodercli",
-    args: ["--cwd", workingDirectory, "--resume", normalizedSessionId, "--print", normalizedMessage],
+    args: ["--cwd", workingDirectory, ...(normalizedSessionId ? ["--resume", normalizedSessionId] : []), "--print", normalizedMessage],
     cwd: workingDirectory,
     stdin: null,
+    target,
   };
 }
 
@@ -106,6 +115,7 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
         resolve({
           ok: true,
           command: commandPlan.command,
+          target: commandPlan.target,
           cwd: commandPlan.cwd,
           stdout: outputTail(stdout),
           stderr: outputTail(stderr),

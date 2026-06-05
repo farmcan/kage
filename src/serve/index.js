@@ -189,7 +189,7 @@ async function handleSend(request, response, options) {
     jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
     return;
   }
-  const result = await runAgentSend({
+  const result = await options.sendRunner({
     agent: body.agent,
     sessionId: body.sessionId,
     cwd: body.cwd,
@@ -266,6 +266,7 @@ export function createKageServeServer(options = {}) {
     cwd: options.cwd ?? process.cwd(),
     password: options.password ?? null,
     allowSend: Boolean(options.allowSend),
+    sendRunner: options.sendRunner ?? runAgentSend,
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };
 

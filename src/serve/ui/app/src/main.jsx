@@ -40,6 +40,7 @@ const agentMeta = {
   qodercli: { label: "QoderCLI", short: "Qoder", color: "var(--qoder)" },
   qoderwork: { label: "QoderWork", short: "QWork", color: "var(--qoder)" },
 };
+const sendAgents = ["claude", "codex", "qodercli"];
 
 function initialPassword() {
   if (!config.passwordRequired) return "";
@@ -122,6 +123,20 @@ function resumeCommand(session) {
   if (session.agent === "codex") return `${cd}codex resume ${shellQuote(session.sessionId)}`;
   if (session.agent === "qodercli") return `qodercli --cwd ${shellQuote(session.cwd || ".")} --resume ${shellQuote(session.sessionId)}`;
   return `${cd}kage ${shellQuote(session.agent)} --session ${shellQuote(session.path)}`;
+}
+
+function sendCommand({ agent, sessionId, cwd, message }) {
+  const cd = cwd ? `cd ${shellQuote(cwd)} && ` : "";
+  if (agent === "claude") {
+    return `${cd}claude ${sessionId ? `--resume ${shellQuote(sessionId)} ` : ""}--print ${shellQuote(message)}`;
+  }
+  if (agent === "codex") {
+    return `${cd}printf %s ${shellQuote(message)} | codex exec ${sessionId ? `resume ${shellQuote(sessionId)} ` : ""}-`;
+  }
+  if (agent === "qodercli") {
+    return `qodercli --cwd ${shellQuote(cwd || ".")} ${sessionId ? `--resume ${shellQuote(sessionId)} ` : ""}--print ${shellQuote(message)}`;
+  }
+  return "";
 }
 
 async function copyText(text, label = "Copied") {
@@ -534,16 +549,43 @@ function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false 
 
 function Composer({ session }) {
   const [draft, setDraft] = useState("");
+  const [mode, setMode] = useState("new");
+  const [targetAgent, setTargetAgent] = useState("codex");
+  const [targetCwd, setTargetCwd] = useState("");
   const sendState = useStore((state) => state.sendState);
-  const disabled = !session || sendState === "sending" || session.agent === "qoderwork";
+  const rootCwd = useStore((state) => state.cwd);
+  const canReply = Boolean(session && sendAgents.includes(session.agent));
+  const effectiveMode = mode === "reply" && canReply ? "reply" : "new";
+  const effectiveAgent = effectiveMode === "reply" ? session.agent : targetAgent;
+  const effectiveCwd = (targetCwd.trim() || session?.cwd || rootCwd || ".").trim();
+  const sessionId = effectiveMode === "reply" ? session?.sessionId : undefined;
+  const disabled = sendState === "sending" || !effectiveAgent || (effectiveMode === "reply" && !canReply);
   const canSend = config.sendEnabled && !disabled;
+
+  useEffect(() => {
+    const nextCwd = session?.cwd || rootCwd || "";
+    setTargetCwd(nextCwd);
+    if (session?.agent && sendAgents.includes(session.agent)) {
+      setTargetAgent(session.agent);
+      setMode("reply");
+    } else {
+      setTargetAgent("codex");
+      setMode("new");
+    }
+  }, [session?.path, session?.agent, session?.cwd, rootCwd]);
 
   async function submit(event) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || !session) return;
+    if (!message || disabled) return;
+    const payload = {
+      agent: effectiveAgent,
+      cwd: effectiveCwd,
+      message,
+      ...(sessionId ? { sessionId } : {}),
+    };
     if (!config.sendEnabled) {
-      await copyText(`${resumeCommand(session)}\n\n# Draft to paste after resume:\n${message}`, "Command copied");
+      await copyText(sendCommand(payload), "Send command copied");
       return;
     }
     useStore.setState({ sendState: "sending" });
@@ -551,15 +593,11 @@ function Composer({ session }) {
       await api("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agent: session.agent,
-          sessionId: session.sessionId,
-          cwd: session.cwd,
-          message,
-        }),
+        body: JSON.stringify(payload),
       });
       setDraft("");
-      useStore.getState().showToast("Message sent");
+      useStore.getState().showToast(effectiveMode === "reply" ? "Message sent to session" : "New session prompt sent");
+      await loadSessions();
     } catch (error) {
       useStore.getState().showToast(error.message);
     } finally {
@@ -569,11 +607,54 @@ function Composer({ session }) {
 
   return (
     <form className="composer" onSubmit={submit}>
+      <div className="composer-head">
+        <div>
+          <strong>Send a prompt</strong>
+          <span>{effectiveMode === "reply" ? `Replying to ${agentMeta[effectiveAgent]?.label || effectiveAgent}` : "Start a new agent session"}</span>
+        </div>
+        <Tabs.Root value={effectiveMode} onValueChange={setMode}>
+          <Tabs.List className="send-mode-tabs" aria-label="Choose send target">
+            <Tabs.Trigger className="send-mode-tab" value="reply" disabled={!canReply}>
+              Reply
+            </Tabs.Trigger>
+            <Tabs.Trigger className="send-mode-tab" value="new">
+              New
+            </Tabs.Trigger>
+          </Tabs.List>
+        </Tabs.Root>
+      </div>
+      <div className="target-panel">
+        {effectiveMode === "reply" ? (
+          <div className="target-summary">
+            <AgentBadge agent={effectiveAgent} />
+            <span>Session {session?.sessionId || "unknown"}</span>
+          </div>
+        ) : (
+          <div className="agent-picker" role="group" aria-label="Choose agent for new prompt">
+            {sendAgents.map((agent) => (
+              <button
+                key={agent}
+                className={cls("agent-choice", targetAgent === agent && "active")}
+                type="button"
+                onClick={() => setTargetAgent(agent)}
+                style={{ "--agent-color": agentMeta[agent].color }}
+              >
+                <span />
+                {agentMeta[agent].label}
+              </button>
+            ))}
+          </div>
+        )}
+        <label className="cwd-field">
+          <span>cwd</span>
+          <input value={targetCwd} onChange={(event) => setTargetCwd(event.target.value)} placeholder={rootCwd || "/path/to/project"} />
+        </label>
+      </div>
       <div className="composer-copy">
         {config.sendEnabled ? (
           <span>
             <Check size={14} />
-            Direct send posts through the local CLI
+            Direct send can reply or start a new local CLI session
           </span>
         ) : (
           <span>
@@ -587,7 +668,7 @@ function Composer({ session }) {
         </button>
       </div>
       <div className="composer-row">
-        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={session ? "Send or stage a follow-up prompt" : "Select a session first"} rows={2} disabled={!session} />
+        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write any prompt for the selected target" rows={2} />
         <button className="send-button" type="submit" disabled={!draft.trim() || disabled}>
           {sendState === "sending" ? <Loader2 size={18} className="spin" /> : canSend ? <Send size={18} /> : <Copy size={18} />}
           {canSend ? "Send" : "Copy"}

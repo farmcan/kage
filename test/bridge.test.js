@@ -812,6 +812,22 @@ test("serve send command builder uses native non-interactive resume commands", (
       args: ["--resume", "claude-session", "--print", "hello claude"],
       cwd: __dirname,
       stdin: null,
+      target: "session",
+    },
+  );
+
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "claude",
+      cwd: __dirname,
+      message: "new claude",
+    }),
+    {
+      command: "claude",
+      args: ["--print", "new claude"],
+      cwd: __dirname,
+      stdin: null,
+      target: "new",
     },
   );
 
@@ -827,6 +843,22 @@ test("serve send command builder uses native non-interactive resume commands", (
       args: ["exec", "resume", "codex-session", "-"],
       cwd: __dirname,
       stdin: "hello codex",
+      target: "session",
+    },
+  );
+
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "codex",
+      cwd: __dirname,
+      message: "new codex",
+    }),
+    {
+      command: "codex",
+      args: ["exec", "-"],
+      cwd: __dirname,
+      stdin: "new codex",
+      target: "new",
     },
   );
 
@@ -842,6 +874,22 @@ test("serve send command builder uses native non-interactive resume commands", (
       args: ["--cwd", __dirname, "--resume", "qoder-session", "--print", "hello qoder"],
       cwd: __dirname,
       stdin: null,
+      target: "session",
+    },
+  );
+
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "qodercli",
+      cwd: __dirname,
+      message: "new qoder",
+    }),
+    {
+      command: "qodercli",
+      args: ["--cwd", __dirname, "--print", "new qoder"],
+      cwd: __dirname,
+      stdin: null,
+      target: "new",
     },
   );
 
@@ -982,6 +1030,49 @@ test("serve send API is disabled unless explicitly allowed", async () => {
     });
     assert.equal(response.status, 403);
     assert.match((await response.json()).error, /--allow-send/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve send API can dispatch a new arbitrary prompt when enabled", async () => {
+  const calls = [];
+  const server = createKageServeServer({
+    cwd: __dirname,
+    allowSend: true,
+    sendRunner: async (payload) => {
+      calls.push(payload);
+      return { ok: true, target: payload.sessionId ? "session" : "new", command: "fake", cwd: payload.cwd, stdout: "sent", stderr: "" };
+    },
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "new arbitrary prompt" }),
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.mode, "send");
+    assert.equal(body.target, "new");
+    assert.deepEqual(calls, [
+      {
+        agent: "codex",
+        sessionId: undefined,
+        cwd: __dirname,
+        message: "new arbitrary prompt",
+        fallbackCwd: __dirname,
+      },
+    ]);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
