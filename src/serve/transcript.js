@@ -1,4 +1,19 @@
 import { parseSession } from "../adapters/sources/index.js";
+import { joinBlocks } from "../adapters/sources/shared.js";
+
+function textValue(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(textValue).filter(Boolean).join("\n");
+  }
+  if (value && typeof value === "object") {
+    const nested = value.text ?? value.content ?? value.output;
+    return nested === undefined ? JSON.stringify(value) : textValue(nested);
+  }
+  return "";
+}
 
 function normalizeBlock(block) {
   if (typeof block === "string") {
@@ -10,10 +25,10 @@ function normalizeBlock(block) {
 
   const type = block.type ?? "text";
   if (type === "text" || type === "output_text" || type === "input_text") {
-    return { type: "text", content: block.text ?? block.content ?? "" };
+    return { type: "text", content: textValue(block.text ?? block.content ?? "") };
   }
   if (type === "thinking") {
-    return { type: "thinking", content: block.text ?? block.content ?? "" };
+    return { type: "thinking", content: textValue(block.thinking ?? block.text ?? block.content ?? "") };
   }
   if (type === "tool_use") {
     return {
@@ -27,13 +42,13 @@ function normalizeBlock(block) {
     return {
       type: "tool_result",
       toolUseId: block.tool_use_id ?? block.toolUseId ?? null,
-      content: block.content ?? block.text ?? "",
+      content: textValue(block.content ?? block.text ?? ""),
     };
   }
 
   return {
     type,
-    content: block.text ?? block.content ?? JSON.stringify(block),
+    content: textValue(block.text ?? block.content ?? block),
   };
 }
 
@@ -42,21 +57,142 @@ function textToBlocks(text) {
   return content ? [{ type: "text", content }] : [];
 }
 
-export function toStructuredMessages(session) {
+function contentToBlocks(content) {
+  if (typeof content === "string") {
+    return textToBlocks(content);
+  }
+  if (!Array.isArray(content)) {
+    return [normalizeBlock(content)].filter(Boolean);
+  }
+  return content.map(normalizeBlock).filter(Boolean);
+}
+
+function isCodexBootstrapMessage(role, blocks) {
+  const text = blocks
+    .filter((block) => block.type === "text")
+    .map((block) => block.content)
+    .join("\n")
+    .trimStart();
+  return role === "user" && text.startsWith("# AGENTS.md instructions for ");
+}
+
+function customToolInput(payload) {
+  if (payload.input) {
+    return payload.input;
+  }
+  if (payload.arguments) {
+    try {
+      return JSON.parse(payload.arguments);
+    } catch {
+      return payload.arguments;
+    }
+  }
+  return payload;
+}
+
+function codexPayloadBlocks(payload) {
+  if (payload?.type === "message") {
+    return contentToBlocks(payload.content);
+  }
+  if (payload?.type === "function_call" || payload?.type === "custom_tool_call" || payload?.type === "tool_call") {
+    return [
+      {
+        type: "tool_use",
+        id: payload.call_id ?? payload.id ?? null,
+        name: payload.name ?? payload.tool_name ?? payload.type,
+        input: customToolInput(payload),
+      },
+    ];
+  }
+  if (payload?.type === "function_call_output" || payload?.type === "tool_result") {
+    return [
+      {
+        type: "tool_result",
+        toolUseId: payload.call_id ?? payload.tool_use_id ?? null,
+        content: textValue(payload.output ?? payload.content ?? ""),
+      },
+    ];
+  }
+  return [];
+}
+
+function structuredFromRawItems(session) {
+  const items = Array.isArray(session.rawItems) ? session.rawItems : [];
+  if (session.agent === "claude") {
+    return items
+      .map((item) => {
+        if (item.type !== "user" && item.type !== "assistant") {
+          return null;
+        }
+        const role = item.message?.role ?? item.type;
+        const blocks = contentToBlocks(item.message?.content);
+        return blocks.length > 0 ? { role, blocks } : null;
+      })
+      .filter(Boolean);
+  }
+
+  if (session.agent === "codex") {
+    return items
+      .map((item) => {
+        if (item.type === "event_msg" && item.payload?.type === "agent_message") {
+          return null;
+        }
+        if (item.type !== "response_item") {
+          return null;
+        }
+        const payload = item.payload ?? {};
+        const role = payload.role ?? (payload.type === "function_call_output" ? "tool" : "assistant");
+        if (role === "developer" || role === "system") {
+          return null;
+        }
+        const blocks = codexPayloadBlocks(payload);
+        if (blocks.length === 0 || isCodexBootstrapMessage(role, blocks)) {
+          return null;
+        }
+        return { role, blocks };
+      })
+      .filter(Boolean);
+  }
+
+  if (session.agent === "qodercli" || session.agent === "qoderwork") {
+    return items
+      .filter((item) => !item.isMeta)
+      .map((item) => {
+        const role = item.message?.role ?? item.type ?? "unknown";
+        const blocks = contentToBlocks(item.message?.content);
+        return blocks.length > 0 ? { role, blocks } : null;
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function groupConsecutiveMessages(messages) {
+  return messages.reduce((groups, message) => {
+    const previous = groups.at(-1);
+    if (previous && previous.role === message.role) {
+      previous.blocks.push(...message.blocks);
+      return groups;
+    }
+    groups.push({ role: message.role, blocks: [...message.blocks] });
+    return groups;
+  }, []);
+}
+
+function structuredFromParsedMessages(session) {
   return session.messages
     .map((message) => {
-      const blocks = Array.isArray(message.blocks)
-        ? message.blocks.map(normalizeBlock).filter(Boolean)
-        : textToBlocks(message.text);
-      if (blocks.length === 0) {
-        return null;
-      }
-      return {
-        role: message.role ?? "unknown",
-        blocks,
-      };
+      const blocks = Array.isArray(message.blocks) ? message.blocks.map(normalizeBlock).filter(Boolean) : textToBlocks(message.text ?? joinBlocks(message.content));
+      return blocks.length > 0 ? { role: message.role ?? "unknown", blocks } : null;
     })
     .filter(Boolean);
+}
+
+export function toStructuredMessages(session) {
+  const rawMessages = structuredFromRawItems(session);
+  const messages = rawMessages.length > 0 ? rawMessages : structuredFromParsedMessages(session);
+  return groupConsecutiveMessages(messages);
 }
 
 export async function readTranscript({ sessionPath, agent }) {

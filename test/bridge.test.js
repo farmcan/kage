@@ -825,6 +825,63 @@ test("serve API returns structured transcript blocks", async () => {
   }
 });
 
+test("serve API preserves native thinking and tool result blocks", async () => {
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const sessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
+    const url = new URL(`http://127.0.0.1:${port}/api/transcript`);
+    url.searchParams.set("path", sessionPath);
+    url.searchParams.set("agent", "claude");
+    const response = await fetch(url);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    const assistant = payload.messages.find((message) => message.role === "assistant");
+    assert.deepEqual(assistant.blocks.map((block) => block.type), ["thinking", "text"]);
+    assert.ok(payload.messages.find((message) => message.blocks.some((block) => block.type === "tool_result")));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve root exposes installable PWA assets", async () => {
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const root = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(root.status, 200);
+    const html = await root.text();
+    assert.match(html, /rel="manifest"/);
+    assert.match(html, /serviceWorker/);
+
+    const manifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
+    assert.equal(manifest.status, 200);
+    assert.equal((await manifest.json()).display, "standalone");
+
+    const serviceWorker = await fetch(`http://127.0.0.1:${port}/sw.js`);
+    assert.equal(serviceWorker.status, 200);
+    assert.match(await serviceWorker.text(), /skipWaiting/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("serve password mode loads the page and protects APIs", async () => {
   const server = createKageServeServer({ cwd: __dirname, password: "1234" });
   await new Promise((resolve, reject) => {

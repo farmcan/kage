@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTranscript } from "./transcript.js";
-import { renderServeUi } from "./ui/index.js";
+import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
 const defaultPort = 9876;
 const defaultHost = "0.0.0.0";
@@ -223,6 +223,14 @@ export function createKageServeServer(options = {}) {
     try {
       if (url.pathname === "/" || url.pathname === "/index.html") {
         textResponse(response, 200, renderServeUi({ passwordRequired: Boolean(serverOptions.password) }), "text/html; charset=utf-8");
+        return;
+      }
+      if (url.pathname === "/manifest.webmanifest") {
+        textResponse(response, 200, renderServeManifest(), "application/manifest+json; charset=utf-8");
+        return;
+      }
+      if (url.pathname === "/sw.js") {
+        textResponse(response, 200, renderServeServiceWorker(), "text/javascript; charset=utf-8");
         return;
       }
       if (!requireAuth(request, serverOptions)) {
