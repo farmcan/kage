@@ -100,6 +100,12 @@ function localAgentRoots() {
   };
 }
 
+function commonWorkspaceRoots(home = os.homedir()) {
+  return ["wrksp", "workspace", "workspaces", "Projects", "projects", "Developer", "dev", "code"].map((entry) =>
+    path.join(home, entry),
+  );
+}
+
 async function canonicalizeWorkspacePath(value) {
   const text = String(value ?? "").trim();
   if (!text) {
@@ -116,6 +122,101 @@ async function canonicalizeWorkspacePath(value) {
 function isSubpath(candidate, ancestor) {
   const relativePath = path.relative(ancestor, candidate);
   return !relativePath || (relativePath !== ".." && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath));
+}
+
+async function isDirectory(candidate) {
+  try {
+    return (await fs.promises.stat(candidate)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function listFirstLevelDirectories(rootDir, { maxEntries = 1000 } = {}) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const dirs = [];
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    if (dirs.length >= maxEntries) {
+      break;
+    }
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) {
+      continue;
+    }
+    const candidate = path.join(rootDir, entry.name);
+    if (await isDirectory(candidate)) {
+      dirs.push(candidate);
+    }
+  }
+  return dirs;
+}
+
+function directoryChoiceLabel(directoryPath, home = os.homedir()) {
+  const relativeHome = path.relative(home, directoryPath);
+  if (relativeHome && relativeHome !== ".." && !relativeHome.startsWith(`..${path.sep}`) && !path.isAbsolute(relativeHome)) {
+    return `~/${relativeHome}`;
+  }
+  return directoryPath;
+}
+
+async function collectLocalDirectoryChoices(cwd = process.cwd()) {
+  const home = os.homedir();
+  const currentCwd = await canonicalizeWorkspacePath(cwd);
+  const roots = new Map();
+
+  if (currentCwd && (await isDirectory(currentCwd))) {
+    const parent = path.dirname(currentCwd);
+    if (parent && parent !== currentCwd) {
+      roots.set(parent, "cwd-parent");
+    }
+  }
+
+  for (const root of commonWorkspaceRoots(home)) {
+    if (await isDirectory(root)) {
+      roots.set(await canonicalizeWorkspacePath(root), "common-root");
+    }
+  }
+
+  const choices = new Map();
+  const addChoice = async (directoryPath, source, root = null) => {
+    if (!(await isDirectory(directoryPath))) {
+      return;
+    }
+    const canonicalPath = await canonicalizeWorkspacePath(directoryPath);
+    if (choices.has(canonicalPath)) {
+      return;
+    }
+    choices.set(canonicalPath, {
+      path: canonicalPath,
+      name: path.basename(canonicalPath) || canonicalPath,
+      label: directoryChoiceLabel(canonicalPath, home),
+      source,
+      root,
+      current: canonicalPath === currentCwd,
+      selectable: true,
+    });
+  };
+
+  if (currentCwd) {
+    await addChoice(currentCwd, "current");
+  }
+
+  for (const [root, source] of roots) {
+    const canonicalRoot = await canonicalizeWorkspacePath(root);
+    if (source === "common-root") {
+      await addChoice(canonicalRoot, source);
+    }
+    for (const child of await listFirstLevelDirectories(canonicalRoot)) {
+      await addChoice(child, source === "cwd-parent" ? "cwd-parent-child" : "common-root-child", canonicalRoot);
+    }
+  }
+
+  return [...choices.values()].sort((left, right) => left.label.localeCompare(right.label));
 }
 
 async function collectAgentWorkspaces(agent, rootDir) {
@@ -144,41 +245,60 @@ async function collectAgentWorkspaces(agent, rootDir) {
   }
 }
 
-async function buildProjectsInventory() {
+async function buildProjectsInventory({ cwd = process.cwd() } = {}) {
   const roots = localAgentRoots();
-  const agentRoots = await Promise.all(Object.entries(roots).map(([agent, root]) => collectAgentWorkspaces(agent, root)));
+  const [agentRoots, directoryChoices] = await Promise.all([
+    Promise.all(Object.entries(roots).map(([agent, root]) => collectAgentWorkspaces(agent, root))),
+    collectLocalDirectoryChoices(cwd),
+  ]);
+  const transcriptWorkspaces = uniqueWorkspaces(agentRoots.flatMap((group) => group.workspaces));
+  const localWorkspaces = directoryChoices.map((choice) => choice.path);
 
   return {
-    workspaces: uniqueWorkspaces(agentRoots.flatMap((group) => group.workspaces)),
+    workspaces: uniqueWorkspaces([...transcriptWorkspaces, ...localWorkspaces]),
+    transcriptWorkspaces,
+    directoryChoices,
     agents: agentRoots,
   };
 }
 
 async function buildProjectsPayload({ workspace, includeSubdirs = true } = {}, options = {}) {
-  const inventory = await buildProjectsInventory();
+  const inventory = await buildProjectsInventory({ cwd: options.cwd });
   const normalizedWorkspace = workspace ? await canonicalizeWorkspacePath(workspace) : null;
+  const requestedWorkspaceExists = normalizedWorkspace ? await isDirectory(normalizedWorkspace) : false;
 
   let workspaceValidation = null;
   if (normalizedWorkspace) {
-    let valid = false;
-    for (const candidate of inventory.workspaces) {
-      if (includeSubdirs ? isSubpath(candidate, normalizedWorkspace) : candidate === normalizedWorkspace) {
-        valid = true;
-        break;
+    let knownWorkspace = false;
+    if (requestedWorkspaceExists) {
+      knownWorkspace = true;
+    } else {
+      for (const candidate of inventory.workspaces) {
+        if (includeSubdirs ? isSubpath(candidate, normalizedWorkspace) : candidate === normalizedWorkspace) {
+          knownWorkspace = true;
+          break;
+        }
       }
     }
     workspaceValidation = {
       requested: normalizedWorkspace,
-      valid,
+      valid: knownWorkspace,
       includeSubdirs,
-      ...(valid ? {} : { reason: "The requested workspace does not match any known project." }),
+      ...(knownWorkspace ? {} : { reason: "The requested workspace does not exist or does not match any known project." }),
     };
   }
+
+  const workspaces = uniqueWorkspaces([
+    ...inventory.workspaces,
+    ...(requestedWorkspaceExists ? [normalizedWorkspace] : []),
+  ]);
 
   return {
     mode: "projects",
     cwd: options.cwd || null,
-    workspaces: inventory.workspaces,
+    workspaces,
+    transcriptWorkspaces: inventory.transcriptWorkspaces,
+    directoryChoices: inventory.directoryChoices,
     selectedWorkspace: normalizedWorkspace,
     workspaceValidation,
     errors: inventory.agents.filter((entry) => entry.error).map((entry) => ({

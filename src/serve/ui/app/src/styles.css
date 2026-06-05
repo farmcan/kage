@@ -117,12 +117,52 @@ button {
   background: transparent;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+
+.logo-mark.active {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--ok) 22%, transparent),
+    0 0 24px color-mix(in srgb, var(--ok) 18%, transparent);
 }
 
 .kage-logo-icon {
   width: 36px;
   height: 36px;
   display: block;
+  transform-origin: 50% 58%;
+}
+
+.kage-logo-prompt,
+.kage-logo-cursor,
+.kage-logo-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.logo-mark.active .kage-logo-icon {
+  animation: kage-logo-breathe 2.4s ease-in-out infinite;
+}
+
+.logo-mark.active .kage-logo-prompt {
+  animation: kage-logo-run-prompt 1.2s ease-in-out infinite;
+}
+
+.logo-mark.active .kage-logo-cursor {
+  animation: kage-logo-cursor 1.2s ease-in-out infinite;
+}
+
+.logo-mark.active .kage-logo-dot {
+  animation: kage-logo-dot-step 1.35s ease-in-out infinite;
+}
+
+.logo-mark.active .kage-logo-dot-green {
+  animation-delay: 120ms;
+}
+
+.logo-mark.active .kage-logo-dot-warm {
+  animation-delay: 240ms;
 }
 
 .brand-copy {
@@ -328,6 +368,25 @@ button {
 
 .workspace.board-mode {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace.conversation-fullscreen {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace.conversation-fullscreen .sidebar,
+.workspace.conversation-fullscreen .dispatch-panel {
+  display: none;
+}
+
+.workspace.conversation-fullscreen .conversation-panel {
+  position: fixed;
+  inset: 12px;
+  z-index: 45;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  background: var(--panel);
 }
 
 .sidebar,
@@ -714,7 +773,7 @@ button {
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   background: color-mix(in srgb, var(--panel-2) 70%, transparent);
@@ -2027,6 +2086,50 @@ textarea:disabled {
   }
 }
 
+@keyframes kage-logo-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-1px) scale(1.015);
+  }
+}
+
+@keyframes kage-logo-run-prompt {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: translateX(0);
+  }
+  45% {
+    opacity: 1;
+    transform: translateX(5px);
+  }
+}
+
+@keyframes kage-logo-cursor {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scaleX(0.92);
+  }
+  45% {
+    opacity: 1;
+    transform: scaleX(1.08);
+  }
+}
+
+@keyframes kage-logo-dot-step {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  42% {
+    transform: translateY(-7px);
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -2036,6 +2139,23 @@ textarea:disabled {
   50% {
     opacity: 0.36;
     transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-mark,
+  .kage-logo-icon,
+  .kage-logo-prompt,
+  .kage-logo-cursor,
+  .kage-logo-dot {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .logo-mark.active {
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 0 0 1px color-mix(in srgb, var(--ok) 24%, transparent);
   }
 }
 
@@ -2149,8 +2269,21 @@ textarea:disabled {
     display: none;
   }
 
+  .workspace.conversation-fullscreen .conversation-panel {
+    order: 1;
+    display: grid;
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .workspace.conversation-fullscreen .conversation-composer {
+    display: block;
+  }
+
   .conversation-head {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
     padding: 12px;
   }
 
@@ -2357,8 +2490,21 @@ textarea:disabled {
   display: none;
 }
 
+.app-shell.mock-mobile .workspace.conversation-fullscreen .conversation-panel {
+  order: 1;
+  display: grid;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  border-radius: 0;
+}
+
+.app-shell.mock-mobile .workspace.conversation-fullscreen .conversation-composer {
+  display: block;
+}
+
 .app-shell.mock-mobile .conversation-head {
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   padding: 12px;
 }
 

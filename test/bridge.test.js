@@ -1324,8 +1324,70 @@ test("serve projects API aggregates workspaces across local agent roots", async 
     const resolvedWorkspaces = await Promise.all((payload.workspaces || []).map((entry) => canonicalPath(entry)));
     const expected = await Promise.all([workspaceA, workspaceB].map((entry) => canonicalPath(entry)));
     assert.deepEqual(Array.isArray(payload.errors) ? payload.errors : null, []);
-    assert.deepEqual(resolvedWorkspaces.sort(), expected.sort());
+    for (const workspace of expected) {
+      assert.equal(resolvedWorkspaces.includes(workspace), true);
+    }
+    assert.deepEqual(payload.transcriptWorkspaces.sort(), expected.sort());
+    assert.equal(Array.isArray(payload.directoryChoices), true);
     assert.equal(payload.selectedWorkspace, null);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
+test("serve projects API includes local directory choices without sessions", async () => {
+  const fakeHome = await makeTempDir("serve-projects-empty-home");
+  const parentDir = await makeTempDir("serve-projects-parent");
+  const currentDir = path.join(parentDir, "current");
+  const siblingDir = path.join(parentDir, "sibling");
+  const commonRoot = path.join(fakeHome, "wrksp");
+  const commonChild = path.join(commonRoot, "common-child");
+
+  await fs.mkdir(currentDir, { recursive: true });
+  await fs.mkdir(siblingDir, { recursive: true });
+  await fs.mkdir(commonChild, { recursive: true });
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: currentDir });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/projects`);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+
+    assert.equal(payload.mode, "projects");
+    assert.deepEqual(payload.transcriptWorkspaces, []);
+    assert.deepEqual(payload.errors, []);
+
+    const workspaces = await Promise.all(payload.workspaces.map((entry) => canonicalPath(entry)));
+    const expectedWorkspaces = await Promise.all([currentDir, siblingDir, commonRoot, commonChild].map((entry) => canonicalPath(entry)));
+    for (const workspace of expectedWorkspaces) {
+      assert.equal(workspaces.includes(workspace), true);
+    }
+
+    const choicesByPath = new Map(payload.directoryChoices.map((choice) => [choice.path, choice]));
+    const canonicalCurrent = await canonicalPath(currentDir);
+    const canonicalSibling = await canonicalPath(siblingDir);
+    const canonicalCommonChild = await canonicalPath(commonChild);
+    assert.equal(choicesByPath.get(canonicalCurrent)?.source, "current");
+    assert.equal(choicesByPath.get(canonicalCurrent)?.current, true);
+    assert.equal(choicesByPath.get(canonicalSibling)?.source, "cwd-parent-child");
+    assert.equal(choicesByPath.get(canonicalCommonChild)?.source, "common-root-child");
+    assert.equal(choicesByPath.get(canonicalCommonChild)?.selectable, true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     if (oldHome === undefined) {
@@ -1375,15 +1437,23 @@ test("serve projects API validates workspace query and includeSubdirs flag", asy
     strictUrl.searchParams.set("workspace", workspaceRoot);
     strictUrl.searchParams.set("includeSubdirs", "false");
     const strictPayload = await (await fetch(strictUrl)).json();
-    assert.equal(strictPayload.workspaceValidation.valid, false);
+    assert.equal(strictPayload.workspaceValidation.valid, true);
     assert.equal(strictPayload.workspaceValidation.includeSubdirs, false);
-    assert.equal(strictPayload.workspaceValidation.reason, "The requested workspace does not match any known project.");
+    assert.equal(await canonicalPath(strictPayload.workspaceValidation.requested), await canonicalPath(workspaceRoot));
 
     const aliasUrl = new URL(`http://127.0.0.1:${port}/api/projects`);
     aliasUrl.searchParams.set("cwd", workspaceChild);
     const aliasPayload = await (await fetch(aliasUrl)).json();
     assert.equal(aliasPayload.workspaceValidation.valid, true);
     assert.equal(aliasPayload.workspaceValidation.includeSubdirs, true);
+
+    const unrelatedDir = await makeTempDir("serve-projects-arbitrary-local");
+    const arbitraryUrl = new URL(`http://127.0.0.1:${port}/api/projects`);
+    arbitraryUrl.searchParams.set("workspace", unrelatedDir);
+    const arbitraryPayload = await (await fetch(arbitraryUrl)).json();
+    assert.equal(arbitraryPayload.workspaceValidation.valid, true);
+    const arbitraryWorkspaces = await Promise.all(arbitraryPayload.workspaces.map((entry) => canonicalPath(entry)));
+    assert.equal(arbitraryWorkspaces.includes(await canonicalPath(unrelatedDir)), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     if (oldHome === undefined) {

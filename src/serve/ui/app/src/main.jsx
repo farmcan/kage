@@ -13,6 +13,8 @@ import {
   Hammer,
   Loader2,
   Lock,
+  Maximize2,
+  Minimize2,
   Moon,
   RefreshCw,
   Search,
@@ -145,6 +147,10 @@ function normalizeWorkspace(value) {
   return normalized.length > 0 ? normalized : "";
 }
 
+function uniqueNormalizedWorkspaces(items = []) {
+  return Array.from(new Set(items.map(normalizeWorkspace).filter(Boolean))).sort((left, right) => left.localeCompare(right));
+}
+
 function isAllWorkspaces(value) {
   return normalizeWorkspace(value) === ALL_WORKSPACES_VALUE;
 }
@@ -173,11 +179,11 @@ function KageLogoIcon() {
       <rect x="56" y="56" width="400" height="400" rx="104" fill="url(#kage-logo-badge)" />
       <rect x="144" y="133" width="224" height="176" rx="36" fill="#f7f2e6" />
       <rect x="168" y="158" width="176" height="126" rx="19" fill="url(#kage-logo-screen)" />
-      <path d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M267 267h72" fill="none" stroke="#f7f2e6" strokeWidth="24" strokeLinecap="round" />
-      <circle cx="164" cy="360" r="24" fill="#3a86ff" />
-      <circle cx="256" cy="376" r="24" fill="#10a37f" />
-      <circle cx="348" cy="360" r="24" fill="#d97757" />
+      <path className="kage-logo-prompt" d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
+      <path className="kage-logo-cursor" d="M267 267h72" fill="none" stroke="#f7f2e6" strokeWidth="24" strokeLinecap="round" />
+      <circle className="kage-logo-dot kage-logo-dot-blue" cx="164" cy="360" r="24" fill="#3a86ff" />
+      <circle className="kage-logo-dot kage-logo-dot-green" cx="256" cy="376" r="24" fill="#10a37f" />
+      <circle className="kage-logo-dot kage-logo-dot-warm" cx="348" cy="360" r="24" fill="#d97757" />
       <path d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" strokeWidth="16" strokeLinecap="round" opacity="0.56" />
     </svg>
   );
@@ -185,6 +191,11 @@ function KageLogoIcon() {
 
 function initialPassword() {
   if (!config.passwordRequired) return "";
+  const fromQuery = query.get("password")?.trim();
+  if (fromQuery) {
+    writeStorageValue(PASSWORD_STORAGE_KEY, fromQuery);
+    return fromQuery;
+  }
   const existing = readStorageValue(PASSWORD_STORAGE_KEY);
   if (existing) return existing;
   const entered = prompt("KAGE password") || "";
@@ -218,6 +229,7 @@ const useStore = create((set, get) => ({
   loadingMessage: "",
   stream: null,
   detailOpen: false,
+  conversationFullscreen: false,
   toast: "",
   sendState: "idle",
   error: "",
@@ -253,6 +265,9 @@ const useStore = create((set, get) => ({
   },
   setSelectedPath(selectedPath) {
     set({ selectedPath: selectedPath || null });
+  },
+  setConversationFullscreen(conversationFullscreen) {
+    set({ conversationFullscreen });
   },
   setSelectedWorkspace(selectedWorkspace) {
     set({ selectedWorkspace: normalizeWorkspace(selectedWorkspace) || null });
@@ -349,7 +364,8 @@ async function loadProjects() {
   try {
     useStore.setState({ loadingMessage: "Scanning local agent roots..." });
     const data = await api("/api/projects");
-    const projects = Array.isArray(data.workspaces) ? data.workspaces.map(normalizeWorkspace).filter(Boolean) : [];
+    const directoryChoicePaths = Array.isArray(data.directoryChoices) ? data.directoryChoices.map((choice) => choice?.path) : [];
+    const projects = uniqueNormalizedWorkspaces([...(Array.isArray(data.workspaces) ? data.workspaces : []), ...directoryChoicePaths]);
     useStore.setState({
       projects,
     });
@@ -638,6 +654,31 @@ function latestMessageBlock(messages = []) {
   return null;
 }
 
+const LOGO_ACTIVE_TASK_STATUSES = new Set(["queued", "running", "needs_review"]);
+const LOGO_ACTIVITY_TEXT_RE = /\b(running|tool|thinking|processing|working|executing|queued)\b/i;
+
+function transcriptSuggestsLogoActivity({ transcript, live, activityUpdatedAt, now }) {
+  if (!live || !transcript || !activityUpdatedAt || now - activityUpdatedAt >= ACTIVITY_IDLE_AFTER_MS) {
+    return false;
+  }
+  const latest = latestMessageBlock(transcript.messages || []);
+  const block = latest?.block;
+  if (!block) return Boolean(latest?.message?._pending);
+  if (latest?.message?._pending || block.type === "tool_use" || block.type === "tool_result" || block.type === "thinking") {
+    return true;
+  }
+  const activityText = [block.type, block.name, blockText(block)].filter(Boolean).join(" ");
+  return LOGO_ACTIVITY_TEXT_RE.test(activityText);
+}
+
+function hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt, now }) {
+  return (
+    sendState === "sending"
+    || (tasks || []).some((task) => LOGO_ACTIVE_TASK_STATUSES.has(task?.status))
+    || transcriptSuggestsLogoActivity({ transcript, live, activityUpdatedAt, now })
+  );
+}
+
 function deriveConversationActivity({ selectedSession, transcript, live, sendState, error, activityUpdatedAt, now, verb }) {
   if (!selectedSession) {
     return {
@@ -799,6 +840,11 @@ function groupLabelForWorkspace(workspaceKey) {
   return tail || trimmed;
 }
 
+function workspaceOptionLabel(workspacePath) {
+  const label = groupLabelForWorkspace(workspacePath);
+  return label === workspacePath ? label : `${label} - ${workspacePath}`;
+}
+
 function sessionDisplayTitle(session) {
   return session.shortTitle || session.title || "(untitled)";
 }
@@ -828,8 +874,13 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       .map((session) => normalizeSession(session))
       .sort((left, right) => right._updatedAtMs - left._updatedAtMs);
     const availableWorkspaces = Array.isArray(data.workspaces) ? data.workspaces : [];
-    const validProjects = availableWorkspaces.map(normalizeWorkspace).filter(Boolean);
+    const validProjects = uniqueNormalizedWorkspaces(availableWorkspaces);
     const selectedWorkspace = normalizeWorkspace(data.selectedWorkspace || previousState.selectedWorkspace || data.cwd);
+    const mergedProjects = uniqueNormalizedWorkspaces([
+      ...(previousState.projects || []),
+      ...validProjects,
+      selectedWorkspace,
+    ]);
     const preferredPath = sessionPathFromQuery() || previousState.selectedPath || "";
     const restoredSession = preferredPath ? sessions.find((session) => session.path === preferredPath) : null;
     const preservedSession = preserveSelection && previousState.selectedPath
@@ -848,7 +899,7 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       agents: data.agents || [],
       cwd: data.cwd,
       workspaces: validProjects,
-      projects: validProjects,
+      projects: mergedProjects,
       selectedWorkspace,
       selectedPath: selectedPath,
       selectedSession: selectedSession || null,
@@ -880,6 +931,7 @@ function switchWorkspace(nextWorkspace) {
   useStore.getState().stream?.close();
   useStore.setState({
     selectedWorkspace: workspace || null,
+    projects: uniqueNormalizedWorkspaces([...(useStore.getState().projects || []), workspace]),
     selectedPath: null,
     selectedSession: null,
     transcript: null,
@@ -1073,6 +1125,7 @@ function App() {
   const theme = useStore((state) => state.theme);
   const detailOpen = useStore((state) => state.detailOpen);
   const viewMode = useStore((state) => state.viewMode);
+  const conversationFullscreen = useStore((state) => state.conversationFullscreen);
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
@@ -1101,7 +1154,7 @@ function App() {
     <Tooltip.Provider delayDuration={220}>
       <div className={cls("app-shell", isMockMobile && "mock-mobile")}>
         <TopBar />
-        <main className={cls("workspace", detailOpen && "detail-open", viewMode === "board" && "board-mode")}>
+        <main className={cls("workspace", detailOpen && "detail-open", conversationFullscreen && "conversation-fullscreen", viewMode === "board" && "board-mode")}>
           <WorkspaceContent />
         </main>
         <Toast />
@@ -1130,16 +1183,18 @@ function TopBar() {
   const viewMode = useStore((state) => state.viewMode);
   const setViewMode = useStore((state) => state.setViewMode);
   const sessions = useStore((state) => state.sessions);
+  const tasks = useStore((state) => state.tasks);
+  const transcript = useStore((state) => state.transcript);
+  const live = useStore((state) => state.live);
+  const sendState = useStore((state) => state.sendState);
+  const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const projects = useStore((state) => state.projects);
   const workspaces = useStore((state) => state.workspaces);
   const loading = useStore((state) => state.loading);
   const loadingMessage = useStore((state) => state.loadingMessage);
   const selectedWorkspace = useStore((state) => state.selectedWorkspace);
   const workspaceOptions = useMemo(
-    () =>
-      Array.from(new Set([...(projects || []), ...(workspaces || [])]))
-        .filter(Boolean)
-        .sort((left, right) => left.localeCompare(right)),
+    () => uniqueNormalizedWorkspaces([...(projects || []), ...(workspaces || []), selectedWorkspace]),
     [projects, workspaces, selectedWorkspace],
   );
   const selectedWorkspaceValue = normalizeWorkspace(selectedWorkspace) || "";
@@ -1149,6 +1204,8 @@ function TopBar() {
       ? groupLabelForWorkspace(selectedWorkspace)
       : "Current workspace";
   const [customWorkspace, setCustomWorkspace] = useState(isAllWorkspaces(selectedWorkspace) ? "" : selectedWorkspace || "");
+  const now = useIntervalNow(Boolean(live && activityUpdatedAt), 1000);
+  const logoActive = hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt, now });
 
   useEffect(() => {
     setCustomWorkspace(isAllWorkspaces(selectedWorkspace) ? "" : selectedWorkspace || "");
@@ -1161,7 +1218,7 @@ function TopBar() {
   return (
     <header className="topbar">
       <div className="brand-lockup">
-        <div className="logo-mark">
+        <div className={cls("logo-mark", logoActive && "active")}>
           <KageLogoIcon />
         </div>
         <div className="brand-copy">
@@ -1182,7 +1239,7 @@ function TopBar() {
           <option value={ALL_WORKSPACES_VALUE}>All workspaces</option>
           {workspaceOptions.map((workspacePath) => (
             <option key={workspacePath} value={workspacePath} title={workspacePath}>
-              {groupLabelForWorkspace(workspacePath)}
+              {workspaceOptionLabel(workspacePath)}
             </option>
           ))}
         </select>
@@ -1204,11 +1261,11 @@ function TopBar() {
           />
           <datalist id="kage-workspaces">
             {workspaceOptions.map((workspacePath) => (
-              <option key={workspacePath} value={workspacePath} />
+              <option key={workspacePath} value={workspacePath} label={workspaceOptionLabel(workspacePath)} />
             ))}
           </datalist>
           <button type="button" className="icon-button" onClick={applyWorkspaceFilter}>
-            Open
+            Open Path
           </button>
         </div>
       </label>
@@ -1495,6 +1552,8 @@ function Conversation() {
   const error = useStore((state) => state.error);
   const sendState = useStore((state) => state.sendState);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
+  const conversationFullscreen = useStore((state) => state.conversationFullscreen);
+  const setConversationFullscreen = useStore((state) => state.setConversationFullscreen);
   const now = useIntervalNow(Boolean(selectedSession), 1000);
   const verb = useRotatingVerb(Boolean(selectedSession && live));
   const activity = useMemo(
@@ -1545,6 +1604,12 @@ function Conversation() {
             <span>Claude, Codex, QoderCLI, and QoderWork sessions appear here.</span>
           </div>
         )}
+        <IconButton
+          label={conversationFullscreen ? "Exit fullscreen conversation" : "Fullscreen conversation"}
+          onClick={() => setConversationFullscreen(!conversationFullscreen)}
+        >
+          {conversationFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+        </IconButton>
       </div>
 
       {selectedSession && (
