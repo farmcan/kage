@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Find, search, replay, and bridge local AI coding sessions across Claude Code, Codex, QoderCLI, and QoderWork, with native resume and fork actions where supported."
+      content="KAGE is a local-first memory layer for Claude Code, Codex, QoderCLI, and QoderWork: search, replay, fork, bridge, and dispatch local AI coding sessions without uploading transcripts."
     >
-    <title>KAGE - Local AI Coding Session Manager</title>
+    <title>KAGE - Local AI Agent Memory Layer</title>
     <style>
       :root {
         color-scheme: dark;
@@ -645,18 +645,22 @@
           order: 2;
           position: relative;
           inset: auto;
-          width: calc(100% + 40px);
-          height: 250px;
-          margin: 26px -20px 0;
-          opacity: 0.82;
+          width: 100%;
+          height: 320px;
+          margin: 28px auto 0;
+          opacity: 0.86;
           overflow: hidden;
         }
 
         .app-window {
-          min-width: 760px;
-          min-height: 520px;
-          transform: scale(0.58);
-          transform-origin: top left;
+          position: relative;
+          left: 50%;
+          width: 760px;
+          min-width: 0;
+          height: 520px;
+          min-height: 0;
+          transform: translateX(-50%) scale(0.58);
+          transform-origin: top center;
         }
 
         .hero-copy p {
@@ -683,6 +687,26 @@
           padding-bottom: 0;
         }
 
+        @media (max-width: 480px) {
+          .hero-scene {
+            height: 270px;
+          }
+
+          .app-window {
+            transform: translateX(-50%) scale(0.5);
+          }
+        }
+
+        @media (max-width: 390px) {
+          .hero-scene {
+            height: 248px;
+          }
+
+          .app-window {
+            transform: translateX(-50%) scale(0.46);
+          }
+        }
+
         .proof-grid,
         .split,
         .workflow-grid,
@@ -703,6 +727,7 @@
         <div class="links">
           <a href="#workflows">Workflows</a>
           <a href="#desktop">Desktop</a>
+          <a href="#local-web">Local Web</a>
           <a href="#matrix">Routes</a>
           <a href="https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg">Download</a>
           <a href="https://github.com/farmcan/kage/releases">Releases</a>
@@ -719,27 +744,27 @@
               <span class="dot"></span>
               <span class="dot"></span>
               <span class="dot"></span>
-              <span class="window-title">KAGE desktop workspace</span>
+              <span class="window-title">KAGE local command center</span>
             </div>
             <div class="app-grid">
               <aside class="sidebar">
                 <div class="path-name">kage</div>
                 <div class="path-sub">~/wrksp/kage</div>
                 <div class="tabs">
-                  <span>All</span>
-                  <span>Codex</span>
-                  <span>Claude</span>
+                  <span>Sessions</span>
+                  <span>Board</span>
+                  <span>Dispatch</span>
                 </div>
-                <div class="search">Search transcripts</div>
+                <div class="search">Search sessions, tasks, cwd</div>
                 <div class="session-list">
                   <div class="session-row active">
                     <div class="agent">Codex</div>
-                    <div class="session-title">Homepage release audit</div>
+                    <div class="session-title">Remote link design review</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
                     <div class="agent" style="color: var(--agent-claude)">Claude Code</div>
-                    <div class="session-title">Session loading plan</div>
+                    <div class="session-title">Task board UI fix</div>
                     <div class="session-path">~/wrksp/kage</div>
                   </div>
                   <div class="session-row">
@@ -757,21 +782,21 @@
                 <div class="detail-top">
                   <div class="agent-icon">&gt;_</div>
                   <div>
-                    <h3>Homepage release audit</h3>
-                    <div class="detail-meta">Codex session in ~/wrksp/kage</div>
+                    <h3>Remote link design review</h3>
+                    <div class="detail-meta">Codex task in ~/wrksp/kage</div>
                   </div>
                 </div>
                 <div class="detail-actions">
-                  <span class="mini-button primary">Continue</span>
+                  <span class="mini-button primary">Dispatch</span>
+                  <span class="mini-button">Board</span>
                   <span class="mini-button">New Session</span>
                   <span class="mini-button">Terminal.app</span>
-                  <span class="mini-button">Replay story</span>
                 </div>
                 <div class="terminal">
-                  $ kage search "release" --since 90d --limit 50<br>
-                  <span class="ok">Found local sessions without scanning full history.</span><br><br>
-                  $ kage actions --limit 120<br>
-                  Continue, Fork, Bridge, Replay story, New Session
+                  $ kage serve --port 9876 --password 1234<br>
+                  <span class="ok">Mobile-friendly local board ready on your trusted LAN.</span><br><br>
+                  $ kage search "remote link" --since 90d<br>
+                  Continue, New Session, Dispatch, Bridge, Replay
                 </div>
               </section>
             </div>
@@ -780,11 +805,12 @@
 
         <div class="shell">
           <div class="hero-copy">
-            <p class="eyebrow">Local-first AI coding session manager</p>
+            <p class="eyebrow">Local-first AI agent memory layer</p>
             <h1>KAGE</h1>
             <p>
-              A macOS desktop workspace and CLI for finding, searching, replaying, and moving local coding-agent
-              sessions across Claude Code, Codex, QoderCLI, and QoderWork without uploading transcript content.
+              Find the Claude Code, Codex, or Qoder session where useful work happened. Replay it, fork it,
+              dispatch follow-up tasks, or bridge context into another agent's native resume format without
+              uploading transcript content.
             </p>
             <div class="actions">
               <a class="button" href="https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg">Download DMG</a>
@@ -793,8 +819,9 @@
               <a class="button secondary" href="https://github.com/farmcan/kage/releases">Releases</a>
             </div>
             <div class="hero-proof" aria-label="Product proof">
-              <span>New Session</span>
-              <span>Recent history window</span>
+              <span>Task board</span>
+              <span>Phone-friendly local viewer</span>
+              <span>Search / Replay / Fork / Bridge</span>
               <span>Claude Code / Codex / QoderCLI / QoderWork</span>
               <span>Latest: v0.1.16</span>
             </div>
@@ -805,16 +832,16 @@
       <section class="proof-strip" aria-label="Current capabilities">
         <div class="shell proof-grid">
           <div class="proof-item">
-            <strong>90d / 120</strong>
-            <span>Recent desktop window by default.</span>
+            <strong>Fast recent search</strong>
+            <span>Bounded session windows keep large histories responsive.</span>
           </div>
           <div class="proof-item">
-            <strong>Terminal.app</strong>
-            <span>Fallback for noisy interactive sessions.</span>
+            <strong>Task board</strong>
+            <span>Dispatch, track, review, and complete local agent runs.</span>
           </div>
           <div class="proof-item">
-            <strong>Demo mode</strong>
-            <span>Try KAGE before local history exists.</span>
+            <strong>Serve UI</strong>
+            <span>Open a trusted LAN viewer from phone or tablet.</span>
           </div>
           <div class="proof-item">
             <strong>Local first</strong>
@@ -828,8 +855,8 @@
           <div>
             <h2>Current desktop surface</h2>
             <p>
-              The app is now centered on the full desktop workspace: recent local sessions on the left,
-              explicit action controls on the right, and a clear path to launch a new agent session.
+              The app is centered on the full desktop workspace: recent local sessions, explicit action controls,
+              agent launch commands, process status, and a clear path back to Terminal.app when a noisy session needs it.
             </p>
           </div>
           <div class="media-stack">
@@ -844,13 +871,14 @@
           <div>
             <h2>Workflows that match local agent memory</h2>
             <p>
-              KAGE is not another coding agent. It is the session layer around the agents you already use.
+              KAGE is not another coding agent. It is the local memory layer around the agents you already use:
+              useful past context becomes searchable, reviewable, branchable, and portable.
             </p>
           </div>
           <div class="workflow-grid">
             <article class="workflow">
-              <strong>Continue</strong>
-              <p>Resume the selected session in its native agent without hunting through JSONL files.</p>
+              <strong>Dispatch board</strong>
+              <p>Start a one-off Claude Code, Codex, or QoderCLI task and track it from queued to review.</p>
             </article>
             <article class="workflow">
               <strong>New Session</strong>
@@ -861,8 +889,8 @@
               <p>Branch a session or move useful context into another agent's native resume format.</p>
             </article>
             <article class="workflow">
-              <strong>Replay story</strong>
-              <p>Turn a transcript into a local read-only review when the work needs to be inspected.</p>
+              <strong>Search / Replay</strong>
+              <p>Find old local work by project or transcript text, then replay it as a local review artifact.</p>
             </article>
           </div>
         </div>
@@ -883,7 +911,7 @@
               <ul>
                 <li>You use more than one AI coding agent.</li>
                 <li>You need to find old local sessions by project or transcript text.</li>
-                <li>You want to fork, bridge, or replay sessions without copy-pasting transcripts.</li>
+                <li>You want a local board to dispatch, review, bridge, and replay agent work.</li>
               </ul>
             </article>
             <article class="fit">
@@ -891,8 +919,39 @@
               <ul>
                 <li>You only use one agent and never revisit old sessions.</li>
                 <li>You need a signed and notarized macOS installer today.</li>
-                <li>You expect hosted sync, team sharing, or mobile control today.</li>
+                <li>You expect hosted sync, team sharing, or a public remote relay today.</li>
               </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="local-web" class="section">
+        <div class="shell split">
+          <div>
+            <h2>Phone-friendly without becoming cloud-first</h2>
+            <p>
+              <code>kage serve</code> opens the same local memory layer in a responsive web UI. It is designed for trusted
+              LAN use today: password-protected when you want it, read-only when you only need to inspect, and still
+              backed by local session files and local agent CLIs.
+            </p>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow">
+              <strong>Local viewer</strong>
+              <p>Browse sessions and transcripts from a phone or tablet on the same trusted network.</p>
+            </article>
+            <article class="workflow">
+              <strong>Arbitrary workspace</strong>
+              <p>Type a directory path and let KAGE validate it locally before scanning sessions or dispatching work.</p>
+            </article>
+            <article class="workflow">
+              <strong>Task review</strong>
+              <p>Keep dispatched tasks inside the board, then open an inline detail panel only when you need context.</p>
+            </article>
+            <article class="workflow">
+              <strong>Remote Link direction</strong>
+              <p>Future optional relay work should stay opt-in and preserve the same local-first execution boundary.</p>
             </article>
           </div>
         </div>
@@ -932,8 +991,8 @@
                 <td>Replay a QoderCLI session as a local HTML story.</td>
               </tr>
               <tr>
-                <td><code>kage qoderwork qoderwork --export session-story-html</code></td>
-                <td>Replay a QoderWork source session as a local HTML story.</td>
+                <td><code>kage serve --password 1234</code></td>
+                <td>Open the local command center and task board for a trusted phone or tablet.</td>
               </tr>
             </tbody>
           </table>
@@ -943,10 +1002,10 @@
       <section class="section">
         <div class="shell split">
           <div>
-            <h2>Built for open source adoption</h2>
+            <h2>Project status</h2>
             <p>
-              Releases carry user-facing workflow notes, GitHub issues hold the roadmap, and the public
-              homepage stays aligned with the latest DMG.
+              KAGE is already useful as a local desktop/CLI tool. The next adoption work is about trust,
+              proof, and optional remote connectivity that does not weaken the local-first boundary.
             </p>
           </div>
           <div class="roadmap">
@@ -963,8 +1022,8 @@
               <p>Move useful context across Claude Code, Codex, QoderCLI, and QoderWork sessions.</p>
             </article>
             <article class="step">
-              <strong>Packaging</strong>
-              <p>DMG releases are published; signing and notarization remain tracked in GitHub issues.</p>
+              <strong>Remote Link</strong>
+              <p>Optional relay design is being explored; current remote access remains local/LAN-first.</p>
             </article>
           </div>
         </div>

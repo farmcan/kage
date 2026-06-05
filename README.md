@@ -5,48 +5,43 @@
 <h1 align="center">KAGE</h1>
 
 <p align="center">
-  Local-first desktop workspace and CLI for AI coding session memory.
+  Local memory for Claude Code, Codex, QoderCLI, and QoderWork.
 </p>
 
 [![CI](https://github.com/farmcan/kage/actions/workflows/ci.yml/badge.svg)](https://github.com/farmcan/kage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-desktop_app-black.svg)](app/)
 
-KAGE finds, searches, replays, and bridges local AI coding sessions across `Claude Code`, `Codex`, `QoderCLI`, and `QoderWork`, with native resume/fork actions where the agent exposes a stable interface.
+KAGE is the local memory layer for the AI coding tools you already run. Find the session where useful work happened, replay it, fork it, or bridge it into another agent's native resume format without uploading transcript content.
 
-> Your AI coding agents already have memory. KAGE makes it searchable, portable, and local.
-
-KAGE treats coding-agent sessions as local project assets. It gives you a macOS desktop workspace and a CLI for finding the session where useful work happened, continuing it, starting a fresh agent session, branching it, or moving it into another agent's native resume format.
-
-It does not upload transcript content, run its own coding model, or try to replace your terminal. The app is a thin native shell over the same JSON CLI contract, so transcript parsing and route logic stay in one place.
-
-The CLI command is `kage`.
-The name comes from the "shadow clone" idea: a useful coding agent should be able to fork its current working context into parallel branches instead of forcing every task through one linear loop.
-
-Action language in KAGE is intentionally narrow:
-
-- `Continue` resumes the original session in its native agent.
-- `New Session` starts a fresh Codex, Claude Code, or QoderCLI terminal in the watched project.
-- `Fork` creates a new same-agent session from the selected context, so you can branch the work without mutating the original session.
-- `Bridge` converts the session into another agent's native resume format.
-- `Replay story` creates a local, read-only HTML review of what happened in the transcript. It is not a fork.
+> Your coding agents already have memory. KAGE makes it searchable, actionable, and local-first.
 
 Homepage: <https://farmcan.github.io/kage/>
 
 Latest release: [KAGE v0.1.16](https://github.com/farmcan/kage/releases/tag/v0.1.16)
 
-## Use KAGE If
+## Why Star KAGE
 
-- You use more than one AI coding agent and want context to move with you.
-- You remember a useful plan, bug, or implementation detail, but not which local session contains it.
-- You want transcript search, replay, and cleanup without sending everything to a hosted service.
-- You want a desktop workspace for agent memory, plus scriptable CLI actions for automation.
+- **One local surface for many agents.** Claude Code, Codex, QoderCLI, and QoderWork keep separate transcript stores; KAGE makes them feel like one workspace.
+- **Task board for local agent runs.** Dispatch one-off tasks, track queued/running/review/completed states, and keep the result visible without losing the session list.
+- **Phone-friendly local viewer.** `kage serve` exposes a responsive local web UI for trusted LAN use, with optional password protection and read-only mode.
+- **Session memory without hosted indexing.** Transcript content stays on disk by default; KAGE reads local files and launches local tools.
+- **Bridge and replay when context matters.** Move useful work between agents or create a local HTML story replay for review.
 
-## Skip It For Now If
+## What Works Today
 
-- You only use one coding agent and never revisit old sessions.
-- You need a signed and notarized macOS installer today. The current DMG is unsigned while [#34](https://github.com/farmcan/kage/issues/34) is open.
-- You expect cloud sync, team sharing, or a mobile companion today. Those are future directions, not shipped product.
+| Surface | What you can do |
+|---|---|
+| macOS desktop | Browse project sessions, filter agents, inspect messages, start new sessions, launch Terminal.app, run resume/fork/bridge/replay actions. |
+| CLI | Search, list, bridge, fork, replay, clean, generate actions, and script everything through `kage`. |
+| Local web | Open a mobile-friendly sessions view and task board with `kage serve --port 9876 --password <pin>`. |
+| Local dispatch | Send prompts to Claude Code, Codex, or QoderCLI as new tasks, then review and complete them from the board. |
+
+Remote-control tools keep today's agent run moving. KAGE helps you recover, reuse, and branch yesterday's useful context.
+
+Star KAGE if you want AI coding sessions to become searchable, reusable local project memory instead of forgotten JSONL files.
+
+KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or terminal replacement. It is the local memory and control layer around the agents you already trust.
 
 ## Screenshots
 
@@ -83,13 +78,13 @@ kage sessions --include-subdirs
 kage search "auth"
 ```
 
-Open a phone-friendly local web viewer:
+Open the local command center:
 
 ```bash
-kage serve --port 9876
+kage serve --port 9876 --password 1234
 ```
 
-Then open the printed LAN URL from a phone or tablet on the same trusted network. Add `--password <pin>` if you want a simple shared secret for the viewer.
+Open the printed LAN URL from a phone or tablet on the same trusted network. Add `--read-only` when you only want to inspect sessions without dispatching local agent runs.
 
 Bridge a useful session:
 
@@ -97,7 +92,20 @@ Bridge a useful session:
 kage c2x
 ```
 
-From the desktop app, use `New Session` to start a fresh Codex, Claude Code, or QoderCLI session in the watched directory. The embedded terminal runs commands through `/bin/zsh -lc`; if the embedded terminal feels slow for a noisy agent session, use the `Terminal.app` button to open the same command in macOS Terminal.
+From the desktop app or serve UI, use `New Session` / `Dispatch` to start a fresh Codex, Claude Code, or QoderCLI run in the selected working directory.
+
+## Use KAGE If
+
+- You use more than one AI coding agent and want context to move with you.
+- You remember a useful plan, bug, or implementation detail, but not which local session contains it.
+- You want transcript search, replay, and cleanup without sending everything to a hosted service.
+- You want a desktop workspace, task board, local web UI, and scriptable CLI actions for automation.
+
+## Skip It For Now If
+
+- You only use one coding agent and never revisit old sessions.
+- You need a signed and notarized macOS installer today. The current DMG is unsigned while [#34](https://github.com/farmcan/kage/issues/34) is open.
+- You expect hosted cloud sync, team sharing, or a public remote relay today. Those are future directions, not shipped product.
 
 Build and open the macOS desktop app from a local checkout:
 
@@ -118,24 +126,19 @@ open app/.build/release/KAGE.app
 
 ## Why It Exists
 
-KAGE is built around three practical workflows.
+KAGE is built around four practical workflows.
 
-1. Fork a conversation and keep the useful context.
+1. Run local agents from one board.
+Dispatch prompts to Claude Code, Codex, or QoderCLI, then review the result before marking the task complete.
+
+2. Fork a conversation and keep the useful context.
 You can branch an existing session, trim it, append one new user message, and continue without rebuilding context from scratch.
 
-2. Bridge between agents.
+3. Bridge between agents.
 You can move a session between tools like `Claude -> Codex` or `Codex -> Claude` and keep working with a native session file instead of a pasted transcript.
 
-3. Browse local agent memory.
-The desktop app gives you a project-scoped session list, search, recent messages, and per-session actions without leaving macOS.
-
-## Why People Star It
-
-- You use more than one AI coding agent and want context to move with you.
-- You have old local sessions that are useful but hard to find.
-- You want transcript search without uploading everything to another service.
-- You want resume, bridge, replay, and cleanup flows that are scriptable from a CLI.
-- You want a desktop workspace for local agent memory instead of raw JSONL files.
+4. Browse local agent memory.
+The desktop app and local web UI give you a project-scoped session list, search, recent messages, and per-session actions without leaving the local machine.
 
 ## Core Examples
 

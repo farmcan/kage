@@ -6,18 +6,18 @@ KAGE's GitHub page is the main product surface until the desktop app has signed 
 
 Keep these fields aligned after every positioning change:
 
-- Description: `Local-first desktop and CLI session manager for Claude Code, Codex, QoderCLI, and QoderWork.`
+- Description: `Local memory for AI coding agents. Find, replay, fork, bridge, and dispatch Claude Code, Codex, and Qoder sessions.`
 - Website: `https://farmcan.github.io/kage/`
-- Topics: `ai-coding`, `claude-code`, `codex`, `qodercli`, `qoderwork`, `session-management`, `desktop-app`, `macos`
+- Topics: `ai-coding`, `coding-agents`, `claude-code`, `codex`, `qodercli`, `qoderwork`, `session-management`, `agent-memory`, `local-first`, `desktop-app`, `macos`, `cli`
 
-Do not add topics that imply shipped capabilities before they exist, such as `ios`, `sync`, `daemon`, or `terminal-emulator`.
+Do not add topics that imply shipped capabilities before they exist, such as `ios`, `sync`, `remote-control`, `daemon`, or `terminal-emulator`.
 
 ## README Design
 
 The README should convert a first-time visitor in this order:
 
-1. One-line category: local-first desktop and CLI session manager.
-2. Pain line: useful agent memory is scattered across local transcripts.
+1. One-line category: local memory layer for AI coding agents.
+2. Pain line: useful agent work is scattered across local transcripts.
 3. Fit check: who should use KAGE and who should skip it for now.
 4. Proof: screenshot or GIF of desktop search and bridge flow.
 5. Fast path: install, doctor, sessions, search, bridge.
@@ -25,11 +25,12 @@ The README should convert a first-time visitor in this order:
 7. Support matrix: Claude Code, Codex, QoderCLI, and QoderWork routes.
 8. Contribution path: issue templates, contributing guide, current docs.
 
-Keep the top third short. Move deep route tables and implementation details below the quick-start path.
+Keep the top third short. Move deep route tables and implementation details below the quick-start path. Do not lead with mobile remote-control language; KAGE's stronger open-source differentiation is reusable local agent memory.
 
 The README should also include a plain comparison against nearby alternatives:
 
 - native Codex / Claude resume pickers
+- Claude Remote Control, Codex mobile remote, MuxAgent-style remote control
 - Warp or a normal terminal
 - raw transcript scripts
 - hosted knowledge tools
@@ -43,6 +44,7 @@ The Pages site should be lighter than the README:
 - one visual app screenshot or GIF once available
 - two CTAs: GitHub repo and releases
 - current workflows, not historical implementation plans
+- a clear boundary that `kage serve` is local/LAN-first while hosted Remote Link is only a future optional direction
 
 Do not duplicate the entire README. The site should help someone decide whether to click GitHub.
 
