@@ -33,7 +33,7 @@ import "./styles.css";
 
 const config = {
   passwordRequired: false,
-  sendEnabled: false,
+  sendEnabled: true,
   ...(window.__KAGE_CONFIG__ || {}),
 };
 const query = new URLSearchParams(window.location.search);
@@ -639,7 +639,7 @@ function DispatchPanel() {
           Dispatch Console
         </div>
         <strong>Assign prompts to local agents</strong>
-        <span>{config.sendEnabled ? "Direct send is enabled for this local runtime." : "Copy mode is active until serve starts with --allow-send."}</span>
+          <span>{config.sendEnabled ? "Direct send is enabled for this local runtime." : "Read-only mode is active; restart without --read-only for direct send."}</span>
       </div>
       <div className="dispatch-metrics" aria-label="Dispatch runtime summary">
         <div>
@@ -889,11 +889,11 @@ function Composer({ session, compact = false }) {
                 Direct send can reply or start a new local CLI session
               </span>
             ) : (
-              <span>
-                <Lock size={14} />
-                Restart with <code>--allow-send</code> for direct send
-              </span>
-            )}
+                <span>
+                  <Lock size={14} />
+                  Restart without <code>--read-only</code> for direct send
+                </span>
+              )}
             <button type="button" onClick={() => copyText(resumeCommand(session), "Resume command copied")} disabled={!session}>
               <Copy size={15} />
               Copy resume

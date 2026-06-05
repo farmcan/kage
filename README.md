@@ -390,6 +390,7 @@ Serve a mobile-friendly session viewer over your LAN:
 ```bash
 kage serve
 kage serve --port 9876 --password 1234
+kage serve --read-only
 ```
 
 Generate menu-bar friendly actions and run one:

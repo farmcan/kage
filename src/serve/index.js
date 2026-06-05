@@ -181,7 +181,7 @@ async function handleSend(request, response, options) {
     return;
   }
   if (!options.allowSend) {
-    jsonResponse(response, 403, { error: "Message sending is disabled. Restart with kage serve --allow-send." });
+    jsonResponse(response, 403, { error: "Message sending is disabled. Restart without --read-only to allow sending prompts." });
     return;
   }
   const body = await readJsonBody(request);
@@ -265,7 +265,7 @@ export function createKageServeServer(options = {}) {
   const serverOptions = {
     cwd: options.cwd ?? process.cwd(),
     password: options.password ?? null,
-    allowSend: Boolean(options.allowSend),
+    allowSend: options.allowSend !== false,
     sendRunner: options.sendRunner ?? runAgentSend,
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };
@@ -312,7 +312,7 @@ export async function startServeCommand({
   port = defaultPort,
   host = defaultHost,
   password = null,
-  allowSend = false,
+  allowSend = true,
   cwd = process.cwd(),
   stdout = process.stdout,
 } = {}) {
@@ -338,9 +338,6 @@ export async function startServeCommand({
   } else if (urls.length > 0) {
     stdout.write("  Auth:   none; use --password <pin> on shared networks\n");
   }
-  stdout.write(`  Send:   ${allowSend ? "enabled" : "disabled; use --allow-send to post prompts"}\n`);
-  if (allowSend && !password && urls.length > 0) {
-    stdout.write("  Warning: sending is enabled without a password on the local network\n");
-  }
+  stdout.write(`  Send:   ${allowSend ? "enabled" : "disabled; use --read-only to disable"}\n`);
   return server;
 }

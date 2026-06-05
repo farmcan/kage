@@ -63,7 +63,7 @@ self.addEventListener("activate", (event) => {
 `;
 }
 
-export function renderServeUi({ passwordRequired = false, sendEnabled = false } = {}) {
+export function renderServeUi({ passwordRequired = false, sendEnabled = true } = {}) {
   const configScript = `window.__KAGE_CONFIG__ = ${JSON.stringify({ passwordRequired, sendEnabled })};`;
   return readServeUiHtml().replace("window.__KAGE_CONFIG__ = {};", configScript);
 }

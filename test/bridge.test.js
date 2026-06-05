@@ -794,7 +794,7 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /--run/);
   assert.match(result.stdout, /--include-subdirs/);
   assert.match(result.stdout, /--port <number>/);
-  assert.match(result.stdout, /--allow-send/);
+  assert.match(result.stdout, /--read-only/);
   assert.match(result.stdout, /--limit <n>/);
   assert.match(result.stdout, /--version/);
 });
@@ -1029,7 +1029,7 @@ test("serve root exposes installable PWA assets", async () => {
     const html = await root.text();
     assert.match(html, /rel="manifest"/);
     assert.match(html, /serviceWorker/);
-    assert.match(html, /window\.__KAGE_CONFIG__ = \{"passwordRequired":false,"sendEnabled":false\};/);
+    assert.match(html, /window\.__KAGE_CONFIG__ = \{"passwordRequired":false,"sendEnabled":true\};/);
 
     const manifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
     assert.equal(manifest.status, 200);
@@ -1057,7 +1057,7 @@ test("serve password mode loads the page and protects APIs", async () => {
     const { port } = server.address();
     const root = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(root.status, 200);
-    assert.match(await root.text(), /window\.__KAGE_CONFIG__ = \{"passwordRequired":true,"sendEnabled":false\};/);
+    assert.match(await root.text(), /window\.__KAGE_CONFIG__ = \{"passwordRequired":true,"sendEnabled":true\};/);
 
     const unauthorized = await fetch(`http://127.0.0.1:${port}/api/doctor`);
     assert.equal(unauthorized.status, 401);
@@ -1072,8 +1072,8 @@ test("serve password mode loads the page and protects APIs", async () => {
   }
 });
 
-test("serve send API is disabled unless explicitly allowed", async () => {
-  const server = createKageServeServer({ cwd: __dirname });
+test("serve send API is disabled in read-only mode", async () => {
+  const server = createKageServeServer({ cwd: __dirname, allowSend: false });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
@@ -1090,17 +1090,16 @@ test("serve send API is disabled unless explicitly allowed", async () => {
       body: JSON.stringify({ agent: "claude", sessionId: "id", message: "hello" }),
     });
     assert.equal(response.status, 403);
-    assert.match((await response.json()).error, /--allow-send/);
+  assert.match((await response.json()).error, /--read-only/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
-test("serve send API can dispatch a new arbitrary prompt when enabled", async () => {
+test("serve send API is enabled by default", async () => {
   const calls = [];
   const server = createKageServeServer({
     cwd: __dirname,
-    allowSend: true,
     sendRunner: async (payload) => {
       calls.push(payload);
       return { ok: true, target: payload.sessionId ? "session" : "new", command: "fake", cwd: payload.cwd, stdout: "sent", stderr: "" };
