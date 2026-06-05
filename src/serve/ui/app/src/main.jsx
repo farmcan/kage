@@ -21,9 +21,13 @@ import {
   Sparkles,
   Sun,
   Terminal,
+  UserRound,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
 import { create } from "zustand";
 
 import "./styles.css";
@@ -41,6 +45,21 @@ const agentMeta = {
   qoderwork: { label: "QoderWork", short: "QWork", color: "var(--qoder)" },
 };
 const sendAgents = ["claude", "codex", "qodercli"];
+const markdownPlugins = [remarkGfm, remarkBreaks];
+const markdownComponents = {
+  a({ node, ...props }) {
+    return <a {...props} target="_blank" rel="noreferrer" />;
+  },
+  input({ node, ...props }) {
+    return <input {...props} disabled />;
+  },
+};
+const messageFilterOptions = [
+  { value: "all", label: "turns", statKey: "messages" },
+  { value: "tool_use", label: "tool calls", statKey: "tool_use" },
+  { value: "tool_result", label: "tool results", statKey: "tool_result" },
+  { value: "thinking", label: "thinking blocks", statKey: "thinking" },
+];
 
 function agentColor(agent) {
   return agentMeta[agent]?.color || "var(--muted)";
@@ -52,16 +71,26 @@ function agentColorStyle(agent, property = "--agent-color") {
 
 function KageLogoIcon() {
   return (
-    <svg className="kage-logo-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="10" y="10" width="44" height="38" rx="10" strokeWidth="5" />
-        <path d="M23 25l9 7-9 7" strokeWidth="5.8" />
-        <path d="M37 39h9" strokeWidth="5" />
-        <path d="M18 55c8 6 20 6 28 0" strokeWidth="3.2" opacity="0.68" />
-      </g>
-      <circle cx="18" cy="55" r="3.2" fill="currentColor" />
-      <circle cx="32" cy="56" r="3.2" fill="currentColor" />
-      <circle cx="46" cy="55" r="3.2" fill="currentColor" />
+    <svg className="kage-logo-icon" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="kage-logo-badge" x1="96" y1="72" x2="416" y2="440" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#182026" />
+          <stop offset="1" stopColor="#0b1013" />
+        </linearGradient>
+        <linearGradient id="kage-logo-screen" x1="152" y1="140" x2="360" y2="310" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#202b32" />
+          <stop offset="1" stopColor="#12191e" />
+        </linearGradient>
+      </defs>
+      <rect x="56" y="56" width="400" height="400" rx="104" fill="url(#kage-logo-badge)" />
+      <rect x="144" y="133" width="224" height="176" rx="36" fill="#f7f2e6" />
+      <rect x="168" y="158" width="176" height="126" rx="19" fill="url(#kage-logo-screen)" />
+      <path d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M267 267h72" fill="none" stroke="#f7f2e6" strokeWidth="24" strokeLinecap="round" />
+      <circle cx="164" cy="360" r="24" fill="#3a86ff" />
+      <circle cx="256" cy="376" r="24" fill="#10a37f" />
+      <circle cx="348" cy="360" r="24" fill="#d97757" />
+      <path d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" strokeWidth="16" strokeLinecap="round" opacity="0.56" />
     </svg>
   );
 }
@@ -85,6 +114,7 @@ const useStore = create((set, get) => ({
   selectedPath: null,
   selectedSession: null,
   transcript: null,
+  messageFilter: "all",
   live: false,
   loading: false,
   stream: null,
@@ -101,6 +131,9 @@ const useStore = create((set, get) => ({
   },
   setSelectedAgent(selectedAgent) {
     set({ selectedAgent });
+  },
+  setMessageFilter(messageFilter) {
+    set({ messageFilter });
   },
   showToast(toast) {
     set({ toast });
@@ -235,6 +268,7 @@ async function selectSession(session, { openDetail = true } = {}) {
     selectedPath: session.path,
     selectedSession: session,
     transcript: null,
+    messageFilter: "all",
     live: false,
     detailOpen: openDetail,
     error: "",
@@ -279,6 +313,25 @@ function useTranscriptStats(transcript) {
     }
     return counts;
   }, [transcript]);
+}
+
+function messageMatchesFilter(message, filter) {
+  if (filter === "all") return true;
+  return (message.blocks || []).some((block) => block.type === filter);
+}
+
+function conversationAgentLabel(agent, label) {
+  if (agent === "claude") return "Claude";
+  if (agent === "codex") return "Codex";
+  if (agent === "qodercli" || agent === "qoderwork") return "Qoder";
+  return label || agentMeta[agent]?.label || agent || "Assistant";
+}
+
+function roleLabel(role, agent, agentLabel) {
+  if (role === "user") return "You";
+  if (role === "assistant") return conversationAgentLabel(agent, agentLabel);
+  if (role === "tool") return "Tool";
+  return role || "Message";
 }
 
 function App() {
@@ -446,9 +499,17 @@ function AgentBadge({ agent, label }) {
 function Conversation() {
   const selectedSession = useStore((state) => state.selectedSession);
   const transcript = useStore((state) => state.transcript);
+  const messageFilter = useStore((state) => state.messageFilter);
+  const setMessageFilter = useStore((state) => state.setMessageFilter);
   const live = useStore((state) => state.live);
   const error = useStore((state) => state.error);
   const stats = useTranscriptStats(transcript);
+  const statCounts = {
+    messages: transcript?.messages?.length || 0,
+    tool_use: stats.tool_use || 0,
+    tool_result: stats.tool_result || 0,
+    thinking: stats.thinking || 0,
+  };
 
   return (
     <section className="conversation-panel" style={agentColorStyle(selectedSession?.agent, "--session-color")}>
@@ -479,14 +540,32 @@ function Conversation() {
 
       {selectedSession && (
         <div className="stat-strip">
-          <span>{transcript?.messages?.length || 0} turns</span>
-          <span>{stats.tool_use || 0} tool calls</span>
-          <span>{stats.tool_result || 0} tool results</span>
-          <span>{stats.thinking || 0} thinking blocks</span>
+          {messageFilterOptions.map((option) => {
+            const count = statCounts[option.statKey] || 0;
+            const active = messageFilter === option.value;
+            const disabled = option.value !== "all" && count === 0;
+            return (
+              <button
+                key={option.value}
+                className={cls("stat-chip", active && "active")}
+                type="button"
+                aria-pressed={active}
+                disabled={disabled}
+                title={disabled ? `No ${option.label} in this session` : `Show ${option.label}`}
+                onClick={() => setMessageFilter(option.value)}
+              >
+                {count} {option.label}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {error ? <div className="empty-state error">{error}</div> : <MessageViewport transcript={transcript} agent={selectedSession?.agent} />}
+      {error ? (
+        <div className="empty-state error">{error}</div>
+      ) : (
+        <MessageViewport transcript={transcript} agent={selectedSession?.agent} agentLabel={selectedSession?.agentLabel} filter={messageFilter} />
+      )}
       {selectedSession && (
         <div className="conversation-composer">
           <Composer session={selectedSession} compact />
@@ -536,9 +615,11 @@ function DispatchPanel() {
   );
 }
 
-function MessageViewport({ transcript, agent }) {
+function MessageViewport({ transcript, agent, agentLabel, filter }) {
   const parentRef = useRef(null);
-  const messages = transcript?.messages || [];
+  const allMessages = transcript?.messages || [];
+  const activeFilter = filter || "all";
+  const messages = useMemo(() => allMessages.filter((message) => messageMatchesFilter(message, activeFilter)), [allMessages, activeFilter]);
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
@@ -550,17 +631,20 @@ function MessageViewport({ transcript, agent }) {
     if (messages.length > 0) {
       virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
     }
-  }, [messages.length]);
+  }, [messages.length, activeFilter]);
 
   if (!transcript) {
     return <div className="empty-state">Loading transcript...</div>;
   }
-  if (messages.length === 0) {
+  if (allMessages.length === 0) {
     return <div className="empty-state">No transcript messages yet.</div>;
+  }
+  if (messages.length === 0) {
+    return <div className="empty-state">No messages match this filter.</div>;
   }
 
   return (
-    <div className="message-viewport" ref={parentRef} style={agentColorStyle(agent, "--session-color")}>
+    <div className={cls("message-viewport", `filter-${activeFilter}`)} ref={parentRef} style={agentColorStyle(agent, "--session-color")}>
       <div className="virtual-canvas" style={{ height: `${virtualizer.getTotalSize()}px` }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const message = messages[virtualRow.index];
@@ -574,7 +658,7 @@ function MessageViewport({ transcript, agent }) {
             >
               <div className="message-role">
                 {roleIcon(message.role)}
-                {message.role || "message"}
+                {roleLabel(message.role, agent, agentLabel)}
               </div>
               <div className="message-blocks">{(message.blocks || []).map((block, index) => <BlockView key={index} block={block} />)}</div>
             </article>
@@ -588,12 +672,13 @@ function MessageViewport({ transcript, agent }) {
 function roleIcon(role) {
   if (role === "assistant") return <Bot size={14} />;
   if (role === "tool") return <Hammer size={14} />;
+  if (role === "user") return <UserRound size={14} />;
   return <Sparkles size={14} />;
 }
 
 function BlockView({ block }) {
   if (block.type === "text") {
-    return <div className="text-block">{block.content}</div>;
+    return <MarkdownText content={block.content} />;
   }
   if (block.type === "thinking") {
     return <DisclosureBlock icon={<Brain size={16} />} title="Thinking" tone="thinking" content={block.content} />;
@@ -605,6 +690,16 @@ function BlockView({ block }) {
     return <DisclosureBlock icon={<Terminal size={16} />} title="Tool result" tone="tool-result" content={block.content} defaultOpen={lineCount(block.content) <= 5} />;
   }
   return <DisclosureBlock icon={<Braces size={16} />} title={block.type || "Block"} content={block.content || JSON.stringify(block, null, 2)} />;
+}
+
+function MarkdownText({ content }) {
+  return (
+    <div className="text-block markdown-body">
+      <ReactMarkdown components={markdownComponents} remarkPlugins={markdownPlugins} skipHtml>
+        {String(content ?? "")}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function lineCount(content) {
