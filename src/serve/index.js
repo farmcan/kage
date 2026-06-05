@@ -14,6 +14,8 @@ import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./
 const defaultPort = 9876;
 const defaultHost = "0.0.0.0";
 const ALL_WORKSPACES_VALUE = "__all_workspaces__";
+const maxTaskHistory = 100;
+const dispatchAgents = new Set(["claude", "codex", "qodercli"]);
 
 function cliPath() {
   return path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "cli.js");
@@ -255,6 +257,156 @@ function sendTargetKey(body, fallbackCwd) {
   return `${agent}:new:${cwd}`;
 }
 
+function taskTitleFromMessage(message) {
+  const text = String(message ?? "").trim().replace(/\s+/g, " ");
+  if (!text) {
+    return "Untitled task";
+  }
+  return text.length > 96 ? `${text.slice(0, 93)}...` : text;
+}
+
+function taskProjectName(cwd) {
+  const value = String(cwd ?? "").trim();
+  if (!value) {
+    return "current project";
+  }
+  return path.basename(value) || value;
+}
+
+function agentLabel(agent) {
+  switch (agent) {
+    case "claude":
+      return "Claude";
+    case "codex":
+      return "Codex";
+    case "qodercli":
+      return "QoderCLI";
+    case "qoderwork":
+      return "QoderWork";
+    default:
+      return agent || "Agent";
+  }
+}
+
+function publicTask(task) {
+  return {
+    id: task.id,
+    agent: task.agent,
+    agentLabel: task.agentLabel,
+    cwd: task.cwd,
+    project: task.project,
+    title: task.title,
+    message: task.message,
+    status: task.status,
+    progress: task.progress,
+    targetKey: task.targetKey,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    startedAt: task.startedAt,
+    reviewAt: task.reviewAt,
+    completedAt: task.completedAt,
+    durationMs: task.durationMs,
+    pid: task.pid,
+    stdout: task.stdout,
+    stderr: task.stderr,
+    error: task.error,
+    logs: task.logs,
+  };
+}
+
+function trimTaskHistory(tasks) {
+  const values = Array.from(tasks.values()).sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  for (const task of values.slice(maxTaskHistory)) {
+    if (task.status !== "running" && task.status !== "queued") {
+      tasks.delete(task.id);
+    }
+  }
+}
+
+function createTask(body, options, targetKey) {
+  const now = new Date().toISOString();
+  const cwd = String(body.cwd ?? options.cwd ?? "").trim() || options.cwd || process.cwd();
+  const agent = String(body.agent ?? "").trim();
+  return {
+    id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    agent,
+    agentLabel: agentLabel(agent),
+    cwd,
+    project: taskProjectName(cwd),
+    title: taskTitleFromMessage(body.message),
+    message: String(body.message ?? ""),
+    status: "queued",
+    progress: 0,
+    targetKey,
+    createdAt: now,
+    updatedAt: now,
+    startedAt: null,
+    reviewAt: null,
+    completedAt: null,
+    durationMs: null,
+    pid: null,
+    stdout: "",
+    stderr: "",
+    error: "",
+    logs: ["Queued for local dispatch."],
+  };
+}
+
+async function runDispatchTask(task, body, options) {
+  task.status = "running";
+  task.progress = 35;
+  task.startedAt = new Date().toISOString();
+  task.updatedAt = task.startedAt;
+  task.logs = [...task.logs, `Starting ${task.agentLabel} in ${task.project}.`];
+  try {
+    const result = await options.sendRunner({
+      agent: body.agent,
+      sessionId: body.sessionId,
+      cwd: body.cwd,
+      message: body.message,
+      fallbackCwd: options.cwd,
+    });
+    const completedAt = new Date().toISOString();
+    task.status = "needs_review";
+    task.progress = 90;
+    task.reviewAt = completedAt;
+    task.updatedAt = completedAt;
+    task.durationMs = result.durationMs ?? null;
+    task.pid = result.pid ?? null;
+    task.stdout = result.stdout || "";
+    task.stderr = result.stderr || "";
+    task.logs = [
+      ...task.logs,
+      result.stdout ? "Agent returned output; review before completing." : "Agent process finished; review before completing.",
+      ...(result.stderr ? ["stderr captured; open task details for context."] : []),
+    ];
+  } catch (error) {
+    const completedAt = new Date().toISOString();
+    task.status = "failed";
+    task.progress = 100;
+    task.completedAt = completedAt;
+    task.updatedAt = completedAt;
+    task.durationMs = error.result?.durationMs ?? null;
+    task.pid = error.result?.pid ?? null;
+    task.stdout = error.result?.stdout || "";
+    task.stderr = error.result?.stderr || "";
+    task.error = error.message;
+    task.logs = [...task.logs, error.message];
+  } finally {
+    options.sendInflight.delete(task.targetKey);
+  }
+}
+
+function markTaskCompleted(task) {
+  const now = new Date().toISOString();
+  task.status = "completed";
+  task.progress = 100;
+  task.completedAt = now;
+  task.updatedAt = now;
+  task.logs = [...(task.logs || []), "Marked complete after review."];
+  return task;
+}
+
 function applyWorkspaceContext(payload, workspace, options = {}) {
   if (!payload || typeof payload !== "object") {
     return payload;
@@ -327,6 +479,22 @@ async function handleApi(request, response, url, options) {
     jsonResponse(response, 200, await runKageJson(["desktop-state", ...kageScopeArgs(url)], { cwd: options.cwd }));
     return;
   }
+  const taskActionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/(complete|retry)$/);
+  if (taskActionMatch) {
+    await handleTaskAction(request, response, options, {
+      taskId: decodeURIComponent(taskActionMatch[1]),
+      action: taskActionMatch[2],
+    });
+    return;
+  }
+  if (url.pathname === "/api/tasks") {
+    await handleTasks(request, response, options);
+    return;
+  }
+  if (url.pathname === "/api/dispatch") {
+    await handleDispatch(request, response, options);
+    return;
+  }
   if (url.pathname === "/api/transcript") {
     jsonResponse(
       response,
@@ -347,6 +515,124 @@ async function handleApi(request, response, url, options) {
     return;
   }
   jsonResponse(response, 404, { error: "Not found" });
+}
+
+async function handleTasks(request, response, options) {
+  if (request.method !== "GET") {
+    jsonResponse(response, 405, { error: "Use GET" });
+    return;
+  }
+  const tasks = Array.from(options.tasks.values())
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .map(publicTask);
+  jsonResponse(response, 200, { mode: "tasks", tasks });
+}
+
+async function handleTaskAction(request, response, options, { taskId, action }) {
+  if (request.method !== "POST") {
+    jsonResponse(response, 405, { error: "Use POST" });
+    return;
+  }
+  const task = options.tasks.get(taskId);
+  if (!task) {
+    jsonResponse(response, 404, { error: "Task not found" });
+    return;
+  }
+  if (action === "complete") {
+    if (task.status !== "needs_review" && task.status !== "completed") {
+      jsonResponse(response, 409, { error: "Only tasks that need review can be completed." });
+      return;
+    }
+    jsonResponse(response, 200, { mode: "task", task: publicTask(markTaskCompleted(task)) });
+    return;
+  }
+  if (action === "retry") {
+    if (!options.allowSend) {
+      jsonResponse(response, 403, { error: "Task dispatch is disabled. Restart without --read-only to retry local agents." });
+      return;
+    }
+    if (task.status === "running" || task.status === "queued") {
+      jsonResponse(response, 409, { error: "This task is already running." });
+      return;
+    }
+    const body = { agent: task.agent, cwd: task.cwd, message: task.message };
+    const targetKey = sendTargetKey(body, options.cwd);
+    if (options.sendInflight.has(targetKey)) {
+      jsonResponse(response, 409, {
+        mode: "dispatch",
+        status: "busy",
+        error: "A task is already running for this target. Wait for it to finish before retrying.",
+        targetKey,
+      });
+      return;
+    }
+    const nextTask = createTask(body, options, targetKey);
+    nextTask.logs = [`Retrying ${task.id}.`];
+    options.tasks.set(nextTask.id, nextTask);
+    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: nextTask.id });
+    task.logs = [...(task.logs || []), `Retry dispatched as ${nextTask.id}.`];
+    task.updatedAt = new Date().toISOString();
+    trimTaskHistory(options.tasks);
+    setTimeout(() => {
+      void runDispatchTask(nextTask, body, options);
+    }, 0);
+    jsonResponse(response, 202, { mode: "dispatch", task: publicTask(nextTask) });
+    return;
+  }
+  jsonResponse(response, 404, { error: "Task action not found" });
+}
+
+async function handleDispatch(request, response, options) {
+  if (request.method !== "POST") {
+    jsonResponse(response, 405, { error: "Use POST" });
+    return;
+  }
+  if (!options.allowSend) {
+    jsonResponse(response, 403, { error: "Task dispatch is disabled. Restart without --read-only to dispatch local agents." });
+    return;
+  }
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    jsonResponse(response, 400, { error: error.message });
+    return;
+  }
+  const agent = String(body.agent ?? "").trim();
+  if (!dispatchAgents.has(agent)) {
+    jsonResponse(response, 400, { error: "Choose a supported dispatch agent: claude, codex, or qodercli." });
+    return;
+  }
+  if (!String(body.message ?? "").trim()) {
+    jsonResponse(response, 400, { error: "Message is required." });
+    return;
+  }
+  if (String(body.message ?? "").length > 16_000) {
+    jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
+    return;
+  }
+  const targetKey = sendTargetKey(body, options.cwd);
+  if (options.sendInflight.has(targetKey)) {
+    jsonResponse(response, 409, {
+      mode: "dispatch",
+      status: "busy",
+      error: "A task is already running for this target. Wait for it to finish before dispatching another prompt.",
+      targetKey,
+    });
+    return;
+  }
+  try {
+    const task = createTask(body, options, targetKey);
+    options.tasks.set(task.id, task);
+    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: task.id });
+    trimTaskHistory(options.tasks);
+    setTimeout(() => {
+      void runDispatchTask(task, body, options);
+    }, 0);
+    jsonResponse(response, 202, { mode: "dispatch", task: publicTask(task) });
+  } catch (error) {
+    jsonResponse(response, 500, { mode: "dispatch", status: "failed", error: error.message, targetKey });
+  }
 }
 
 async function handleSend(request, response, options) {
@@ -465,6 +751,7 @@ export function createKageServeServer(options = {}) {
     allowSend: options.allowSend !== false,
     sendRunner: options.sendRunner ?? runAgentSend,
     sendInflight: new Map(),
+    tasks: new Map(),
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };
 

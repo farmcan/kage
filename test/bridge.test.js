@@ -1540,6 +1540,222 @@ test("serve send API rejects concurrent sends to the same target", async () => {
   }
 });
 
+test("serve dispatch API tracks in-memory task lifecycle", async () => {
+  let releaseSend;
+  let sendStartedResolve;
+  const sendStarted = new Promise((resolve) => {
+    sendStartedResolve = resolve;
+  });
+  const server = createKageServeServer({
+    cwd: __dirname,
+    sendRunner: async (payload) => {
+      sendStartedResolve(payload);
+      await new Promise((release) => {
+        releaseSend = release;
+      });
+      return {
+        ok: true,
+        target: "new",
+        command: "fake",
+        cwd: payload.cwd,
+        status: "completed",
+        stdout: "task done",
+        stderr: "",
+        durationMs: 42,
+      };
+    },
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const dispatchResponse = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "Build the board" }),
+    });
+    assert.equal(dispatchResponse.status, 202);
+    const dispatchBody = await dispatchResponse.json();
+    assert.equal(dispatchBody.mode, "dispatch");
+    assert.equal(dispatchBody.task.status, "queued");
+    assert.equal(dispatchBody.task.title, "Build the board");
+
+    const payload = await sendStarted;
+    assert.equal(payload.message, "Build the board");
+
+    const duplicateResponse = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "Build it again" }),
+    });
+    assert.equal(duplicateResponse.status, 409);
+
+    const runningTasks = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+    assert.equal(runningTasks.mode, "tasks");
+    assert.equal(runningTasks.tasks[0].status, "running");
+
+    releaseSend();
+    let reviewTask;
+    for (let index = 0; index < 20; index += 1) {
+      const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+      reviewTask = tasksBody.tasks.find((task) => task.id === dispatchBody.task.id);
+      if (reviewTask?.status === "needs_review") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(reviewTask.status, "needs_review");
+    assert.equal(reviewTask.progress, 90);
+    assert.equal(reviewTask.stdout, "task done");
+    assert.ok(reviewTask.logs.some((line) => /review|returned output/i.test(line)));
+
+    const completeResponse = await fetch(`http://127.0.0.1:${port}/api/tasks/${encodeURIComponent(dispatchBody.task.id)}/complete`, {
+      method: "POST",
+    });
+    assert.equal(completeResponse.status, 200);
+    const completeBody = await completeResponse.json();
+    assert.equal(completeBody.task.status, "completed");
+    assert.equal(completeBody.task.progress, 100);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve dispatch API validates requests before launching an agent", async () => {
+  const readOnlyServer = createKageServeServer({ cwd: __dirname, allowSend: false });
+  await new Promise((resolve, reject) => {
+    readOnlyServer.once("error", reject);
+    readOnlyServer.listen(0, "127.0.0.1", () => {
+      readOnlyServer.off("error", reject);
+      resolve();
+    });
+  });
+  try {
+    const { port } = readOnlyServer.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "blocked" }),
+    });
+    assert.equal(response.status, 403);
+  } finally {
+    await new Promise((resolve) => readOnlyServer.close(resolve));
+  }
+
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  try {
+    const { port } = server.address();
+    const invalidJson = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    assert.equal(invalidJson.status, 400);
+    assert.match((await invalidJson.json()).error, /Invalid JSON/);
+
+    const missingMessage = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "" }),
+    });
+    assert.equal(missingMessage.status, 400);
+    assert.match((await missingMessage.json()).error, /Message is required/);
+
+    const unsupportedAgent = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "qoderwork", cwd: __dirname, message: "run" }),
+    });
+    assert.equal(unsupportedAgent.status, 400);
+    assert.match((await unsupportedAgent.json()).error, /supported dispatch agent/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve dispatch API retries failed tasks", async () => {
+  let calls = 0;
+  const server = createKageServeServer({
+    cwd: __dirname,
+    sendRunner: async () => {
+      calls += 1;
+      if (calls === 1) {
+        const error = new Error("agent failed");
+        error.result = { stdout: "", stderr: "boom", durationMs: 12 };
+        throw error;
+      }
+      return {
+        ok: true,
+        target: "new",
+        command: "fake",
+        cwd: __dirname,
+        status: "completed",
+        stdout: "retry done",
+        stderr: "",
+        durationMs: 24,
+      };
+    },
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const dispatchResponse = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "Retry me" }),
+    });
+    assert.equal(dispatchResponse.status, 202);
+    const dispatchBody = await dispatchResponse.json();
+
+    let failedTask;
+    for (let index = 0; index < 20; index += 1) {
+      const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+      failedTask = tasksBody.tasks.find((task) => task.id === dispatchBody.task.id);
+      if (failedTask?.status === "failed") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(failedTask.status, "failed");
+    assert.equal(failedTask.stderr, "boom");
+
+    const retryResponse = await fetch(`http://127.0.0.1:${port}/api/tasks/${encodeURIComponent(failedTask.id)}/retry`, {
+      method: "POST",
+    });
+    assert.equal(retryResponse.status, 202);
+    const retryBody = await retryResponse.json();
+    assert.notEqual(retryBody.task.id, failedTask.id);
+
+    let reviewTask;
+    for (let index = 0; index < 20; index += 1) {
+      const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+      reviewTask = tasksBody.tasks.find((task) => task.id === retryBody.task.id);
+      if (reviewTask?.status === "needs_review") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(reviewTask.status, "needs_review");
+    assert.equal(reviewTask.stdout, "retry done");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test("cli shows help with no arguments", async () => {
   const result = await spawnCli([]);
   assert.equal(result.code, 0);

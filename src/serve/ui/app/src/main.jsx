@@ -21,6 +21,7 @@ import {
   Sun,
   Terminal,
   UserRound,
+  X,
 } from "lucide-react";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -120,6 +121,13 @@ const SPINNER_VERBS = [
   "Forming",
   "Architecting",
 ];
+const TASK_COLUMNS = [
+  { value: "queued", label: "Queued", progress: 0 },
+  { value: "running", label: "Running", progress: 45 },
+  { value: "needs_review", label: "Needs Review", progress: 90 },
+  { value: "completed", label: "Completed", progress: 100 },
+  { value: "failed", label: "Failed", progress: 100 },
+];
 
 function initialWorkspaceFromQuery() {
   if (query.get("all") === ALL_WORKSPACES_QUERY) {
@@ -194,8 +202,11 @@ const useStore = create((set, get) => ({
   projects: [],
   workspaces: [],
   selectedWorkspace: initialWorkspaceFromQuery(),
+  viewMode: "sessions",
   selectedAgent: "all",
   search: "",
+  tasks: [],
+  selectedTaskId: null,
   selectedPath: null,
   selectedSession: null,
   transcript: null,
@@ -218,6 +229,27 @@ const useStore = create((set, get) => ({
   },
   setSearch(search) {
     set({ search });
+  },
+  setViewMode(viewMode) {
+    set({ viewMode });
+  },
+  setTasks(tasks) {
+    set({ tasks });
+  },
+  upsertTask(task) {
+    if (!task?.id) return;
+    const tasks = get().tasks || [];
+    const existingIndex = tasks.findIndex((item) => item.id === task.id);
+    const nextTasks = existingIndex >= 0
+      ? tasks.map((item) => (item.id === task.id ? task : item))
+      : [task, ...tasks];
+    set({ tasks: nextTasks });
+  },
+  removeTask(taskId) {
+    set({ tasks: (get().tasks || []).filter((task) => task.id !== taskId) });
+  },
+  setSelectedTaskId(selectedTaskId) {
+    set({ selectedTaskId });
   },
   setSelectedPath(selectedPath) {
     set({ selectedPath: selectedPath || null });
@@ -333,6 +365,20 @@ async function loadProjects() {
     }
     return projects;
   } catch {
+    return [];
+  }
+}
+
+async function loadTasks({ silent = false } = {}) {
+  try {
+    const data = await api("/api/tasks");
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    useStore.getState().setTasks(tasks);
+    return tasks;
+  } catch (error) {
+    if (!silent) {
+      useStore.getState().showToast(error.message);
+    }
     return [];
   }
 }
@@ -1026,16 +1072,24 @@ function AgentMark({ agent, size = 14 }) {
 function App() {
   const theme = useStore((state) => state.theme);
   const detailOpen = useStore((state) => state.detailOpen);
+  const viewMode = useStore((state) => state.viewMode);
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
   useEffect(() => {
     const boot = async () => {
       await loadProjects();
+      await loadTasks({ silent: true });
       await loadSessions();
     };
     void boot();
     return () => useStore.getState().stream?.close();
+  }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadTasks({ silent: true });
+    }, 2500);
+    return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -1047,10 +1101,8 @@ function App() {
     <Tooltip.Provider delayDuration={220}>
       <div className={cls("app-shell", isMockMobile && "mock-mobile")}>
         <TopBar />
-        <main className={cls("workspace", detailOpen && "detail-open")}>
-          <Sidebar />
-          <Conversation />
-          <DispatchPanel />
+        <main className={cls("workspace", detailOpen && "detail-open", viewMode === "board" && "board-mode")}>
+          <WorkspaceContent />
         </main>
         <Toast />
       </div>
@@ -1058,9 +1110,25 @@ function App() {
   );
 }
 
+function WorkspaceContent() {
+  const viewMode = useStore((state) => state.viewMode);
+  if (viewMode === "board") {
+    return <TaskBoardPanel />;
+  }
+  return (
+    <>
+      <Sidebar />
+      <Conversation />
+      <DispatchPanel />
+    </>
+  );
+}
+
 function TopBar() {
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
+  const viewMode = useStore((state) => state.viewMode);
+  const setViewMode = useStore((state) => state.setViewMode);
   const sessions = useStore((state) => state.sessions);
   const projects = useStore((state) => state.projects);
   const workspaces = useStore((state) => state.workspaces);
@@ -1144,6 +1212,14 @@ function TopBar() {
           </button>
         </div>
       </label>
+      <div className="view-switch" role="tablist" aria-label="Switch KAGE view">
+        <button type="button" className={cls(viewMode === "sessions" && "active")} onClick={() => setViewMode("sessions")}>
+          Sessions
+        </button>
+        <button type="button" className={cls(viewMode === "board" && "active")} onClick={() => setViewMode("board")}>
+          Board
+        </button>
+      </div>
       <div className="top-actions">
         <StatusPill />
         <IconButton label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
@@ -1520,6 +1596,300 @@ function Conversation() {
       )}
     </section>
   );
+}
+
+function TaskBoardPanel() {
+  const tasks = useStore((state) => state.tasks);
+  const selectedTaskId = useStore((state) => state.selectedTaskId);
+  const setSelectedTaskId = useStore((state) => state.setSelectedTaskId);
+  const selectedWorkspace = useStore((state) => state.selectedWorkspace);
+  const cwd = useStore((state) => state.cwd);
+  const dispatchWorkspace = isAllWorkspaces(selectedWorkspace) ? cwd : selectedWorkspace || cwd || "";
+  const now = useIntervalNow(tasks.some((task) => task.status === "running" || task.status === "queued"), 1000);
+  const [agentFilter, setAgentFilter] = useState("all");
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
+  const filteredTasks = useMemo(
+    () => (agentFilter === "all" ? tasks : tasks.filter((task) => task.agent === agentFilter)),
+    [tasks, agentFilter],
+  );
+  const taskCounts = useMemo(() => {
+    const counts = new Map([["all", tasks.length]]);
+    for (const agent of sendAgents) {
+      counts.set(agent, tasks.filter((task) => task.agent === agent).length);
+    }
+    return counts;
+  }, [tasks]);
+
+  return (
+    <section className="task-board-panel">
+      <div className="task-board-head">
+        <div>
+          <div className="panel-kicker">
+            <Braces size={14} />
+            Task Board
+          </div>
+          <strong>Dispatch and track local agent tasks</strong>
+          <span>{filteredTasks.length ? `${filteredTasks.length} tasks in this board` : "Create a local one-shot task to start tracking agent work."}</span>
+        </div>
+        <div className="board-agent-tabs" role="tablist" aria-label="Filter tasks by agent">
+          {["all", ...sendAgents].map((agent) => (
+            <button
+              key={agent}
+              type="button"
+              className={cls(agentFilter === agent && "active")}
+              style={agent === "all" ? undefined : agentColorStyle(agent)}
+              onClick={() => setAgentFilter(agent)}
+            >
+              {agent === "all" ? "All" : agentMeta[agent]?.short || agent}
+              <span>{taskCounts.get(agent) || 0}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="task-board-columns" aria-label="Agent task board">
+        {TASK_COLUMNS.map((column) => {
+          const columnTasks = filteredTasks.filter((task) => task.status === column.value);
+          return (
+            <section key={column.value} className={cls("task-column", column.value)}>
+              <div className="task-column-head">
+                <strong>{column.label}</strong>
+                <span>{columnTasks.length}</span>
+              </div>
+              <div className="task-column-body">
+                {columnTasks.length ? (
+                  columnTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      now={now}
+                      active={selectedTaskId === task.id}
+                      onSelect={() => setSelectedTaskId(task.id)}
+                    />
+                  ))
+                ) : (
+                  <div className="task-empty">No tasks</div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <TaskDispatchBar workspace={dispatchWorkspace} />
+
+      {selectedTask && (
+        <TaskDetailPanel task={selectedTask} now={now} onClose={() => setSelectedTaskId(null)} />
+      )}
+    </section>
+  );
+}
+
+function TaskCard({ task, now, active, onSelect }) {
+  const verb = useRotatingVerb(task.status === "running");
+  const age = elapsedLabel(Date.parse(task.createdAt || 0), now);
+  const lastLog = task.logs?.[task.logs.length - 1] || task.error || task.stdout || "Waiting for activity.";
+  return (
+    <button type="button" className={cls("task-card", task.status, active && "active")} style={agentColorStyle(task.agent)} onClick={onSelect}>
+      <div className="task-card-top">
+        <AgentBadge agent={task.agent} label={task.agentLabel} />
+        <span>{age || compactDate(task.createdAt)}</span>
+      </div>
+      <strong>{task.title || "Untitled task"}</strong>
+      <p>{lastLog}</p>
+      <div className="task-progress" aria-label={`Progress ${task.progress || 0}%`}>
+        <span style={{ width: `${Math.max(0, Math.min(100, task.progress || 0))}%` }} />
+      </div>
+      <div className="task-card-foot">
+        <code>{task.project || task.cwd || "project"}</code>
+        <span>{task.status === "running" ? `${verb}...` : taskStatusLabel(task.status)}</span>
+      </div>
+    </button>
+  );
+}
+
+function TaskDispatchBar({ workspace }) {
+  const [agent, setAgent] = useState("codex");
+  const [cwd, setCwd] = useState(workspace || "");
+  const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setCwd(workspace || "");
+  }, [workspace]);
+
+  async function submit(event) {
+    event.preventDefault();
+    const message = draft.trim();
+    const targetCwd = (cwd.trim() || workspace || ".").trim();
+    if (!message || submitting) return;
+    const payload = { agent, cwd: targetCwd, message };
+    if (!config.sendEnabled) {
+      await copyText(sendCommand(payload), "Dispatch command copied");
+      return;
+    }
+    setSubmitting(true);
+    const optimisticTask = {
+      id: `local-task-${Date.now()}`,
+      agent,
+      agentLabel: agentMeta[agent]?.label || agent,
+      cwd: targetCwd,
+      project: groupLabelForWorkspace(targetCwd),
+      title: taskTitleFromPrompt(message),
+      message,
+      status: "queued",
+      progress: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      logs: ["Queued locally."],
+    };
+    useStore.getState().upsertTask(optimisticTask);
+    useStore.getState().setSelectedTaskId(optimisticTask.id);
+    setDraft("");
+    try {
+      const data = await api("/api/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (data.task) {
+        useStore.getState().removeTask(optimisticTask.id);
+        useStore.getState().upsertTask(data.task);
+        useStore.getState().setSelectedTaskId(data.task.id);
+      }
+      useStore.getState().showToast("Task dispatched");
+      void loadTasks({ silent: true });
+    } catch (error) {
+      useStore.getState().showToast(error.message);
+      useStore.getState().upsertTask({
+        ...optimisticTask,
+        status: "failed",
+        progress: 100,
+        updatedAt: new Date().toISOString(),
+        error: error.message,
+        logs: [...optimisticTask.logs, error.message],
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="task-dispatch-bar" onSubmit={submit} style={agentColorStyle(agent)}>
+      <label>
+        <span>Agent</span>
+        <select value={agent} onChange={(event) => setAgent(event.target.value)}>
+          {sendAgents.map((item) => (
+            <option key={item} value={item}>{agentMeta[item]?.label || item}</option>
+          ))}
+        </select>
+      </label>
+      <label className="task-dispatch-cwd">
+        <span>Workspace</span>
+        <input value={cwd} onChange={(event) => setCwd(event.target.value)} placeholder="/path/to/project" />
+      </label>
+      <label className="task-dispatch-prompt">
+        <span>Task</span>
+        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Describe a task to dispatch..." />
+      </label>
+      <button type="submit" disabled={!draft.trim() || submitting}>
+        {submitting ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+        {config.sendEnabled ? "Dispatch" : "Copy"}
+      </button>
+    </form>
+  );
+}
+
+function TaskDetailPanel({ task, now, onClose }) {
+  const [acting, setActing] = useState("");
+  async function completeTask() {
+    if (acting) return;
+    setActing("complete");
+    try {
+      const data = await api(`/api/tasks/${encodeURIComponent(task.id)}/complete`, { method: "POST" });
+      if (data.task) {
+        useStore.getState().upsertTask(data.task);
+      }
+      useStore.getState().showToast("Task completed");
+      void loadTasks({ silent: true });
+    } catch (error) {
+      useStore.getState().showToast(error.message);
+    } finally {
+      setActing("");
+    }
+  }
+  async function retryTask() {
+    if (acting) return;
+    setActing("retry");
+    try {
+      const data = await api(`/api/tasks/${encodeURIComponent(task.id)}/retry`, { method: "POST" });
+      if (data.task) {
+        useStore.getState().upsertTask(data.task);
+        useStore.getState().setSelectedTaskId(data.task.id);
+      }
+      useStore.getState().showToast("Task retried");
+      void loadTasks({ silent: true });
+    } catch (error) {
+      useStore.getState().showToast(error.message);
+    } finally {
+      setActing("");
+    }
+  }
+
+  return (
+    <aside className="task-detail-panel" style={agentColorStyle(task.agent)}>
+      <div className="task-detail-head">
+        <AgentBadge agent={task.agent} label={task.agentLabel} />
+        <button type="button" className="icon-button" onClick={onClose} aria-label="Close task detail">
+          <X size={16} />
+        </button>
+      </div>
+      <strong>{task.title}</strong>
+      <span>{taskStatusLabel(task.status)} / {elapsedLabel(Date.parse(task.createdAt || 0), now) || compactDate(task.createdAt)}</span>
+      <div className="task-progress large">
+        <span style={{ width: `${Math.max(0, Math.min(100, task.progress || 0))}%` }} />
+      </div>
+      {(task.status === "needs_review" || task.status === "failed") && (
+        <div className="task-detail-actions">
+          {task.status === "needs_review" && (
+            <button type="button" onClick={completeTask} disabled={Boolean(acting)}>
+              {acting === "complete" ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+              Approve & Complete
+            </button>
+          )}
+          <button type="button" className="secondary" onClick={retryTask} disabled={Boolean(acting)}>
+            {acting === "retry" ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />}
+            Retry
+          </button>
+        </div>
+      )}
+      <dl className="task-meta">
+        <div><dt>Project</dt><dd>{task.cwd || "current project"}</dd></div>
+        <div><dt>Created</dt><dd>{new Date(task.createdAt || Date.now()).toLocaleString()}</dd></div>
+        {task.pid && <div><dt>PID</dt><dd>{task.pid}</dd></div>}
+      </dl>
+      <div className="task-log">
+        <strong>Activity</strong>
+        {(task.logs || []).map((entry, index) => (
+          <code key={`${task.id}-${index}`}>{entry}</code>
+        ))}
+        {task.stdout && <code>{task.stdout}</code>}
+        {task.stderr && <code>{task.stderr}</code>}
+        {task.error && <code>{task.error}</code>}
+      </div>
+    </aside>
+  );
+}
+
+function taskTitleFromPrompt(prompt) {
+  const text = String(prompt || "").trim().replace(/\s+/g, " ");
+  if (!text) return "Untitled task";
+  return text.length > 96 ? `${text.slice(0, 93)}...` : text;
+}
+
+function taskStatusLabel(status) {
+  if (status === "needs_review") return "Needs review";
+  return status ? status.replace(/_/g, " ") : "queued";
 }
 
 function DispatchPanel() {
