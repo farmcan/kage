@@ -54,6 +54,11 @@ const markdownComponents = {
     return <input {...props} disabled />;
   },
 };
+function messageBlocksKey(blocks) {
+  return (blocks || [])
+    .map((block) => `${block.type || "text"}:${String(block.content || "")}`)
+    .join("|");
+}
 const messageFilterOptions = [
   { value: "all", label: "turns", statKey: "messages" },
   { value: "tool_use", label: "tool calls", statKey: "tool_use" },
@@ -122,6 +127,87 @@ const useStore = create((set, get) => ({
   toast: "",
   sendState: "idle",
   error: "",
+  pendingMessages: {},
+  addPendingMessage(sessionPath, text) {
+    if (!sessionPath || !text) {
+      return undefined;
+    }
+    const state = get();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    set({
+      pendingMessages: {
+        ...state.pendingMessages,
+        [sessionPath]: [
+          ...(state.pendingMessages[sessionPath] || []),
+          {
+            id,
+            role: "user",
+            blocks: [{ type: "text", content: String(text) }],
+            createdAt: Date.now(),
+            isPending: true,
+          },
+        ],
+      },
+    });
+    return id;
+  },
+  removePendingMessage(sessionPath, messageId) {
+    if (!sessionPath || !messageId) {
+      return;
+    }
+    const state = get();
+    const current = state.pendingMessages[sessionPath];
+    if (!current) {
+      return;
+    }
+    const next = current.filter((message) => message.id !== messageId);
+    if (next.length === current.length) {
+      return;
+    }
+    const nextPendingMessages = { ...state.pendingMessages };
+    if (next.length > 0) {
+      nextPendingMessages[sessionPath] = next;
+    } else {
+      delete nextPendingMessages[sessionPath];
+    }
+    set({ pendingMessages: nextPendingMessages });
+  },
+  syncPendingMessages(sessionPath, transcriptMessages = []) {
+    if (!sessionPath) {
+      return;
+    }
+    const state = get();
+    const current = state.pendingMessages[sessionPath];
+    if (!current?.length) {
+      return;
+    }
+    const committed = new Set(
+      (transcriptMessages || []).filter((message) => message?.role === "user").map((message) => messageBlocksKey(message.blocks)),
+    );
+    const next = current.filter((message) => !committed.has(messageBlocksKey(message.blocks)));
+    if (next.length === current.length) {
+      return;
+    }
+    const nextPendingMessages = { ...state.pendingMessages };
+    if (next.length > 0) {
+      nextPendingMessages[sessionPath] = next;
+    } else {
+      delete nextPendingMessages[sessionPath];
+    }
+    set({ pendingMessages: nextPendingMessages });
+  },
+  clearPendingMessages(sessionPath) {
+    if (!sessionPath) {
+      return;
+    }
+    const state = get();
+    if (!state.pendingMessages[sessionPath]) {
+      return;
+    }
+    const next = { ...state.pendingMessages };
+    delete next[sessionPath];
+    set({ pendingMessages: next });
+  },
   setTheme(theme) {
     localStorage.setItem("kageServeTheme", theme);
     set({ theme });
@@ -278,11 +364,14 @@ async function selectSession(session, { openDetail = true } = {}) {
   const stream = new EventSource(authUrl(streamPath));
   useStore.setState({ stream });
   stream.addEventListener("transcript", (event) => {
-    useStore.setState({ transcript: JSON.parse(event.data), live: true });
+    const transcript = JSON.parse(event.data);
+    useStore.getState().syncPendingMessages(session.path, transcript?.messages || []);
+    useStore.setState({ transcript, live: true });
   });
   stream.addEventListener("error", async () => {
     try {
       const transcript = await api(`/api/transcript?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`);
+      useStore.getState().syncPendingMessages(session.path, transcript?.messages || []);
       useStore.setState({ transcript, live: false });
     } catch (error) {
       useStore.setState({ error: error.message, live: false });
@@ -499,6 +588,7 @@ function AgentBadge({ agent, label }) {
 function Conversation() {
   const selectedSession = useStore((state) => state.selectedSession);
   const transcript = useStore((state) => state.transcript);
+  const pendingMessages = useStore((state) => (selectedSession?.path ? state.pendingMessages[selectedSession.path] || [] : []));
   const messageFilter = useStore((state) => state.messageFilter);
   const setMessageFilter = useStore((state) => state.setMessageFilter);
   const live = useStore((state) => state.live);
@@ -564,7 +654,13 @@ function Conversation() {
       {error ? (
         <div className="empty-state error">{error}</div>
       ) : (
-        <MessageViewport transcript={transcript} agent={selectedSession?.agent} agentLabel={selectedSession?.agentLabel} filter={messageFilter} />
+        <MessageViewport
+          transcript={transcript}
+          pendingMessages={pendingMessages}
+          agent={selectedSession?.agent}
+          agentLabel={selectedSession?.agentLabel}
+          filter={messageFilter}
+        />
       )}
       {selectedSession && (
         <div className="conversation-composer">
@@ -615,11 +711,22 @@ function DispatchPanel() {
   );
 }
 
-function MessageViewport({ transcript, agent, agentLabel, filter }) {
+function MessageViewport({ transcript, pendingMessages = [], agent, agentLabel, filter }) {
   const parentRef = useRef(null);
   const allMessages = transcript?.messages || [];
   const activeFilter = filter || "all";
-  const messages = useMemo(() => allMessages.filter((message) => messageMatchesFilter(message, activeFilter)), [allMessages, activeFilter]);
+  const pendingMessageKeys = useMemo(
+    () => new Set((allMessages || []).filter((message) => message?.role === "user").map((message) => messageBlocksKey(message.blocks))),
+    [allMessages],
+  );
+  const effectiveMessages = useMemo(() => {
+    const merged = [
+      ...allMessages,
+      ...(pendingMessages || []).filter((message) => !pendingMessageKeys.has(messageBlocksKey(message.blocks))),
+    ];
+    return merged.filter((message) => messageMatchesFilter(message, activeFilter));
+  }, [allMessages, pendingMessages, activeFilter, pendingMessageKeys]);
+  const messages = useMemo(() => effectiveMessages, [effectiveMessages]);
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
@@ -636,7 +743,7 @@ function MessageViewport({ transcript, agent, agentLabel, filter }) {
   if (!transcript) {
     return <div className="empty-state">Loading transcript...</div>;
   }
-  if (allMessages.length === 0) {
+  if (effectiveMessages.length === 0) {
     return <div className="empty-state">No transcript messages yet.</div>;
   }
   if (messages.length === 0) {
@@ -653,12 +760,18 @@ function MessageViewport({ transcript, agent, agentLabel, filter }) {
               key={virtualRow.key}
               ref={virtualizer.measureElement}
               data-index={virtualRow.index}
-              className={cls("message-card", message.role)}
+              className={cls("message-card", message.role, message.isPending && "pending")}
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
               <div className="message-role">
                 {roleIcon(message.role)}
                 {roleLabel(message.role, agent, agentLabel)}
+                {message.isPending ? (
+                  <span className="message-pending-label">
+                    <Loader2 size={11} className="spin" />
+                    Sending
+                  </span>
+                ) : null}
               </div>
               <div className="message-blocks">{(message.blocks || []).map((block, index) => <BlockView key={index} block={block} />)}</div>
             </article>
@@ -783,6 +896,8 @@ function Composer({ session, compact = false }) {
       return;
     }
     useStore.setState({ sendState: "sending" });
+    const sessionPathForReply = effectiveMode === "reply" ? session?.path : null;
+    const pendingMessageId = sessionPathForReply ? useStore.getState().addPendingMessage(sessionPathForReply, message) : undefined;
     try {
       await api("/api/send", {
         method: "POST",
@@ -791,8 +906,16 @@ function Composer({ session, compact = false }) {
       });
       setDraft("");
       useStore.getState().showToast(effectiveMode === "reply" ? "Message sent to session" : "New session prompt sent");
-      await loadSessions();
+      if (sessionPathForReply && pendingMessageId) {
+        setTimeout(() => {
+          useStore.getState().removePendingMessage(sessionPathForReply, pendingMessageId);
+        }, 5000);
+      }
+      loadSessions().catch(() => {});
     } catch (error) {
+      if (sessionPathForReply && pendingMessageId) {
+        useStore.getState().removePendingMessage(sessionPathForReply, pendingMessageId);
+      }
       useStore.getState().showToast(error.message);
     } finally {
       useStore.setState({ sendState: "idle" });

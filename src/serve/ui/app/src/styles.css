@@ -661,6 +661,20 @@ button {
   line-height: 1.45;
 }
 
+.message-card.pending {
+  opacity: 0.88;
+  border-style: dashed;
+}
+
+.message-pending-label {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: color-mix(in srgb, var(--session-color) 72%, var(--muted));
+  font-size: 10.5px;
+}
+
 .markdown-body {
   min-width: 0;
   max-width: 100%;
