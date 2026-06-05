@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTranscript } from "./transcript.js";
+import { runAgentSend } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
 const defaultPort = 9876;
@@ -58,6 +59,27 @@ function runKageJson(args, { cwd }) {
         reject(new Error(`Could not decode kage output: ${error.message}`));
       }
     });
+  });
+}
+
+function readJsonBody(request, { maxBytes = 64 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > maxBytes) {
+        reject(new Error("Request body is too large"));
+        request.destroy();
+      }
+    });
+    request.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(new Error(`Invalid JSON body: ${error.message}`));
+      }
+    });
+    request.on("error", reject);
   });
 }
 
@@ -146,7 +168,35 @@ async function handleApi(request, response, url, options) {
     await handleStream(response, url, options);
     return;
   }
+  if (url.pathname === "/api/send") {
+    await handleSend(request, response, options);
+    return;
+  }
   jsonResponse(response, 404, { error: "Not found" });
+}
+
+async function handleSend(request, response, options) {
+  if (request.method !== "POST") {
+    jsonResponse(response, 405, { error: "Use POST" });
+    return;
+  }
+  if (!options.allowSend) {
+    jsonResponse(response, 403, { error: "Message sending is disabled. Restart with kage serve --allow-send." });
+    return;
+  }
+  const body = await readJsonBody(request);
+  if (String(body.message ?? "").length > 16_000) {
+    jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
+    return;
+  }
+  const result = await runAgentSend({
+    agent: body.agent,
+    sessionId: body.sessionId,
+    cwd: body.cwd,
+    message: body.message,
+    fallbackCwd: options.cwd,
+  });
+  jsonResponse(response, 200, { mode: "send", ...result });
 }
 
 async function handleStream(response, url, options) {
@@ -215,6 +265,7 @@ export function createKageServeServer(options = {}) {
   const serverOptions = {
     cwd: options.cwd ?? process.cwd(),
     password: options.password ?? null,
+    allowSend: Boolean(options.allowSend),
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };
 
@@ -222,7 +273,15 @@ export function createKageServeServer(options = {}) {
     const url = new URL(request.url, "http://localhost");
     try {
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        textResponse(response, 200, renderServeUi({ passwordRequired: Boolean(serverOptions.password) }), "text/html; charset=utf-8");
+        textResponse(
+          response,
+          200,
+          renderServeUi({
+            passwordRequired: Boolean(serverOptions.password),
+            sendEnabled: serverOptions.allowSend,
+          }),
+          "text/html; charset=utf-8",
+        );
         return;
       }
       if (url.pathname === "/manifest.webmanifest") {
@@ -252,10 +311,11 @@ export async function startServeCommand({
   port = defaultPort,
   host = defaultHost,
   password = null,
+  allowSend = false,
   cwd = process.cwd(),
   stdout = process.stdout,
 } = {}) {
-  const server = createKageServeServer({ cwd, password });
+  const server = createKageServeServer({ cwd, password, allowSend });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
@@ -276,6 +336,10 @@ export async function startServeCommand({
     stdout.write("  Auth:   password enabled\n");
   } else if (urls.length > 0) {
     stdout.write("  Auth:   none; use --password <pin> on shared networks\n");
+  }
+  stdout.write(`  Send:   ${allowSend ? "enabled" : "disabled; use --allow-send to post prompts"}\n`);
+  if (allowSend && !password && urls.length > 0) {
+    stdout.write("  Warning: sending is enabled without a password on the local network\n");
   }
   return server;
 }

@@ -38,6 +38,11 @@ const steps = [
     args: ["diff", "--check"],
   },
   {
+    label: "Serve UI build",
+    command: "npm",
+    args: ["run", "build:serve-ui"],
+  },
+  {
     label: "SVG XML validation",
     command: "xmllint",
     args: ["--noout", ...svgFiles],

@@ -9,10 +9,12 @@
   },
   "files": [
     "src",
+    "vite.serve-ui.config.mjs",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
+    "build:serve-ui": "vite build --config vite.serve-ui.config.mjs",
     "check:all": "node scripts/check-all.mjs",
     "test": "node --test",
     "test:e2e:real": "node scripts/e2e-real.mjs"
@@ -38,5 +40,18 @@
   "engines": {
     "node": ">=20"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-virtual": "^3.14.2",
+    "@vitejs/plugin-react": "^6.0.2",
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16",
+    "vite-plugin-singlefile": "^2.3.3",
+    "zustand": "^5.0.14"
+  }
 }

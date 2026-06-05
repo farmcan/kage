@@ -12,6 +12,7 @@ import { exportSession } from "../src/core/exporting.js";
 import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import { createKageServeServer } from "../src/serve/index.js";
+import { buildAgentSendCommand } from "../src/serve/send.js";
 import {
   buildStoryPayload,
   detectAgent,
@@ -793,8 +794,58 @@ test("cli --help only documents native export commands", async () => {
   assert.match(result.stdout, /--run/);
   assert.match(result.stdout, /--include-subdirs/);
   assert.match(result.stdout, /--port <number>/);
+  assert.match(result.stdout, /--allow-send/);
   assert.match(result.stdout, /--limit <n>/);
   assert.match(result.stdout, /--version/);
+});
+
+test("serve send command builder uses native non-interactive resume commands", () => {
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "claude",
+      sessionId: "claude-session",
+      cwd: __dirname,
+      message: "hello claude",
+    }),
+    {
+      command: "claude",
+      args: ["--resume", "claude-session", "--print", "hello claude"],
+      cwd: __dirname,
+      stdin: null,
+    },
+  );
+
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "codex",
+      sessionId: "codex-session",
+      cwd: __dirname,
+      message: "hello codex",
+    }),
+    {
+      command: "codex",
+      args: ["exec", "resume", "codex-session", "-"],
+      cwd: __dirname,
+      stdin: "hello codex",
+    },
+  );
+
+  assert.deepEqual(
+    buildAgentSendCommand({
+      agent: "qodercli",
+      sessionId: "qoder-session",
+      cwd: __dirname,
+      message: "hello qoder",
+    }),
+    {
+      command: "qodercli",
+      args: ["--cwd", __dirname, "--resume", "qoder-session", "--print", "hello qoder"],
+      cwd: __dirname,
+      stdin: null,
+    },
+  );
+
+  assert.throws(() => buildAgentSendCommand({ agent: "qoderwork", sessionId: "id", cwd: __dirname, message: "hello" }), /read-only/);
 });
 
 test("serve API returns structured transcript blocks", async () => {
@@ -869,6 +920,7 @@ test("serve root exposes installable PWA assets", async () => {
     const html = await root.text();
     assert.match(html, /rel="manifest"/);
     assert.match(html, /serviceWorker/);
+    assert.match(html, /window\.__KAGE_CONFIG__ = \{"passwordRequired":false,"sendEnabled":false\};/);
 
     const manifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
     assert.equal(manifest.status, 200);
@@ -896,7 +948,7 @@ test("serve password mode loads the page and protects APIs", async () => {
     const { port } = server.address();
     const root = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(root.status, 200);
-    assert.match(await root.text(), /const passwordRequired = true/);
+    assert.match(await root.text(), /window\.__KAGE_CONFIG__ = \{"passwordRequired":true,"sendEnabled":false\};/);
 
     const unauthorized = await fetch(`http://127.0.0.1:${port}/api/doctor`);
     assert.equal(unauthorized.status, 401);
@@ -906,6 +958,30 @@ test("serve password mode loads the page and protects APIs", async () => {
     });
     assert.equal(authorized.status, 200);
     assert.equal((await authorized.json()).mode, "doctor");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("serve send API is disabled unless explicitly allowed", async () => {
+  const server = createKageServeServer({ cwd: __dirname });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/api/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: "claude", sessionId: "id", message: "hello" }),
+    });
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).error, /--allow-send/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

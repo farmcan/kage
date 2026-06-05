@@ -31,7 +31,7 @@ const helpText = `Usage:
   kage search [query] [--agent ${agentUsage}] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
   kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
   kage run-action <id> [--include-subdirs] [--json]
-  kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>]
+  kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--allow-send]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
   kage <agent>
@@ -84,6 +84,7 @@ Options:
   --port <number>
   --host <address>
   --password <pin>
+  --allow-send
   --stdout
   --json
   --version
@@ -125,6 +126,7 @@ const completionOptions = [
   "--port",
   "--host",
   "--password",
+  "--allow-send",
   "--stdout",
   "--json",
   "--confirm",
@@ -223,6 +225,7 @@ function parseArgs(argv) {
     servePort: null,
     serveHost: null,
     servePassword: null,
+    serveAllowSend: false,
     clean: false,
     cleanConfirm: false,
     cleanOlderThan: null,
@@ -322,6 +325,8 @@ function parseArgs(argv) {
       } else if (arg === "--password") {
         args.servePassword = readOptionValue(argv, i, arg, { allowOptionValue: true });
         i += 1;
+      } else if (arg === "--allow-send") {
+        args.serveAllowSend = true;
       } else if (arg === "--stdout") {
         args.stdout = true;
       } else if (arg === "--json") {
@@ -348,8 +353,8 @@ function parseArgs(argv) {
   if ((args.cleanConfirm || args.cleanOlderThan) && first !== "clean") {
     return { ...args, error: "--confirm and --older-than are only supported with kage clean" };
   }
-  if ((args.servePort || args.serveHost || args.servePassword) && first !== "serve") {
-    return { ...args, error: "--port, --host, and --password are only supported with kage serve" };
+  if ((args.servePort || args.serveHost || args.servePassword || args.serveAllowSend) && first !== "serve") {
+    return { ...args, error: "--port, --host, --password, and --allow-send are only supported with kage serve" };
   }
   if ((args.since || args.until || args.limit) && !["sessions", "search", "actions", "desktop-state"].includes(first)) {
     return {
@@ -418,7 +423,7 @@ function parseArgs(argv) {
   }
   if (first === "serve") {
     if (second) {
-      return { ...args, error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>]" };
+      return { ...args, error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--allow-send]" };
     }
     return { ...args, serve: true };
   }
@@ -799,6 +804,7 @@ complete -c kage -l include-subdirs
 complete -c kage -l port -r
 complete -c kage -l host -r
 complete -c kage -l password -r
+complete -c kage -l allow-send
 complete -c kage -l preview
 complete -c kage -l run
 complete -c kage -l older-than -r
@@ -1640,6 +1646,7 @@ async function main() {
       port: args.servePort ?? undefined,
       host: args.serveHost ?? undefined,
       password: args.servePassword,
+      allowSend: args.serveAllowSend,
     });
     return;
   }
