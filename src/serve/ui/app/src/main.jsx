@@ -5,7 +5,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Activity,
   ArrowLeft,
-  Bot,
   Brain,
   Braces,
   Check,
@@ -54,10 +53,21 @@ const markdownComponents = {
     return <input {...props} disabled />;
   },
 };
-function messageBlocksKey(blocks) {
-  return (blocks || [])
-    .map((block) => `${block.type || "text"}:${String(block.content || "")}`)
-    .join("|");
+
+function readStorageValue(key, fallback = "") {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorageValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Local storage can be unavailable in some browser contexts.
+  }
 }
 const messageFilterOptions = [
   { value: "all", label: "turns", statKey: "messages" },
@@ -127,87 +137,6 @@ const useStore = create((set, get) => ({
   toast: "",
   sendState: "idle",
   error: "",
-  pendingMessages: {},
-  addPendingMessage(sessionPath, text) {
-    if (!sessionPath || !text) {
-      return undefined;
-    }
-    const state = get();
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    set({
-      pendingMessages: {
-        ...state.pendingMessages,
-        [sessionPath]: [
-          ...(state.pendingMessages[sessionPath] || []),
-          {
-            id,
-            role: "user",
-            blocks: [{ type: "text", content: String(text) }],
-            createdAt: Date.now(),
-            isPending: true,
-          },
-        ],
-      },
-    });
-    return id;
-  },
-  removePendingMessage(sessionPath, messageId) {
-    if (!sessionPath || !messageId) {
-      return;
-    }
-    const state = get();
-    const current = state.pendingMessages[sessionPath];
-    if (!current) {
-      return;
-    }
-    const next = current.filter((message) => message.id !== messageId);
-    if (next.length === current.length) {
-      return;
-    }
-    const nextPendingMessages = { ...state.pendingMessages };
-    if (next.length > 0) {
-      nextPendingMessages[sessionPath] = next;
-    } else {
-      delete nextPendingMessages[sessionPath];
-    }
-    set({ pendingMessages: nextPendingMessages });
-  },
-  syncPendingMessages(sessionPath, transcriptMessages = []) {
-    if (!sessionPath) {
-      return;
-    }
-    const state = get();
-    const current = state.pendingMessages[sessionPath];
-    if (!current?.length) {
-      return;
-    }
-    const committed = new Set(
-      (transcriptMessages || []).filter((message) => message?.role === "user").map((message) => messageBlocksKey(message.blocks)),
-    );
-    const next = current.filter((message) => !committed.has(messageBlocksKey(message.blocks)));
-    if (next.length === current.length) {
-      return;
-    }
-    const nextPendingMessages = { ...state.pendingMessages };
-    if (next.length > 0) {
-      nextPendingMessages[sessionPath] = next;
-    } else {
-      delete nextPendingMessages[sessionPath];
-    }
-    set({ pendingMessages: nextPendingMessages });
-  },
-  clearPendingMessages(sessionPath) {
-    if (!sessionPath) {
-      return;
-    }
-    const state = get();
-    if (!state.pendingMessages[sessionPath]) {
-      return;
-    }
-    const next = { ...state.pendingMessages };
-    delete next[sessionPath];
-    set({ pendingMessages: next });
-  },
   setTheme(theme) {
     localStorage.setItem("kageServeTheme", theme);
     set({ theme });
@@ -364,14 +293,11 @@ async function selectSession(session, { openDetail = true } = {}) {
   const stream = new EventSource(authUrl(streamPath));
   useStore.setState({ stream });
   stream.addEventListener("transcript", (event) => {
-    const transcript = JSON.parse(event.data);
-    useStore.getState().syncPendingMessages(session.path, transcript?.messages || []);
-    useStore.setState({ transcript, live: true });
+    useStore.setState({ transcript: JSON.parse(event.data), live: true });
   });
   stream.addEventListener("error", async () => {
     try {
       const transcript = await api(`/api/transcript?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`);
-      useStore.getState().syncPendingMessages(session.path, transcript?.messages || []);
       useStore.setState({ transcript, live: false });
     } catch (error) {
       useStore.setState({ error: error.message, live: false });
@@ -421,6 +347,38 @@ function roleLabel(role, agent, agentLabel) {
   if (role === "assistant") return conversationAgentLabel(agent, agentLabel);
   if (role === "tool") return "Tool";
   return role || "Message";
+}
+
+function normalizedAgent(agent) {
+  if (agent === "qoderwork") return "qodercli";
+  return agent;
+}
+
+function AgentMark({ agent, size = 14 }) {
+  const normalized = normalizedAgent(agent || "codex");
+  const base = { width: size, height: size };
+
+  if (normalized === "claude") {
+    return (
+      <span className="agent-mark agent-mark-claude" style={base}>
+        <span>C</span>
+      </span>
+    );
+  }
+
+  if (normalized === "qodercli") {
+    return (
+      <span className="agent-mark agent-mark-qoder" style={base}>
+        <span>Q{">"}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="agent-mark agent-mark-codex" style={base}>
+      <span>&lt;/&gt;</span>
+    </span>
+  );
 }
 
 function App() {
@@ -579,7 +537,7 @@ function AgentBadge({ agent, label }) {
   const meta = agentMeta[agent] || { label: label || agent, color: "var(--muted)" };
   return (
     <span className="agent-badge" style={agentColorStyle(agent)}>
-      <span />
+      <AgentMark agent={agent} />
       {label || meta.label}
     </span>
   );
@@ -588,7 +546,6 @@ function AgentBadge({ agent, label }) {
 function Conversation() {
   const selectedSession = useStore((state) => state.selectedSession);
   const transcript = useStore((state) => state.transcript);
-  const pendingMessages = useStore((state) => (selectedSession?.path ? state.pendingMessages[selectedSession.path] || [] : []));
   const messageFilter = useStore((state) => state.messageFilter);
   const setMessageFilter = useStore((state) => state.setMessageFilter);
   const live = useStore((state) => state.live);
@@ -654,13 +611,7 @@ function Conversation() {
       {error ? (
         <div className="empty-state error">{error}</div>
       ) : (
-        <MessageViewport
-          transcript={transcript}
-          pendingMessages={pendingMessages}
-          agent={selectedSession?.agent}
-          agentLabel={selectedSession?.agentLabel}
-          filter={messageFilter}
-        />
+        <MessageViewport transcript={transcript} agent={selectedSession?.agent} agentLabel={selectedSession?.agentLabel} filter={messageFilter} />
       )}
       {selectedSession && (
         <div className="conversation-composer">
@@ -711,22 +662,11 @@ function DispatchPanel() {
   );
 }
 
-function MessageViewport({ transcript, pendingMessages = [], agent, agentLabel, filter }) {
+function MessageViewport({ transcript, agent, agentLabel, filter }) {
   const parentRef = useRef(null);
   const allMessages = transcript?.messages || [];
   const activeFilter = filter || "all";
-  const pendingMessageKeys = useMemo(
-    () => new Set((allMessages || []).filter((message) => message?.role === "user").map((message) => messageBlocksKey(message.blocks))),
-    [allMessages],
-  );
-  const effectiveMessages = useMemo(() => {
-    const merged = [
-      ...allMessages,
-      ...(pendingMessages || []).filter((message) => !pendingMessageKeys.has(messageBlocksKey(message.blocks))),
-    ];
-    return merged.filter((message) => messageMatchesFilter(message, activeFilter));
-  }, [allMessages, pendingMessages, activeFilter, pendingMessageKeys]);
-  const messages = useMemo(() => effectiveMessages, [effectiveMessages]);
+  const messages = useMemo(() => allMessages.filter((message) => messageMatchesFilter(message, activeFilter)), [allMessages, activeFilter]);
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
@@ -743,7 +683,7 @@ function MessageViewport({ transcript, pendingMessages = [], agent, agentLabel, 
   if (!transcript) {
     return <div className="empty-state">Loading transcript...</div>;
   }
-  if (effectiveMessages.length === 0) {
+  if (allMessages.length === 0) {
     return <div className="empty-state">No transcript messages yet.</div>;
   }
   if (messages.length === 0) {
@@ -760,19 +700,13 @@ function MessageViewport({ transcript, pendingMessages = [], agent, agentLabel, 
               key={virtualRow.key}
               ref={virtualizer.measureElement}
               data-index={virtualRow.index}
-              className={cls("message-card", message.role, message.isPending && "pending")}
+              className={cls("message-card", message.role)}
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
               <div className="message-role">
-                {roleIcon(message.role)}
-                {roleLabel(message.role, agent, agentLabel)}
-                {message.isPending ? (
-                  <span className="message-pending-label">
-                    <Loader2 size={11} className="spin" />
-                    Sending
-                  </span>
-                ) : null}
-              </div>
+                  {roleIcon(message.role, agent)}
+                  {roleLabel(message.role, agent, agentLabel)}
+                </div>
               <div className="message-blocks">{(message.blocks || []).map((block, index) => <BlockView key={index} block={block} />)}</div>
             </article>
           );
@@ -782,8 +716,8 @@ function MessageViewport({ transcript, pendingMessages = [], agent, agentLabel, 
   );
 }
 
-function roleIcon(role) {
-  if (role === "assistant") return <Bot size={14} />;
+function roleIcon(role, agent) {
+  if (role === "assistant") return <AgentMark agent={agent} size={14} />;
   if (role === "tool") return <Hammer size={14} />;
   if (role === "user") return <UserRound size={14} />;
   return <Sparkles size={14} />;
@@ -896,8 +830,6 @@ function Composer({ session, compact = false }) {
       return;
     }
     useStore.setState({ sendState: "sending" });
-    const sessionPathForReply = effectiveMode === "reply" ? session?.path : null;
-    const pendingMessageId = sessionPathForReply ? useStore.getState().addPendingMessage(sessionPathForReply, message) : undefined;
     try {
       await api("/api/send", {
         method: "POST",
@@ -906,16 +838,8 @@ function Composer({ session, compact = false }) {
       });
       setDraft("");
       useStore.getState().showToast(effectiveMode === "reply" ? "Message sent to session" : "New session prompt sent");
-      if (sessionPathForReply && pendingMessageId) {
-        setTimeout(() => {
-          useStore.getState().removePendingMessage(sessionPathForReply, pendingMessageId);
-        }, 5000);
-      }
-      loadSessions().catch(() => {});
+      await loadSessions();
     } catch (error) {
-      if (sessionPathForReply && pendingMessageId) {
-        useStore.getState().removePendingMessage(sessionPathForReply, pendingMessageId);
-      }
       useStore.getState().showToast(error.message);
     } finally {
       useStore.setState({ sendState: "idle" });
