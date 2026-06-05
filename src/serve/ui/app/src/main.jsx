@@ -42,6 +42,30 @@ const agentMeta = {
 };
 const sendAgents = ["claude", "codex", "qodercli"];
 
+function agentColor(agent) {
+  return agentMeta[agent]?.color || "var(--muted)";
+}
+
+function agentColorStyle(agent, property = "--agent-color") {
+  return { [property]: agentColor(agent) };
+}
+
+function KageLogoIcon() {
+  return (
+    <svg className="kage-logo-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="10" y="10" width="44" height="38" rx="10" strokeWidth="5" />
+        <path d="M23 25l9 7-9 7" strokeWidth="5.8" />
+        <path d="M37 39h9" strokeWidth="5" />
+        <path d="M18 55c8 6 20 6 28 0" strokeWidth="3.2" opacity="0.68" />
+      </g>
+      <circle cx="18" cy="55" r="3.2" fill="currentColor" />
+      <circle cx="32" cy="56" r="3.2" fill="currentColor" />
+      <circle cx="46" cy="55" r="3.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 function initialPassword() {
   if (!config.passwordRequired) return "";
   const existing = localStorage.getItem("kageServePassword");
@@ -298,7 +322,7 @@ function TopBar() {
     <header className="topbar">
       <div className="brand-lockup">
         <div className="logo-mark">
-          <Sparkles size={17} />
+          <KageLogoIcon />
         </div>
         <div className="brand-copy">
           <h1>KAGE Dispatch</h1>
@@ -362,7 +386,7 @@ function Sidebar() {
         <Tabs.Root value={selectedAgent} onValueChange={setSelectedAgent}>
           <Tabs.List className="agent-tabs" aria-label="Filter sessions by agent">
             {tabAgents.map((agent) => (
-              <Tabs.Trigger key={agent} className="agent-tab" value={agent}>
+              <Tabs.Trigger key={agent} className="agent-tab" value={agent} style={agent === "all" ? undefined : agentColorStyle(agent)}>
                 {agent === "all" ? "All" : agentMeta[agent]?.short || agent}
                 {agent !== "all" && <span>{counts.get(agent) || 0}</span>}
               </Tabs.Trigger>
@@ -395,6 +419,7 @@ function SessionList({ sessions }) {
         <button
           key={`${session.agent}:${session.path}`}
           className={cls("session-card", selectedPath === session.path && "active")}
+          style={agentColorStyle(session.agent)}
           type="button"
           onClick={() => selectSession(session)}
         >
@@ -411,7 +436,7 @@ function SessionList({ sessions }) {
 function AgentBadge({ agent, label }) {
   const meta = agentMeta[agent] || { label: label || agent, color: "var(--muted)" };
   return (
-    <span className="agent-badge" style={{ "--agent-color": meta.color }}>
+    <span className="agent-badge" style={agentColorStyle(agent)}>
       <span />
       {label || meta.label}
     </span>
@@ -426,7 +451,7 @@ function Conversation() {
   const stats = useTranscriptStats(transcript);
 
   return (
-    <section className="conversation-panel">
+    <section className="conversation-panel" style={agentColorStyle(selectedSession?.agent, "--session-color")}>
       <div className="conversation-head">
         <button className="back-button" type="button" onClick={() => useStore.setState({ detailOpen: false })}>
           <ArrowLeft size={17} />
@@ -461,7 +486,7 @@ function Conversation() {
         </div>
       )}
 
-      {error ? <div className="empty-state error">{error}</div> : <MessageViewport transcript={transcript} />}
+      {error ? <div className="empty-state error">{error}</div> : <MessageViewport transcript={transcript} agent={selectedSession?.agent} />}
       {selectedSession && (
         <div className="conversation-composer">
           <Composer session={selectedSession} compact />
@@ -511,7 +536,7 @@ function DispatchPanel() {
   );
 }
 
-function MessageViewport({ transcript }) {
+function MessageViewport({ transcript, agent }) {
   const parentRef = useRef(null);
   const messages = transcript?.messages || [];
   const virtualizer = useVirtualizer({
@@ -535,7 +560,7 @@ function MessageViewport({ transcript }) {
   }
 
   return (
-    <div className="message-viewport" ref={parentRef}>
+    <div className="message-viewport" ref={parentRef} style={agentColorStyle(agent, "--session-color")}>
       <div className="virtual-canvas" style={{ height: `${virtualizer.getTotalSize()}px` }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const message = messages[virtualRow.index];
@@ -680,7 +705,7 @@ function Composer({ session, compact = false }) {
   }
 
   return (
-    <form className={cls("composer", compact && "compact-composer")} onSubmit={submit}>
+    <form className={cls("composer", compact && "compact-composer")} style={agentColorStyle(effectiveAgent, "--composer-color")} onSubmit={submit}>
       <div className="composer-head">
         <div>
           <strong>Send a prompt</strong>
