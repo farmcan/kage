@@ -1090,7 +1090,7 @@ textarea:disabled {
 
   .dispatch-board {
     grid-template-columns: 1fr;
-    max-height: 220px;
+    max-height: 180px;
     overflow: auto;
   }
 
@@ -1100,6 +1100,22 @@ textarea:disabled {
   .primary-button,
   .icon-button {
     min-height: 44px;
+  }
+
+  .dispatch-panel .composer-copy {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .dispatch-panel .composer-copy span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dispatch-panel .composer-copy button {
+    min-height: 36px;
   }
 }
 

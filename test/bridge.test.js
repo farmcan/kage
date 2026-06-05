@@ -12,7 +12,7 @@ import { exportSession } from "../src/core/exporting.js";
 import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import { createKageServeServer } from "../src/serve/index.js";
-import { buildAgentSendCommand } from "../src/serve/send.js";
+import { buildAgentSendCommand, runAgentSend } from "../src/serve/send.js";
 import {
   buildStoryPayload,
   detectAgent,
@@ -894,6 +894,67 @@ test("serve send command builder uses native non-interactive resume commands", (
   );
 
   assert.throws(() => buildAgentSendCommand({ agent: "qoderwork", sessionId: "id", cwd: __dirname, message: "hello" }), /read-only/);
+});
+
+test("runAgentSend returns after handing the prompt to the CLI", async () => {
+  const binDir = await makeTempDir("kage-send-bin");
+  const marker = path.join(binDir, "marker.txt");
+  const codexPath = path.join(binDir, "codex");
+  await writeExecutable(
+    codexPath,
+    `#!/bin/sh
+cat >/dev/null
+printf started > "$KAGE_SEND_MARKER"
+sleep 5
+`,
+  );
+
+  const oldPath = process.env.PATH;
+  const oldMarker = process.env.KAGE_SEND_MARKER;
+  process.env.PATH = `${binDir}${path.delimiter}${oldPath || ""}`;
+  process.env.KAGE_SEND_MARKER = marker;
+  let result;
+
+  try {
+    const startedAt = Date.now();
+    result = await runAgentSend({ agent: "codex", cwd: binDir, message: "background dispatch" }, { timeoutMs: 2_000 });
+    assert.equal(result.status, "started");
+    assert.equal(result.command, "codex");
+    assert.equal(result.target, "new");
+    assert.equal(result.cwd, binDir);
+    assert.equal(typeof result.pid, "number");
+    assert.ok(Date.now() - startedAt < 900, "send should return before the fake CLI exits");
+
+    let markerText = "";
+    for (let index = 0; index < 20; index += 1) {
+      try {
+        markerText = await fs.readFile(marker, "utf8");
+      } catch {
+        markerText = "";
+      }
+      if (markerText.includes("started")) break;
+      await new Promise((resolve) => setTimeout(resolve, 75));
+    }
+    assert.equal(markerText, "started");
+  } finally {
+    if (result?.pid) {
+      try {
+        process.kill(-result.pid, "SIGTERM");
+      } catch {
+        // The fake CLI may already have exited on a fast system.
+      }
+    }
+    if (oldPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = oldPath;
+    }
+    if (oldMarker === undefined) {
+      delete process.env.KAGE_SEND_MARKER;
+    } else {
+      process.env.KAGE_SEND_MARKER = oldMarker;
+    }
+  }
 });
 
 test("serve API returns structured transcript blocks", async () => {

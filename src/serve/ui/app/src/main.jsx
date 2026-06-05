@@ -621,7 +621,7 @@ function Composer({ session, compact = false }) {
   const effectiveCwd = (targetCwd.trim() || session?.cwd || rootCwd || ".").trim();
   const sessionId = effectiveMode === "reply" ? session?.sessionId : undefined;
   const disabled = sendState === "sending" || !effectiveAgent || (effectiveMode === "reply" && !canReply);
-  const canSend = config.sendEnabled && !disabled;
+  const sendEnabled = config.sendEnabled;
 
   useEffect(() => {
     const nextCwd = session?.cwd || rootCwd || "";
@@ -735,8 +735,8 @@ function Composer({ session, compact = false }) {
       <div className="composer-row">
         <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write any prompt for the selected target" rows={2} />
         <button className="send-button" type="submit" disabled={!draft.trim() || disabled}>
-          {sendState === "sending" ? <Loader2 size={18} className="spin" /> : canSend ? <Send size={18} /> : <Copy size={18} />}
-          {canSend ? "Send" : "Copy"}
+          {sendState === "sending" ? <Loader2 size={18} className="spin" /> : sendEnabled ? <Send size={18} /> : <Copy size={18} />}
+          {sendEnabled ? "Send" : "Copy"}
         </button>
       </div>
     </form>

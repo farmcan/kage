@@ -16,11 +16,6 @@ function optionalText(value) {
   return text || null;
 }
 
-function outputTail(text, maxLength = 12_000) {
-  const value = String(text ?? "").trim();
-  return value.length <= maxLength ? value : value.slice(value.length - maxLength);
-}
-
 function existingCwd(cwd, fallback) {
   const candidate = cwd || fallback;
   try {
@@ -74,12 +69,11 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
   const commandPlan = buildAgentSendCommand(input);
   return new Promise((resolve, reject) => {
     let settled = false;
-    let stdout = "";
-    let stderr = "";
     const child = spawn(commandPlan.command, commandPlan.args, {
       cwd: commandPlan.cwd,
       env: process.env,
-      stdio: ["pipe", "pipe", "pipe"],
+      detached: true,
+      stdio: ["pipe", "ignore", "ignore"],
     });
 
     const timer = setTimeout(() => {
@@ -88,14 +82,33 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
       }
       settled = true;
       child.kill("SIGTERM");
-      reject(new Error(`Send timed out after ${Math.round(timeoutMs / 1000)}s`));
+      reject(new Error(`${commandPlan.command} did not start within ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
 
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
+    child.stdin.on("error", () => {
+      // The child may exit quickly after accepting the prompt; the serve UI has
+      // already handed the task off, so avoid surfacing an incidental pipe error.
     });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
+    child.on("spawn", () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (commandPlan.stdin !== null) {
+        child.stdin.end(commandPlan.stdin);
+      } else {
+        child.stdin.end();
+      }
+      child.unref();
+      resolve({
+        ok: true,
+        command: commandPlan.command,
+        target: commandPlan.target,
+        cwd: commandPlan.cwd,
+        pid: child.pid,
+        status: "started",
+      });
     });
     child.on("error", (error) => {
       if (settled) {
@@ -105,30 +118,5 @@ export function runAgentSend(input, { timeoutMs = Number(process.env.KAGE_SEND_T
       clearTimeout(timer);
       reject(new Error(error.code === "ENOENT" ? `${commandPlan.command} command not found` : error.message));
     });
-    child.on("exit", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      if (code === 0) {
-        resolve({
-          ok: true,
-          command: commandPlan.command,
-          target: commandPlan.target,
-          cwd: commandPlan.cwd,
-          stdout: outputTail(stdout),
-          stderr: outputTail(stderr),
-        });
-        return;
-      }
-      reject(new Error(outputTail(stderr) || outputTail(stdout) || `${commandPlan.command} exited with ${code}`));
-    });
-
-    if (commandPlan.stdin !== null) {
-      child.stdin.end(commandPlan.stdin);
-    } else {
-      child.stdin.end();
-    }
   });
 }
