@@ -427,6 +427,12 @@ button.secondary:hover,
   border-color: color-mix(in srgb, var(--ok) 34%, var(--line));
 }
 
+.status-pill.monitor {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 44%, var(--line));
+  background: color-mix(in srgb, var(--ok) 9%, var(--panel));
+}
+
 .status-pill.readonly {
   color: var(--warn);
   border-color: color-mix(in srgb, var(--warn) 34%, var(--line));
@@ -675,6 +681,51 @@ button.secondary:hover,
   background: transparent;
   font-size: 12px;
   font-weight: 850;
+}
+
+.active-now-card {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--agent-color) 32%, var(--line));
+  border-radius: 0;
+  color: var(--text);
+  background: color-mix(in srgb, var(--agent-color) 13%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--agent-color);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.active-now-card div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.active-now-card strong {
+  color: var(--agent-color);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.active-now-card small,
+.active-now-card > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.active-now-card > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pull-refresh-indicator {

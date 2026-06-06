@@ -160,6 +160,19 @@ test("docs position kage serve as a mobile agent monitor", async () => {
   assert.match(homepage, /See what your agents are doing from your phone/u);
 });
 
+test("serve surfaces live monitoring as a primary state", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /KAGE Monitor/u);
+  assert.match(serveMain, /Monitoring live session/u);
+  assert.match(serveMain, /className="status-pill monitor"/u);
+  assert.match(serveMain, /className="active-now-card"/u);
+  assert.match(serveMain, />Active now</u);
+  assert.match(serveStyles, /\.status-pill\.monitor/u);
+  assert.match(serveStyles, /\.active-now-card/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

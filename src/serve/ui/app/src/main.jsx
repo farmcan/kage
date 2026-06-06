@@ -1564,6 +1564,7 @@ function TopBar() {
   const sessions = useStore((state) => state.sessions);
   const tasks = useStore((state) => state.tasks);
   const transcript = useStore((state) => state.transcript);
+  const selectedSession = useStore((state) => state.selectedSession);
   const live = useStore((state) => state.live);
   const sendState = useStore((state) => state.sendState);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
@@ -1582,12 +1583,16 @@ function TopBar() {
     : selectedWorkspace
       ? groupLabelForWorkspace(selectedWorkspace)
       : "Current workspace";
-  const subtitle = sessions.length
-    ? `${sessions.length} sessions${workspaceSummary ? ` · ${workspaceSummary}` : ""}`
-    : "No sessions loaded yet";
   const [customWorkspace, setCustomWorkspace] = useState(isAllWorkspaces(selectedWorkspace) ? "" : selectedWorkspace || "");
   const now = useIntervalNow(Boolean(live && activityUpdatedAt), 1000);
   const logoActive = hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt, now });
+  const activeMonitoring = Boolean(live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS);
+  const activeAgentLabel = selectedSession ? agentMeta[selectedSession.agent]?.label || selectedSession.agentLabel || selectedSession.agent : "";
+  const subtitle = activeMonitoring
+    ? `Monitoring live session${activeAgentLabel ? ` · ${activeAgentLabel}` : ""} · ${elapsedLabel(activityUpdatedAt, now)}`
+    : sessions.length
+      ? `${sessions.length} sessions${workspaceSummary ? ` · ${workspaceSummary}` : ""}`
+      : "No sessions loaded yet";
 
   useEffect(() => {
     setCustomWorkspace(isAllWorkspaces(selectedWorkspace) ? "" : selectedWorkspace || "");
@@ -1604,7 +1609,7 @@ function TopBar() {
           <KageLogoIcon />
         </div>
         <div className="brand-copy">
-          <h1>KAGE Dispatch</h1>
+          <h1>KAGE Monitor</h1>
           <span title={loading ? loadingMessage || subtitle : subtitle}>
             {loading ? loadingMessage || "Refreshing session index..." : subtitle}
           </span>
@@ -1660,6 +1665,12 @@ function TopBar() {
         </button>
       </div>
       <div className="top-actions">
+        {activeMonitoring && (
+          <div className="status-pill monitor">
+            <Activity size={14} />
+            Monitoring
+          </div>
+        )}
         <StatusPill />
         <IconButton label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
           {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
@@ -2080,6 +2091,7 @@ function SessionList({ sessions }) {
     : selectedPath && visibleSessionByPath.has(selectedPath)
       ? selectedPath
       : null;
+  const activeSession = activePath ? visibleSessionByPath.get(activePath) : null;
 
   const openSession = useCallback((session) => {
     syncSessionToUrl(session?.path || "");
@@ -2361,6 +2373,21 @@ function SessionList({ sessions }) {
           <strong>{selectedSessionPaths.length} selected</strong>
           <button type="button" onClick={() => setSelectedSessionPaths([])}>Clear</button>
         </div>
+      )}
+      {activeSession && (
+        <button
+          type="button"
+          className="active-now-card"
+          style={agentColorStyle(activeSession.agent)}
+          onClick={(event) => handleSelectSession(activeSession, event)}
+        >
+          <div>
+            <span className="status-dot pulse" />
+            <strong>Active now</strong>
+            <small>{elapsedLabel(activityUpdatedAt, now)}</small>
+          </div>
+          <span>{sessionDisplayTitle(activeSession)}</span>
+        </button>
       )}
       {groupedSessions.map((group) => {
         const isCollapsed = collapsedGroups.has(group.key);
