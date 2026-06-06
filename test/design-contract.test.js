@@ -87,6 +87,20 @@ test("serve session list exposes sorting and date grouping controls", async () =
   assert.match(serveStyles, /\.session-list-controls/u);
 });
 
+test("serve mobile dispatch is a collapsed bottom sheet", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /mobileDispatchOpen/u);
+  assert.match(serveMain, /className="mobile-dispatch-fab"/u);
+  assert.match(serveMain, /className="mobile-dispatch-backdrop"/u);
+  assert.match(serveMain, /<DispatchPanel mobileOpen=\{mobileDispatchOpen\}/u);
+  assert.match(serveStyles, /\.mobile-dispatch-fab/u);
+  assert.match(serveStyles, /\.dispatch-panel\.mobile-open/u);
+  assert.doesNotMatch(serveStyles, /@media \(max-width: 900px\)[\s\S]*?\.dispatch-panel\s*\{\s*order:\s*1;/u);
+  assert.doesNotMatch(serveStyles, /\.app-shell\.mock-mobile \.dispatch-panel\s*\{\s*order:\s*1;/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

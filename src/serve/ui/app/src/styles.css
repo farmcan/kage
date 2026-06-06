@@ -900,10 +900,24 @@ button.secondary:hover,
   padding: 10px;
 }
 
+.mobile-dispatch-fab,
+.mobile-dispatch-backdrop,
+.dispatch-sheet-close {
+  display: none;
+}
+
 .dispatch-console-head {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.dispatch-console-title {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .dispatch-console-head strong {
@@ -2561,15 +2575,15 @@ textarea:disabled {
   }
 
   .dispatch-panel {
-    order: 1;
+    display: none;
   }
 
   .sidebar {
-    order: 2;
+    order: 1;
   }
 
   .conversation-panel {
-    order: 3;
+    order: 2;
   }
 
   .workspace.detail-open .conversation-panel {
@@ -2598,6 +2612,66 @@ textarea:disabled {
 
   .workspace.detail-open .sidebar,
   .workspace.detail-open .dispatch-panel {
+    display: none;
+  }
+
+  .mobile-dispatch-fab {
+    position: fixed;
+    right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    z-index: 65;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 46px;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    background: var(--accent);
+    box-shadow: 0 16px 44px rgba(21, 28, 35, 0.22);
+    padding: 0 16px;
+    font-weight: 900;
+  }
+
+  .mobile-dispatch-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: rgba(10, 16, 20, 0.36);
+  }
+
+  .dispatch-panel.mobile-open,
+  .workspace.detail-open .dispatch-panel.mobile-open {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 70;
+    display: grid;
+    height: auto;
+    max-height: min(82dvh, 720px);
+    overflow: auto;
+    border-radius: 14px;
+    background: var(--panel);
+  }
+
+  .dispatch-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    background: var(--panel-3);
+  }
+
+  .workspace.conversation-fullscreen .mobile-dispatch-fab {
     display: none;
   }
 
@@ -2794,15 +2868,15 @@ textarea:disabled {
 }
 
 .app-shell.mock-mobile .dispatch-panel {
-  order: 1;
+  display: none;
 }
 
 .app-shell.mock-mobile .sidebar {
-  order: 2;
+  order: 1;
 }
 
 .app-shell.mock-mobile .conversation-panel {
-  order: 3;
+  order: 2;
 }
 
 .app-shell.mock-mobile .workspace.detail-open .conversation-panel {
@@ -2828,6 +2902,66 @@ textarea:disabled {
 .app-shell.mock-mobile .compact-composer .composer-head span,
 .app-shell.mock-mobile .workspace.detail-open .sidebar,
 .app-shell.mock-mobile .workspace.detail-open .dispatch-panel {
+  display: none;
+}
+
+.app-shell.mock-mobile .mobile-dispatch-fab {
+  position: fixed;
+  right: 14px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 65;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 16px 44px rgba(21, 28, 35, 0.22);
+  padding: 0 16px;
+  font-weight: 900;
+}
+
+.app-shell.mock-mobile .mobile-dispatch-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: block;
+  border: 0;
+  border-radius: 0;
+  background: rgba(10, 16, 20, 0.36);
+}
+
+.app-shell.mock-mobile .dispatch-panel.mobile-open,
+.app-shell.mock-mobile .workspace.detail-open .dispatch-panel.mobile-open {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 70;
+  display: grid;
+  height: auto;
+  max-height: min(82dvh, 720px);
+  overflow: auto;
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.app-shell.mock-mobile .dispatch-sheet-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--panel-3);
+}
+
+.app-shell.mock-mobile .workspace.conversation-fullscreen .mobile-dispatch-fab {
   display: none;
 }
 

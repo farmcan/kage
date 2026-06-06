@@ -329,6 +329,7 @@ const useStore = create((set, get) => ({
   messageFilter: "all",
   live: false,
   activityUpdatedAt: 0,
+  mobileDispatchOpen: false,
   loading: false,
   loadingMessage: "",
   stream: null,
@@ -356,7 +357,7 @@ const useStore = create((set, get) => ({
     set(nextSearchState);
   },
   setViewMode(viewMode) {
-    set({ viewMode });
+    set({ viewMode, mobileDispatchOpen: false });
   },
   setTasks(tasks) {
     set({ tasks });
@@ -381,6 +382,9 @@ const useStore = create((set, get) => ({
   },
   setConversationFullscreen(conversationFullscreen) {
     set({ conversationFullscreen });
+  },
+  setMobileDispatchOpen(mobileDispatchOpen) {
+    set({ mobileDispatchOpen });
   },
   setSelectedWorkspace(selectedWorkspace) {
     set({ selectedWorkspace: normalizeWorkspace(selectedWorkspace) || null });
@@ -1494,6 +1498,8 @@ function PasswordGate() {
 
 function WorkspaceContent() {
   const viewMode = useStore((state) => state.viewMode);
+  const mobileDispatchOpen = useStore((state) => state.mobileDispatchOpen);
+  const setMobileDispatchOpen = useStore((state) => state.setMobileDispatchOpen);
   if (viewMode === "board") {
     return <TaskBoardPanel />;
   }
@@ -1501,7 +1507,19 @@ function WorkspaceContent() {
     <>
       <Sidebar />
       <Conversation />
-      <DispatchPanel />
+      <button type="button" className="mobile-dispatch-fab" onClick={() => setMobileDispatchOpen(true)}>
+        <Send size={17} />
+        Dispatch
+      </button>
+      {mobileDispatchOpen && (
+        <button
+          type="button"
+          className="mobile-dispatch-backdrop"
+          aria-label="Close Dispatch Console"
+          onClick={() => setMobileDispatchOpen(false)}
+        />
+      )}
+      <DispatchPanel mobileOpen={mobileDispatchOpen} onCloseMobile={() => setMobileDispatchOpen(false)} />
     </>
   );
 }
@@ -2513,7 +2531,7 @@ function taskStatusLabel(status) {
   return status ? status.replace(/_/g, " ") : "queued";
 }
 
-function DispatchPanel() {
+function DispatchPanel({ mobileOpen = false, onCloseMobile }) {
   const selectedSession = useStore((state) => state.selectedSession);
   const sessions = useStore((state) => state.sessions);
   const cwd = useStore((state) => state.cwd);
@@ -2523,11 +2541,16 @@ function DispatchPanel() {
   const detectedAgents = new Set(sessions.map((session) => session.agent).filter((agent) => sendAgents.includes(agent))).size;
 
   return (
-    <aside className="dispatch-panel">
+    <aside className={cls("dispatch-panel", mobileOpen && "mobile-open")}>
       <div className="dispatch-console-head">
-        <div className="panel-kicker">
-          <Terminal size={14} />
-          Dispatch Console
+        <div className="dispatch-console-title">
+          <div className="panel-kicker">
+            <Terminal size={14} />
+            Dispatch Console
+          </div>
+          <button type="button" className="dispatch-sheet-close" onClick={onCloseMobile} aria-label="Close Dispatch Console">
+            <X size={16} />
+          </button>
         </div>
         <strong>Assign prompts to local agents</strong>
           <span>{config.sendEnabled ? "Direct send is enabled for this local runtime." : "Read-only mode is active; restart without --read-only for direct send."}</span>
