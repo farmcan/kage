@@ -1,0 +1,44 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KAGE mascot">
+  <defs>
+    <radialGradient id="mascot-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 98) rotate(90) scale(118)">
+      <stop offset="0%" stop-color="#f2b84b" stop-opacity="0.28"/>
+      <stop offset="62%" stop-color="#f2b84b" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#f2b84b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mascot-core" x1="70" y1="52" x2="186" y2="204" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7f8fa"/>
+      <stop offset="1" stop-color="#dce5ef"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="28" y="28" width="200" height="200" rx="42" fill="url(#mascot-glow)"/>
+
+  <g transform="translate(56 56)">
+    <ellipse cx="72" cy="72" rx="72" ry="58" fill="#151d22" opacity="0.14"/>
+
+    <g opacity="0.54">
+      <path d="M34 72C44.5 53 50 40 72 37C94 34 114 44 138 59" stroke="#15a074" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="32" cy="79" r="18" fill="none" stroke="#15a074" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <path d="M52 106L92 148 132 109" stroke="#15a074" stroke-width="8" stroke-linecap="round"/>
+
+    <rect x="36" y="92" width="72" height="48" rx="16" fill="url(#mascot-core)" stroke="#202a35" stroke-width="6"/>
+    <path d="M44 126c9 14 19 22 46 22s40-5 46-16" fill="none" stroke="#cf7654" stroke-width="5" stroke-linecap="round" opacity="0.44"/>
+
+    <rect x="84" y="102" width="92" height="70" rx="14" fill="url(#mascot-core)" stroke="#202a35" stroke-width="6"/>
+
+    <path d="M95 130H166" stroke="#3b82f6" stroke-width="7" stroke-linecap="round"/>
+    <path d="M95 149H166" stroke="#3b82f6" stroke-width="7" stroke-linecap="round"/>
+
+    <path d="M42 146h22l9 17h36" fill="none" stroke="#d97757" stroke-width="7" stroke-linecap="round"/>
+
+    <circle cx="114" cy="44" r="9" fill="#f2b84b"/>
+    <circle cx="139" cy="57" r="8" fill="#3b82f6"/>
+    <circle cx="160" cy="44" r="7" fill="#15a074"/>
+
+    <circle cx="40" cy="40" r="24" fill="#f2b84b" fill-opacity="0.15"/>
+    <circle cx="38" cy="38" r="12" fill="#f2b84b" fill-opacity="0.2"/>
+    <circle cx="32" cy="32" r="5" fill="#f2b84b"/>
+  </g>
+</svg>

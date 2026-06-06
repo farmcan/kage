@@ -6,6 +6,7 @@ This directory keeps the public GitHub Pages site, release notes, active maintai
 
 - [GitHub Pages homepage](index.html)
 - [KAGE logo](assets/kage-logo.svg)
+- [KAGE mascot](assets/kage-mascot.svg)
 - [KAGE white logo](assets/kage-logo-white.svg)
 - [Screenshot assets](assets/screenshots/)
 
@@ -18,7 +19,7 @@ The old icon concept assets were removed after the Session Portal icon became th
 
 ## Release Notes
 
-- [v0.1.16](release-notes/v0.1.16.md)
+- [v0.1.17](release-notes/v0.1.17.md)
 - [v0.1.15](release-notes/v0.1.15.md)
 - [v0.1.14](release-notes/v0.1.14.md)
 - [v0.1.13](release-notes/v0.1.13.md)
@@ -39,3 +40,4 @@ The old icon concept assets were removed after the Session Portal icon became th
 ## Archive
 
 - [May 2026 planning notes](archive/2026-05/)
+- [Product strategy and growth notes](product-strategy-and-growth.md)

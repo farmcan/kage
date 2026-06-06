@@ -18,7 +18,7 @@ KAGE is the local memory layer for the AI coding tools you already run. Find the
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.16](https://github.com/farmcan/kage/releases/tag/v0.1.16)
+Latest release: [KAGE v0.1.17](https://github.com/farmcan/kage/releases/tag/v0.1.17)
 
 ## Why Star KAGE
 
@@ -45,11 +45,11 @@ KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or 
 
 ## Screenshots
 
+![KAGE real search-to-bridge flow (15 seconds)](docs/assets/screenshots/kage-search-to-bridge-demo.gif)
+
+![KAGE mobile task board and queue status](docs/assets/screenshots/kage-mobile-board-preview.svg)
+
 ![KAGE current light desktop workspace](docs/assets/screenshots/kage-desktop-preview.svg)
-
-![KAGE phone-friendly task board](docs/assets/screenshots/kage-mobile-board-preview.svg)
-
-![KAGE search, chat, dispatch, and bridge flow](docs/assets/screenshots/kage-demo-flow.svg)
 
 ## Try It In 60 Seconds
 
@@ -58,10 +58,17 @@ Before trying it, KAGE is most useful if you already have at least one Claude Co
 Download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
 ```
 
-The desktop app is currently unsigned. On macOS, right-click `KAGE.app`, choose `Open`, and confirm the first launch if Gatekeeper blocks a normal double-click.
+The desktop app is currently unsigned in CI.
+For trusted installs in local testing, use right-click `Open`, or export signing/notarization env vars for `app/package.sh` before publishing:
+
+```bash
+KAGE_CODESIGN_IDENTITY="Developer ID Application: Your Team" \
+KAGE_NOTARY_PROFILE="kage-notary" \
+(cd app && ./package.sh)
+```
 
 Install the CLI:
 
@@ -196,10 +203,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.16 DMG from GitHub Releases:
+Download the v0.1.17 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.16/KAGE-0.1.16.dmg
+https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -601,7 +608,7 @@ The export pipeline can trim or branch a conversation before writing it:
 - [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
-- [Latest release notes](docs/release-notes/v0.1.16.md)
+- [Latest release notes](docs/release-notes/v0.1.17.md)
 - [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope

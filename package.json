@@ -1,6 +1,6 @@
 {
   "name": "kage",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Local memory for AI coding agents: find, replay, fork, bridge, and dispatch Claude Code, Codex, and Qoder sessions.",
   "type": "module",
   "main": "./src/index.js",
