@@ -42,7 +42,6 @@ const config = {
 
 const AGENT_ICONS = {
   claude: {
-    src: null,
     label: "Claude",
     render: () => (
       <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -189,6 +188,18 @@ const messageFilterOptions = [
   { value: "tool_result", label: "tool results", statKey: "tool_result" },
   { value: "thinking", label: "thinking blocks", statKey: "thinking" },
 ];
+const sessionSortOptions = [
+  { value: "recent", label: "Recent" },
+  { value: "oldest", label: "Oldest" },
+  { value: "agent", label: "Agent" },
+  { value: "turns", label: "Turns" },
+  { value: "title", label: "Title" },
+];
+const sessionGroupOptions = [
+  { value: "workspace", label: "Project" },
+  { value: "date", label: "Date" },
+  { value: "agent", label: "Agent" },
+];
 const SESSION_GROUP_PAGE_SIZE = 80;
 const SESSION_GROUP_INITIAL_SIZE = 80;
 const MESSAGE_WINDOW_SIZE = 420;
@@ -303,6 +314,8 @@ const useStore = create((set, get) => ({
   viewMode: "sessions",
   selectedAgent: "all",
   search: "",
+  sessionSort: "recent",
+  sessionGroupBy: "workspace",
   searchResults: [],
   searchLoading: false,
   searchError: "",
@@ -332,6 +345,12 @@ const useStore = create((set, get) => ({
   },
   setSearch(search) {
     set({ search });
+  },
+  setSessionSort(sessionSort) {
+    set({ sessionSort });
+  },
+  setSessionGroupBy(sessionGroupBy) {
+    set({ sessionGroupBy });
   },
   setSearchState(nextSearchState) {
     set(nextSearchState);
@@ -776,6 +795,85 @@ function formatRelativeTime(value, now = Date.now()) {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
   return compactDate(value);
+}
+
+function sessionTurnCount(session) {
+  const turnCount = Number(session?.turnCount);
+  if (Number.isFinite(turnCount) && turnCount >= 0) {
+    return Math.floor(turnCount);
+  }
+  return Array.isArray(session?.recentUserMessages) ? session.recentUserMessages.length : 0;
+}
+
+function sessionTitleForSort(session) {
+  return String(sessionDisplayTitle(session)).toLowerCase();
+}
+
+function compareSessionRecent(left, right) {
+  return (right._updatedAtMs || 0) - (left._updatedAtMs || 0);
+}
+
+function compareSessionsByMode(left, right, sortMode) {
+  if (sortMode === "oldest") {
+    return (left._updatedAtMs || 0) - (right._updatedAtMs || 0);
+  }
+  if (sortMode === "agent") {
+    const agentCompare = String(left.agentLabel || left.agent || "").localeCompare(String(right.agentLabel || right.agent || ""));
+    return agentCompare || compareSessionRecent(left, right);
+  }
+  if (sortMode === "turns") {
+    return sessionTurnCount(right) - sessionTurnCount(left) || compareSessionRecent(left, right);
+  }
+  if (sortMode === "title") {
+    return sessionTitleForSort(left).localeCompare(sessionTitleForSort(right)) || compareSessionRecent(left, right);
+  }
+  return compareSessionRecent(left, right);
+}
+
+function sortedSessionsByMode(sessions, sortMode) {
+  return [...sessions].sort((left, right) => compareSessionsByMode(left, right, sortMode));
+}
+
+function localDayStartMs(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function dateGroupForSession(session, now = Date.now()) {
+  const updatedDay = localDayStartMs(session?.updatedAt);
+  const today = localDayStartMs(now);
+  if (updatedDay == null || today == null) {
+    return { key: "date:unknown", label: "No date", path: "", order: 50 };
+  }
+  const daysAgo = Math.floor((today - updatedDay) / (24 * 60 * 60 * 1000));
+  if (daysAgo <= 0) return { key: "date:today", label: "Today", path: "", order: 0 };
+  if (daysAgo === 1) return { key: "date:yesterday", label: "Yesterday", path: "", order: 1 };
+  if (daysAgo < 7) return { key: "date:this-week", label: "This week", path: "", order: 2 };
+  if (daysAgo < 30) return { key: "date:this-month", label: "This month", path: "", order: 3 };
+  return { key: "date:older", label: "Older", path: "", order: 4 };
+}
+
+function groupInfoForSession(session, groupBy, now = Date.now()) {
+  if (groupBy === "date") {
+    return dateGroupForSession(session, now);
+  }
+  if (groupBy === "agent") {
+    const label = session.agentLabel || agentMeta[session.agent]?.label || session.agent || "Unknown agent";
+    return {
+      key: `agent:${session.agent || label}`,
+      label,
+      path: "",
+      order: label.toLowerCase(),
+    };
+  }
+  const key = session._groupKey || normalizeGroupKey(session);
+  return {
+    key,
+    label: groupLabelForWorkspace(key),
+    path: workspaceSummaryLabel(key),
+    order: groupLabelForWorkspace(key).toLowerCase(),
+  };
 }
 
 function elapsedLabel(startedAt, now = Date.now()) {
@@ -1622,6 +1720,10 @@ function Sidebar() {
   const searchError = useStore((state) => state.searchError);
   const searchResults = useStore((state) => state.searchResults);
   const selectedWorkspace = useStore((state) => state.selectedWorkspace);
+  const sessionSort = useStore((state) => state.sessionSort);
+  const sessionGroupBy = useStore((state) => state.sessionGroupBy);
+  const setSessionSort = useStore((state) => state.setSessionSort);
+  const setSessionGroupBy = useStore((state) => state.setSessionGroupBy);
   const filteredSessions = useFilteredSessions();
   const counts = useMemo(() => new Map(agents.map((agent) => [agent.agent, agent.sessions.length])), [agents]);
   const tabAgents = ["all", ...agents.map((agent) => agent.agent)];
@@ -1693,6 +1795,28 @@ function Sidebar() {
             )}
           </div>
         )}
+        <div className="session-list-controls">
+          <label>
+            <span>Group</span>
+            <select value={sessionGroupBy} onChange={(event) => setSessionGroupBy(event.target.value)}>
+              {sessionGroupOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Sort</span>
+            <select value={sessionSort} onChange={(event) => setSessionSort(event.target.value)}>
+              {sessionSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
       <SessionList sessions={filteredSessions} />
     </aside>
@@ -1727,7 +1851,7 @@ function HighlightedText({ text, query }) {
 
 const SessionListItem = memo(function SessionListItem({ session, isActive, isStreaming, activityLabel, now = Date.now(), onSelectSession }) {
   const updates = formatRelativeTime(session?.updatedAt, now);
-  const turnCount = Array.isArray(session?.recentUserMessages) ? session.recentUserMessages.length : 0;
+  const turnCount = sessionTurnCount(session);
   const turnText = turnCount === 1 ? "1 turn" : `${turnCount} turns`;
   const searchMatch = session?._searchMatch;
   return (
@@ -1820,31 +1944,39 @@ function SessionList({ sessions }) {
   const search = useStore((state) => state.search);
   const live = useStore((state) => state.live);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
+  const sessionSort = useStore((state) => state.sessionSort);
+  const sessionGroupBy = useStore((state) => state.sessionGroupBy);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [visibleGroupSizes, setVisibleGroupSizes] = useState(new Map());
   const now = useIntervalNow(Boolean(selectedPath && live) || sessions.length > 0, 60_000);
   const activePath = selectedPath && live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS ? selectedPath : null;
+  const orderedSessions = useMemo(() => sortedSessionsByMode(sessions, sessionSort), [sessions, sessionSort]);
   const groupedSessions = useMemo(() => {
     const groups = new Map();
-    for (const session of sessions) {
-      const key = session._groupKey || normalizeGroupKey(session);
-      const list = groups.get(key);
-      if (list) {
-        list.push(session);
+    for (const session of orderedSessions) {
+      const info = groupInfoForSession(session, sessionGroupBy, now);
+      const group = groups.get(info.key);
+      if (group) {
+        group.sessions.push(session);
+        group.count += 1;
       } else {
-        groups.set(key, [session]);
+        groups.set(info.key, {
+          key: info.key,
+          label: info.label,
+          path: info.path,
+          order: info.order,
+          count: 1,
+          sessions: [session],
+        });
       }
     }
-    return Array.from(groups.entries())
-      .sort((left, right) => left[0].localeCompare(right[0]))
-      .map(([key, list]) => ({
-        key,
-        label: groupLabelForWorkspace(key),
-        path: workspaceSummaryLabel(key),
-        count: list.length,
-        sessions: list,
-      }));
-  }, [sessions]);
+    return Array.from(groups.values()).sort((left, right) => {
+      if (typeof left.order === "number" && typeof right.order === "number") {
+        return left.order - right.order;
+      }
+      return String(left.order).localeCompare(String(right.order));
+    });
+  }, [orderedSessions, sessionGroupBy, now]);
 
   const selectSessionByPath = useCallback((session) => {
     syncSessionToUrl(session?.path || "");

@@ -74,6 +74,19 @@ test("serve agent marks use bundled SVG brand artwork", async () => {
   assert.doesNotMatch(serveMain, /<span>[CQX]<\/span>/u);
 });
 
+test("serve session list exposes sorting and date grouping controls", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /const sessionSortOptions = \[[\s\S]*?recent[\s\S]*?agent[\s\S]*?turns[\s\S]*?title/u);
+  assert.match(serveMain, /const sessionGroupOptions = \[[\s\S]*?workspace[\s\S]*?date[\s\S]*?agent/u);
+  assert.match(serveMain, /function dateGroupForSession\(session, now = Date\.now\(\)\)/u);
+  assert.match(serveMain, /Today[\s\S]*?Yesterday[\s\S]*?This week[\s\S]*?Older/u);
+  assert.match(serveMain, /<span>Group<\/span>[\s\S]*?<select value=\{sessionGroupBy\}/u);
+  assert.match(serveMain, /<span>Sort<\/span>[\s\S]*?<select value=\{sessionSort\}/u);
+  assert.match(serveStyles, /\.session-list-controls/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

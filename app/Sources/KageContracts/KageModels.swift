@@ -65,6 +65,7 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
   public let updatedAt: String?
   public let cwd: String
   public let path: String
+  public let turnCount: Int?
   public let recentUserMessages: [String]
   public let lineage: SessionLineage?
 
@@ -77,6 +78,7 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     updatedAt: String?,
     cwd: String,
     path: String,
+    turnCount: Int? = nil,
     recentUserMessages: [String],
     lineage: SessionLineage? = nil
   ) {
@@ -88,6 +90,7 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     self.updatedAt = updatedAt
     self.cwd = cwd
     self.path = path
+    self.turnCount = turnCount
     self.recentUserMessages = recentUserMessages
     self.lineage = lineage
   }

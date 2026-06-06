@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { formatAgentName, listAgentRoots, supportedAgents } from "./agents.js";
 import { sameOrSubpath, samePath, walk } from "./files.js";
-import { getRecentUserMessages, getSessionTitle, getShortSessionTitle } from "./session-labels.js";
+import { getRealUserMessages, getRecentUserMessages, getSessionTitle, getShortSessionTitle } from "./session-labels.js";
 import { parseSession } from "../adapters/sources/index.js";
 
 function normalizeText(value) {
@@ -184,6 +184,7 @@ async function searchAgent(agent, rootDir, filters) {
         updatedAt: session.updatedAt ?? null,
         cwd: session.cwd,
         path: sessionPath,
+        turnCount: getRealUserMessages(session).length,
         recentUserMessages: getRecentUserMessages(session),
         match: findMatchContext(session, title, filters.query),
       });

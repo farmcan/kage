@@ -169,6 +169,7 @@ do {
           "updatedAt": "2026-05-25T06:56:02.409Z",
           "cwd": "/tmp/project",
           "path": "/Users/test/.codex/sessions/session-1.jsonl",
+          "turnCount": 4,
           "recentUserMessages": ["Fix login"]
         }
       ],
@@ -187,6 +188,7 @@ do {
               "updatedAt": "2026-05-25T06:56:02.409Z",
               "cwd": "/tmp/project",
               "path": "/Users/test/.codex/sessions/session-1.jsonl",
+              "turnCount": 4,
               "recentUserMessages": ["Fix login"]
             }
           ]
@@ -209,6 +211,7 @@ do {
     """
   )
   try require(desktopState.sessionsResponse.sessions[0].id == "codex:session-1", "desktop sessions should decode")
+  try require(desktopState.sessionsResponse.sessions[0].turnCount == 4, "desktop sessions should decode turn count")
   try require(desktopState.actionsResponse.actions[0].command == "codex resume session-1", "desktop actions should decode")
 
   let recentDesktopStateArgs = KageCLIArguments.desktopState(

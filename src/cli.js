@@ -1180,6 +1180,7 @@ async function buildSessionCandidates(args, options = {}) {
         updatedAt: summary.updatedAt,
         title: summary.title,
         shortTitle: summary.shortTitle,
+        turnCount: summary.turnCount ?? 0,
         recentUserMessages: summary.recentUserMessages ?? [],
         lineage: await readLineageMetadata(summaryPath),
       });
@@ -1207,6 +1208,7 @@ function toSessionPayload(candidate) {
     updatedAt: candidate.updatedAt ?? null,
     cwd: candidate.cwd,
     path: candidate.sessionPath,
+    turnCount: candidate.turnCount ?? 0,
     recentUserMessages: candidate.recentUserMessages,
     lineage: candidate.lineage ?? null,
   };

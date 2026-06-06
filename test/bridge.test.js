@@ -1286,6 +1286,7 @@ test("serve search API finds transcript text with workspace, cwd alias, and all-
     assert.equal(workspacePayload.mode, "search");
     assert.equal(workspacePayload.results.length, 1);
     assert.equal(workspacePayload.results[0].sessionId, "search-a");
+    assert.equal(workspacePayload.results[0].turnCount, 1);
     assert.match(workspacePayload.results[0].match.text, /auth middleware/);
     assert.match(workspacePayload.results[0].match.field, /^message:assistant:/);
     assert.equal(await canonicalPath(workspacePayload.selectedWorkspace), await canonicalPath(workspaceA));
@@ -1311,6 +1312,7 @@ test("serve search API finds transcript text with workspace, cwd alias, and all-
     assert.equal(allPayload.selectedWorkspace, "__all_workspaces__");
     assert.equal(allPayload.results.length, 1);
     assert.equal(allPayload.results[0].sessionId, "search-b");
+    assert.equal(allPayload.results[0].turnCount, 1);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     if (oldHome === undefined) {
@@ -2095,6 +2097,9 @@ test("cli sessions lists current-project sessions across agents as json", async 
     [
       `{"timestamp":"2026-05-20T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-one","cwd":"${currentDir}"}}`,
       '{"timestamp":"2026-05-20T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex plan"}]}}',
+      '{"timestamp":"2026-05-20T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex follow up"}]}}',
+      '{"timestamp":"2026-05-20T10:00:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex third turn"}]}}',
+      '{"timestamp":"2026-05-20T10:00:04.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"codex fourth turn"}]}}',
     ].join("\n") + "\n",
     "utf8",
   );
@@ -2131,6 +2136,9 @@ test("cli sessions lists current-project sessions across agents as json", async 
   );
   assert.equal(payload.sessions.find((session) => session.sessionId === "qoder-one").agent, "qodercli");
   assert.equal(payload.sessions.find((session) => session.sessionId === "qoderwork-one").agent, "qoderwork");
+  const codexOne = payload.sessions.find((session) => session.sessionId === "codex-one");
+  assert.equal(codexOne.turnCount, 4);
+  assert.equal(codexOne.recentUserMessages.length, 3);
 
   const subtreeResult = await spawnCli(["sessions", "--include-subdirs", "--json"], {
     cwd: currentDir,
@@ -2238,6 +2246,7 @@ test("cli sessions persists and reuses session metadata cache", async () => {
     [
       `{"timestamp":"2026-06-03T10:00:00.000Z","type":"session_meta","payload":{"id":"codex-cache","cwd":"${currentDir}"}}`,
       '{"timestamp":"2026-06-03T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"cache me"}]}}',
+      '{"timestamp":"2026-06-03T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"cache follow up"}]}}',
     ].join("\n") + "\n",
     "utf8",
   );
@@ -2250,12 +2259,14 @@ test("cli sessions persists and reuses session metadata cache", async () => {
   const firstPayload = JSON.parse(firstResult.stdout);
   assert.equal(firstResult.code, 0);
   assert.deepEqual(firstPayload.sessions.map((session) => session.sessionId), ["codex-cache"]);
+  assert.equal(firstPayload.sessions[0].turnCount, 2);
 
   const firstCache = JSON.parse(await fs.readFile(cachePath, "utf8"));
   const cacheEntry = firstCache.entries[`codex:${sessionFile}`];
-  assert.equal(firstCache.version, 1);
+  assert.equal(firstCache.version, 2);
   assert.equal(cacheEntry.summary.sessionId, "codex-cache");
-  assert.deepEqual(cacheEntry.summary.recentUserMessages, ["cache me"]);
+  assert.equal(cacheEntry.summary.turnCount, 2);
+  assert.deepEqual(cacheEntry.summary.recentUserMessages, ["cache follow up", "cache me"]);
 
   const secondResult = await spawnCli(["sessions", "--agent", "codex", "--json"], {
     cwd: currentDir,
