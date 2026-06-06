@@ -136,6 +136,18 @@ test("serve session list supports keyboard focus and multi-select affordances", 
   assert.match(serveStyles, /\.session-card\.selected/u);
 });
 
+test("serve conversation supports focus mode for wide transcript reading", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /conversationFullscreen/u);
+  assert.match(serveMain, /Fullscreen conversation/u);
+  assert.match(serveMain, /Exit fullscreen conversation/u);
+  assert.match(serveStyles, /\.workspace\.conversation-fullscreen/u);
+  assert.match(serveStyles, /\.workspace\.conversation-fullscreen \.sidebar[\s\S]*?display:\s*none/u);
+  assert.match(serveStyles, /\.workspace\.conversation-fullscreen \.conversation-panel/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");
