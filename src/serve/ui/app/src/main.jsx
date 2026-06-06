@@ -45,6 +45,8 @@ const MOBILE_QUERY = "(max-width: 900px)";
 const TOAST_DURATION_MS = 4500;
 const THEME_STORAGE_KEY = "kageServeTheme.v2";
 const PASSWORD_STORAGE_KEY = "kageServePassword";
+const INSTALL_PROMPT_STORAGE_KEY = "kageServeInstallPromptDismissed";
+const SERVER_ORIGIN_STORAGE_KEY = "kageServeServerOrigin";
 const DEFAULT_THEME = "light";
 
 const agentMeta = {
@@ -75,6 +77,14 @@ function readStorageValue(key, fallback = "") {
 function writeStorageValue(key, value) {
   try {
     localStorage.setItem(key, value);
+  } catch {
+    // Local storage can be unavailable in some browser contexts.
+  }
+}
+
+function removeStorageValue(key) {
+  try {
+    localStorage.removeItem(key);
   } catch {
     // Local storage can be unavailable in some browser contexts.
   }
@@ -112,6 +122,10 @@ function useMobileLayout() {
   }, []);
 
   return isMobileLayout;
+}
+
+function isStandalonePwa() {
+  return Boolean(window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone);
 }
 
 function normalizeTheme(value) {
@@ -234,11 +248,7 @@ function initialPassword() {
   }
   const existing = readStorageValue(PASSWORD_STORAGE_KEY);
   if (existing) return existing;
-  const entered = prompt("KAGE password") || "";
-  if (entered) {
-    writeStorageValue(PASSWORD_STORAGE_KEY, entered);
-  }
-  return entered;
+  return "";
 }
 
 const useStore = create((set, get) => ({
@@ -335,6 +345,10 @@ function authUrl(path) {
 async function api(path, options = {}) {
   const response = await fetch(authUrl(path), options);
   if (!response.ok) {
+    if (response.status === 401 && config.passwordRequired) {
+      removeStorageValue(PASSWORD_STORAGE_KEY);
+      useStore.setState({ password: "", error: "" });
+    }
     let message = await response.text();
     try {
       message = JSON.parse(message).error || message;
@@ -878,7 +892,8 @@ function workspaceSummaryLabel(workspaceKey) {
 function groupLabelForWorkspace(workspaceKey) {
   if (!workspaceKey || workspaceKey === "unassigned") return "Unassigned";
   const trimmed = workspaceKey.endsWith("/") ? workspaceKey.slice(0, -1) : workspaceKey;
-  const tail = trimmed.split("/").filter(Boolean).at(-1);
+  const parts = trimmed.split("/").filter(Boolean);
+  const tail = parts[parts.length - 1];
   return tail || trimmed;
 }
 
@@ -1158,14 +1173,17 @@ function AgentMark({ agent, size = 14 }) {
 
 function App() {
   const theme = useStore((state) => state.theme);
+  const password = useStore((state) => state.password);
   const detailOpen = useStore((state) => state.detailOpen);
   const viewMode = useStore((state) => state.viewMode);
   const conversationFullscreen = useStore((state) => state.conversationFullscreen);
   const isMobileLayout = useMobileLayout();
+  const needsPassword = config.passwordRequired && !password;
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
   useEffect(() => {
+    if (needsPassword) return undefined;
     const boot = async () => {
       await loadProjects();
       await loadTasks({ silent: true });
@@ -1173,18 +1191,26 @@ function App() {
     };
     void boot();
     return () => useStore.getState().stream?.close();
-  }, []);
+  }, [needsPassword]);
   useEffect(() => {
+    if (needsPassword) return undefined;
     const timer = window.setInterval(() => {
       void loadTasks({ silent: true });
     }, 2500);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [needsPassword]);
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
+  useEffect(() => {
+    writeStorageValue(SERVER_ORIGIN_STORAGE_KEY, window.location.origin);
+  }, []);
+
+  if (needsPassword) {
+    return <PasswordGate />;
+  }
 
   return (
     <Tooltip.Provider delayDuration={220}>
@@ -1194,8 +1220,57 @@ function App() {
           <WorkspaceContent />
         </main>
         <Toast />
+        <PwaInstallPrompt isMobileLayout={isMobileLayout} />
       </div>
     </Tooltip.Provider>
+  );
+}
+
+function PasswordGate() {
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event) {
+    event.preventDefault();
+    const password = draft.trim();
+    if (!password) {
+      setError("Enter the KAGE password.");
+      return;
+    }
+    writeStorageValue(PASSWORD_STORAGE_KEY, password);
+    useStore.setState({ password, error: "" });
+  }
+
+  return (
+    <main className="password-shell">
+      <form className="password-card" onSubmit={submit}>
+        <div className="password-logo">
+          <KageLogoIcon />
+        </div>
+        <div>
+          <h1>KAGE Dispatch</h1>
+          <p>Enter the local serve password to open this session monitor.</p>
+        </div>
+        <label>
+          <span>Password</span>
+          <input
+            autoFocus
+            type="password"
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setError("");
+            }}
+            placeholder="KAGE password"
+          />
+        </label>
+        {error && <small className="password-error">{error}</small>}
+        <button type="submit">
+          <Lock size={16} />
+          Unlock
+        </button>
+      </form>
+    </main>
   );
 }
 
@@ -1354,6 +1429,66 @@ function IconButton({ label, children, onClick, disabled = false }) {
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
+  );
+}
+
+function PwaInstallPrompt({ isMobileLayout }) {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showIosHint, setShowIosHint] = useState(false);
+  const [visible, setVisible] = useState(() =>
+    isMobileLayout && !isStandalonePwa() && readStorageValue(INSTALL_PROMPT_STORAGE_KEY) !== "1",
+  );
+
+  useEffect(() => {
+    if (!isMobileLayout || isStandalonePwa() || readStorageValue(INSTALL_PROMPT_STORAGE_KEY) === "1") {
+      setVisible(false);
+      return undefined;
+    }
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
+      setVisible(true);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    setVisible(true);
+    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+  }, [isMobileLayout]);
+
+  if (!visible) return null;
+
+  const dismiss = () => {
+    writeStorageValue(INSTALL_PROMPT_STORAGE_KEY, "1");
+    setVisible(false);
+  };
+  const install = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice.catch(() => null);
+      setDeferredPrompt(null);
+      if (choice?.outcome === "accepted") {
+        dismiss();
+      }
+      return;
+    }
+    setShowIosHint(true);
+  };
+
+  return (
+    <aside className="install-banner" role="status">
+      <div className="install-banner-icon">
+        <KageLogoIcon />
+      </div>
+      <div>
+        <strong>Add KAGE to your home screen</strong>
+        <span>{showIosHint ? "Use Share, then Add to Home Screen." : "Open this monitor faster from your phone."}</span>
+      </div>
+      <button type="button" onClick={showIosHint ? dismiss : install}>
+        {showIosHint ? "OK" : "Install"}
+      </button>
+      <button type="button" className="install-dismiss" onClick={dismiss} aria-label="Dismiss install prompt">
+        <X size={15} />
+      </button>
+    </aside>
   );
 }
 
@@ -2119,14 +2254,25 @@ function MessageViewport({ transcript, transcriptIndex, activity, agent, agentLa
     [filterIndexes, activeFilter],
   );
   const shouldAutoScroll = useRef(false);
+  const isNearTail = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [windowStart, setWindowStart] = useState(() =>
     Math.max(filteredMessageIndexes.length - MESSAGE_WINDOW_SIZE, 0),
   );
-  const hasHiddenHistory = filteredMessageIndexes.length > windowStart;
+  const hasHiddenHistory = windowStart > 0;
   const visibleMessageIndexes = useMemo(
     () => filteredMessageIndexes.slice(windowStart),
     [filteredMessageIndexes, windowStart],
   );
+  const tailSignature = useMemo(() => {
+    const messageIndex = visibleMessageIndexes[visibleMessageIndexes.length - 1];
+    const message = messages[messageIndex];
+    if (!message) return "empty";
+    const blockSignature = (message.blocks || [])
+      .map((block) => `${block?.type || "block"}:${blockText(block).length}`)
+      .join("|");
+    return `${message.id || messageIndex}:${message.role || "message"}:${blockSignature}`;
+  }, [messages, visibleMessageIndexes]);
   const loadMore = () => {
     setWindowStart((start) => Math.max(start - MESSAGE_WINDOW_STEP, 0));
   };
@@ -2155,11 +2301,38 @@ function MessageViewport({ transcript, transcriptIndex, activity, agent, agentLa
     },
   });
 
-  useEffect(() => {
-    if (!shouldAutoScroll.current || visibleMessageIndexes.length === 0) return;
+  const scrollToLatest = useCallback(() => {
+    if (visibleMessageIndexes.length === 0) return;
     virtualizer.scrollToIndex(visibleMessageIndexes.length - 1, { align: "end" });
-    shouldAutoScroll.current = false;
-  }, [visibleMessageIndexes.length, windowStart]);
+    isNearTail.current = true;
+    setShowJumpToLatest(false);
+  }, [virtualizer, visibleMessageIndexes.length]);
+
+  useEffect(() => {
+    const element = parentRef.current;
+    if (!element) return undefined;
+    const updateNearTail = () => {
+      const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+      const nearTail = distance < 120;
+      isNearTail.current = nearTail;
+      if (nearTail) {
+        setShowJumpToLatest(false);
+      }
+    };
+    updateNearTail();
+    element.addEventListener("scroll", updateNearTail, { passive: true });
+    return () => element.removeEventListener("scroll", updateNearTail);
+  }, []);
+
+  useEffect(() => {
+    if (visibleMessageIndexes.length === 0) return;
+    if (shouldAutoScroll.current || isNearTail.current) {
+      window.requestAnimationFrame(scrollToLatest);
+      shouldAutoScroll.current = false;
+      return;
+    }
+    setShowJumpToLatest(true);
+  }, [tailSignature, visibleMessageIndexes.length, windowStart, scrollToLatest]);
 
   if (transcript == null) {
     return (
@@ -2216,6 +2389,11 @@ function MessageViewport({ transcript, transcriptIndex, activity, agent, agentLa
           );
         })}
       </div>
+      {showJumpToLatest && (
+        <button type="button" className="jump-latest-button" onClick={scrollToLatest}>
+          Jump to latest
+        </button>
+      )}
     </div>
   );
 }
@@ -2257,9 +2435,86 @@ function lineCount(content) {
   return String(content ?? "").split("\n").length;
 }
 
+function formatBytes(byteCount) {
+  const value = Number(byteCount) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function textBytes(content) {
+  const text = String(content ?? "");
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(text).length;
+  }
+  return text.length;
+}
+
+function estimatedBase64Bytes(value) {
+  const clean = String(value ?? "").replace(/\s+/g, "");
+  if (!clean) return 0;
+  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+}
+
+function looksLikeBase64Blob(value) {
+  const clean = String(value ?? "").replace(/\s+/g, "");
+  if (clean.length < 240) return false;
+  return /^[A-Za-z0-9+/]+={0,2}$/u.test(clean);
+}
+
+function previewText(value, maxLength = 420) {
+  const text = String(value ?? "");
+  return text.length > maxLength ? `${text.slice(0, maxLength)}\n...` : text;
+}
+
+function summarizeDisclosureContent(content) {
+  const text = String(content ?? "");
+  const trimmed = text.trim();
+  const dataUrlMatch = trimmed.match(/^data:([^;,]+)?(?:;[^,]*)?;base64,([\s\S]+)$/iu);
+  if (dataUrlMatch) {
+    const mimeType = dataUrlMatch[1] || "data";
+    const bytes = estimatedBase64Bytes(dataUrlMatch[2]);
+    return {
+      collapsed: true,
+      badge: "binary",
+      label: mimeType.startsWith("image/") ? "Image payload collapsed" : "Base64 payload collapsed",
+      detail: `${mimeType} · ${formatBytes(bytes)}`,
+      preview: previewText(trimmed, 160),
+    };
+  }
+  if (looksLikeBase64Blob(trimmed)) {
+    return {
+      collapsed: true,
+      badge: "base64",
+      label: "Base64-like payload collapsed",
+      detail: formatBytes(estimatedBase64Bytes(trimmed)),
+      preview: previewText(trimmed, 180),
+    };
+  }
+  if (text.length > 24_000 || lineCount(text) > 700) {
+    return {
+      collapsed: true,
+      badge: "large",
+      label: "Large output preview",
+      detail: `${formatBytes(textBytes(text))} · ${lineCount(text)} lines`,
+      preview: previewText(text, 4_000),
+    };
+  }
+  return {
+    collapsed: false,
+    badge: "",
+    label: "",
+    detail: "",
+    preview: text,
+  };
+}
+
 function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [showRaw, setShowRaw] = useState(false);
   const lines = lineCount(content);
+  const summary = summarizeDisclosureContent(content);
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen} className={cls("disclosure", tone)}>
       <Collapsible.Trigger className="disclosure-trigger">
@@ -2267,11 +2522,20 @@ function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false 
           {icon}
           {title}
         </span>
-        <small>{lines > 5 ? `${lines} lines` : open ? "Open" : "Preview"}</small>
+        <small>{summary.badge || (lines > 5 ? `${lines} lines` : open ? "Open" : "Preview")}</small>
         <ChevronDown size={16} className={cls(open && "rotate")} />
       </Collapsible.Trigger>
       <Collapsible.Content className="disclosure-content">
-        <pre>{content}</pre>
+        {summary.collapsed && (
+          <div className="disclosure-summary">
+            <strong>{summary.label}</strong>
+            <span>{summary.detail}</span>
+            <button type="button" className="raw-toggle" onClick={() => setShowRaw((value) => !value)}>
+              {showRaw ? "Show preview" : "Show raw"}
+            </button>
+          </div>
+        )}
+        <pre>{summary.collapsed && !showRaw ? summary.preview : content}</pre>
       </Collapsible.Content>
     </Collapsible.Root>
   );

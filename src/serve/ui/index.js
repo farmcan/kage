@@ -53,12 +53,71 @@ export function renderServeManifest() {
 }
 
 export function renderServeServiceWorker() {
-  return `self.addEventListener("install", (event) => {
+  return `const CACHE_NAME = "kage-serve-shell-v2";
+const SHELL_PATHS = ["/", "/index.html", "/manifest.webmanifest", "/sw.js"];
+
+async function cacheShell() {
+  const cache = await caches.open(CACHE_NAME);
+  await cache.addAll(SHELL_PATHS);
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(cacheShell());
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name.startsWith("kage-serve-") && name !== CACHE_NAME).map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") {
+    return;
+  }
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+  if (url.pathname.startsWith("/api/") && url.pathname !== "/api/sessions") {
+    return;
+  }
+  if (url.pathname === "/api/sessions") {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch {
+        return (await cache.match(request)) || new Response(JSON.stringify({ mode: "sessions", sessions: [], agents: [], offline: true }), {
+          status: 503,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        });
+      }
+    })());
+    return;
+  }
+  if (request.mode === "navigate" || SHELL_PATHS.includes(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          await cache.put(url.pathname === "/index.html" ? "/" : request, response.clone());
+        }
+        return response;
+      } catch {
+        return (await cache.match("/")) || Response.error();
+      }
+    })());
+  }
 });
 `;
 }

@@ -72,6 +72,91 @@ button {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.password-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.password-card {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 18px 52px rgba(21, 28, 35, 0.14);
+}
+
+.password-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.password-card h1,
+.password-card p {
+  margin: 0;
+}
+
+.password-card h1 {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.password-card p {
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.password-card label {
+  display: grid;
+  gap: 6px;
+}
+
+.password-card label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.password-card input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--panel-3);
+  outline: 0;
+}
+
+.password-card input:focus {
+  border-color: color-mix(in srgb, var(--codex) 68%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--codex) 14%, transparent);
+}
+
+.password-card button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  color: #fff;
+  background: var(--text);
+  font-weight: 850;
+}
+
+.password-error {
+  color: var(--danger);
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -1336,9 +1421,45 @@ button.secondary:hover,
   border-top: 1px solid var(--line-soft);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  max-height: min(48vh, 520px);
+  overflow: auto;
   color: var(--text);
   background: color-mix(in srgb, black 10%, transparent);
   font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.disclosure-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--session-color) 6%, transparent);
+}
+
+.disclosure-summary strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.disclosure-summary span {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.raw-toggle {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--session-color) 36%, var(--line));
+  border-radius: var(--radius);
+  color: var(--session-color);
+  background: var(--panel);
+  padding: 0 10px;
+  font-weight: 850;
 }
 
 .thinking .disclosure-content pre {
@@ -1362,6 +1483,24 @@ button.secondary:hover,
 
 .rotate {
   transform: rotate(180deg);
+}
+
+.jump-latest-button {
+  position: sticky;
+  left: 50%;
+  bottom: 12px;
+  z-index: 2;
+  min-height: 34px;
+  width: max-content;
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--session-color) 44%, var(--line));
+  border-radius: 999px;
+  color: var(--session-color);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: 0 10px 30px rgba(21, 28, 35, 0.14);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .composer {
@@ -2112,6 +2251,66 @@ textarea:disabled {
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.install-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 55;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 18px 54px rgba(21, 28, 35, 0.16);
+  backdrop-filter: blur(16px);
+}
+
+.install-banner-icon {
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.install-banner strong,
+.install-banner span {
+  display: block;
+  min-width: 0;
+}
+
+.install-banner strong {
+  font-size: 13px;
+}
+
+.install-banner span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.install-banner button {
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius);
+  color: #fff;
+  background: var(--text);
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.install-banner .install-dismiss {
+  width: 34px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--panel-3);
 }
 
 .spin {

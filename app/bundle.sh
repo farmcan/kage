@@ -30,6 +30,10 @@ cp -R "$REPO_ROOT/src" "$CLI_BUNDLE_DIR/src"
 cp "$REPO_ROOT/package.json" "$CLI_BUNDLE_DIR/package.json"
 cp "$REPO_ROOT/README.md" "$CLI_BUNDLE_DIR/README.md"
 cp "$REPO_ROOT/LICENSE" "$CLI_BUNDLE_DIR/LICENSE"
+if [[ -d "$REPO_ROOT/node_modules/qrcode-terminal" ]]; then
+  mkdir -p "$CLI_BUNDLE_DIR/node_modules"
+  cp -R "$REPO_ROOT/node_modules/qrcode-terminal" "$CLI_BUNDLE_DIR/node_modules/qrcode-terminal"
+fi
 cat > "$CLI_LAUNCHER" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail

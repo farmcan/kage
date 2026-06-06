@@ -11,7 +11,7 @@ import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
 import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
-import { createKageServeServer } from "../src/serve/index.js";
+import { createKageServeServer, serveAccessUrl, terminalQrCode } from "../src/serve/index.js";
 import { buildAgentSendCommand, runAgentSend } from "../src/serve/send.js";
 import {
   buildStoryPayload,
@@ -1072,6 +1072,7 @@ test("serve root exposes installable PWA assets", async () => {
     assert.match(html, /rel="manifest"/);
     assert.match(html, /serviceWorker/);
     assert.match(html, /window\.__KAGE_CONFIG__ = \{"passwordRequired":false,"sendEnabled":true\};/);
+    assert.doesNotMatch(html, /prompt\("KAGE password"\)/);
 
     const manifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
     assert.equal(manifest.status, 200);
@@ -1079,10 +1080,23 @@ test("serve root exposes installable PWA assets", async () => {
 
     const serviceWorker = await fetch(`http://127.0.0.1:${port}/sw.js`);
     assert.equal(serviceWorker.status, 200);
-    assert.match(await serviceWorker.text(), /skipWaiting/);
+    const serviceWorkerText = await serviceWorker.text();
+    assert.match(serviceWorkerText, /skipWaiting/);
+    assert.match(serviceWorkerText, /caches\.open/);
+    assert.match(serviceWorkerText, /addAll\(SHELL_PATHS\)/);
+    assert.match(serviceWorkerText, /"\/api\/sessions"/);
+    assert.match(serviceWorkerText, /pathname\.startsWith\("\/api\/"\)/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("serve phone QR helpers encode password in scannable access URL", async () => {
+  const accessUrl = serveAccessUrl("http://192.168.1.100:9876", "1234");
+  assert.equal(accessUrl, "http://192.168.1.100:9876/?password=1234");
+  const qrCode = await terminalQrCode(accessUrl);
+  assert.ok(qrCode.length > 100);
+  assert.match(qrCode, /\n/);
 });
 
 test("serve sessions API accepts workspace query and returns workspace context", async () => {

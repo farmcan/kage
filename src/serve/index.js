@@ -600,6 +600,33 @@ function localNetworkUrls(port) {
   return urls;
 }
 
+export function serveAccessUrl(url, password) {
+  if (!password) {
+    return url;
+  }
+  try {
+    const nextUrl = new URL(url);
+    nextUrl.searchParams.set("password", password);
+    return nextUrl.toString();
+  } catch {
+    return url;
+  }
+}
+
+export async function terminalQrCode(value) {
+  let rendered = "";
+  let qrcodeTerminal;
+  try {
+    qrcodeTerminal = (await import("qrcode-terminal")).default;
+  } catch {
+    return "";
+  }
+  qrcodeTerminal.generate(value, { small: true }, (output) => {
+    rendered = output;
+  });
+  return rendered.trimEnd();
+}
+
 function canAcceptLanConnections(host) {
   return host === "0.0.0.0" || host === "::";
 }
@@ -988,7 +1015,14 @@ export async function startServeCommand({
   stdout.write("KAGE web viewer running:\n");
   stdout.write(`  Local:  http://localhost:${actualPort}\n`);
   if (urls.length > 0) {
-    stdout.write(`  Phone:  ${urls[0]}\n`);
+    const phoneUrl = urls[0];
+    const phoneAccessUrl = serveAccessUrl(phoneUrl, password);
+    stdout.write(`  Phone:  ${password ? `${phoneUrl} (QR includes password)` : phoneUrl}\n`);
+    const qrCode = await terminalQrCode(phoneAccessUrl);
+    if (qrCode) {
+      stdout.write("\n  Scan to open on your phone:\n");
+      stdout.write(`${qrCode}\n\n`);
+    }
   }
   if (password) {
     stdout.write("  Auth:   password enabled\n");
