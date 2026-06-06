@@ -24,7 +24,7 @@ Latest release: [KAGE v0.1.16](https://github.com/farmcan/kage/releases/tag/v0.1
 
 - **One local surface for many agents.** Claude Code, Codex, QoderCLI, and QoderWork keep separate transcript stores; KAGE makes them feel like one workspace.
 - **Task board for local agent runs.** Dispatch one-off tasks, track queued/running/review/completed states, and keep the result visible without losing the session list.
-- **Phone-friendly local viewer.** `kage serve` exposes a responsive local web UI for trusted LAN use, with optional password protection and read-only mode.
+- **Mobile agent monitor.** `kage serve` lets you see what local Claude, Codex, and Qoder runs are doing from your phone, with sessions first and dispatch as a secondary action.
 - **Session memory without hosted indexing.** Transcript content stays on disk by default; KAGE reads local files and launches local tools.
 - **Bridge and replay when context matters.** Move useful work between agents or create a local HTML story replay for review.
 
@@ -34,7 +34,7 @@ Latest release: [KAGE v0.1.16](https://github.com/farmcan/kage/releases/tag/v0.1
 |---|---|
 | macOS desktop | Browse project sessions, filter agents, inspect messages, start new sessions, launch Terminal.app, run resume/fork/bridge/replay actions. |
 | CLI | Search, list, bridge, fork, replay, clean, generate actions, and script everything through `kage`. |
-| Local web | Open a mobile-friendly sessions view and task board with `kage serve --port 9876 --password <pin>`. |
+| Local web | Watch running agents, browse sessions, review transcripts, and open the task board with `kage serve --port 9876 --password <pin>`. |
 | Local dispatch | Send prompts to Claude Code, Codex, or QoderCLI as new tasks, then review and complete them from the board. |
 
 Remote-control tools keep today's agent run moving. KAGE helps you recover, reuse, and branch yesterday's useful context.
@@ -78,13 +78,13 @@ kage sessions --include-subdirs
 kage search "auth"
 ```
 
-Open the local command center:
+Open the local mobile agent monitor:
 
 ```bash
 kage serve --port 9876 --password 1234
 ```
 
-Open the printed LAN URL from a phone or tablet on the same trusted network. Add `--read-only` when you only want to inspect sessions without dispatching local agent runs.
+Open the printed LAN URL from a phone or tablet on the same trusted network to see what your agents are doing. Add `--read-only` when you only want to monitor sessions without dispatching local agent runs.
 
 Bridge a useful session:
 
@@ -99,7 +99,7 @@ From the desktop app or serve UI, use `New Session` / `Dispatch` to start a fres
 - You use more than one AI coding agent and want context to move with you.
 - You remember a useful plan, bug, or implementation detail, but not which local session contains it.
 - You want transcript search, replay, and cleanup without sending everything to a hosted service.
-- You want a desktop workspace, task board, local web UI, and scriptable CLI actions for automation.
+- You want a desktop workspace, mobile agent monitor, task board, and scriptable CLI actions for automation.
 
 ## Skip It For Now If
 
@@ -388,7 +388,7 @@ kage sessions --include-subdirs
 kage sessions --since 90d --limit 120 --json
 ```
 
-Serve a mobile-friendly session viewer over your LAN:
+Serve the mobile agent monitor over your LAN:
 
 ```bash
 kage serve

@@ -148,6 +148,18 @@ test("serve conversation supports focus mode for wide transcript reading", async
   assert.match(serveStyles, /\.workspace\.conversation-fullscreen \.conversation-panel/u);
 });
 
+test("docs position kage serve as a mobile agent monitor", async () => {
+  const readme = await readRepoFile("README.md");
+  const homepage = await readRepoFile("docs", "index.html");
+
+  assert.match(readme, /Mobile agent monitor/u);
+  assert.match(readme, /see what your agents are doing/u);
+  assert.match(readme, /Serve the mobile agent monitor over your LAN/u);
+  assert.match(homepage, /Mobile agent monitor/u);
+  assert.match(homepage, /See what local agents are doing from phone or tablet/u);
+  assert.match(homepage, /See what your agents are doing from your phone/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");
