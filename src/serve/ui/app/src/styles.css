@@ -1980,6 +1980,39 @@ button.secondary:hover,
   font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.dispatch-search-row {
+  min-width: 0;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  background: var(--panel-3);
+  color: var(--muted);
+}
+
+.dispatch-search-row svg {
+  flex: 0 0 auto;
+}
+
+.dispatch-search-row input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.dispatch-column-list {
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+}
+
 .dispatch-card {
   width: 100%;
   min-height: 38px;
@@ -2005,6 +2038,35 @@ button.secondary:hover,
   box-shadow: inset 3px 0 0 var(--agent-color);
 }
 
+.dispatch-card.session {
+  align-items: stretch;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.dispatch-card.session:hover {
+  border-color: color-mix(in srgb, var(--agent-color) 52%, var(--line));
+}
+
+.dispatch-card.session:focus-within {
+  border-color: color-mix(in srgb, var(--agent-color) 62%, var(--line));
+  box-shadow: inset 3px 0 0 var(--agent-color);
+}
+
+.dispatch-card.running {
+  background: color-mix(in srgb, var(--agent-color) 20%, var(--panel));
+}
+
+.dispatch-card.idle {
+  opacity: 0.82;
+}
+
+.dispatch-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+
 .dispatch-card strong,
 .dispatch-card span {
   min-width: 0;
@@ -2026,15 +2088,120 @@ button.secondary:hover,
   font-size: 11px;
 }
 
-.dispatch-card span {
-  grid-column: 1 / -1;
-  grid-row: 2;
+.dispatch-card span,
+.dispatch-card small {
+  grid-column: 1;
 }
 
-.dispatch-card small {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
+.dispatch-card-meta {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  grid-column: 1;
+}
+
+.dispatch-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--dim);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dim) 14%, transparent);
+}
+
+.dispatch-card.running .dispatch-status-dot {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+.dispatch-card-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-height 140ms ease, opacity 140ms ease, margin-top 140ms ease;
+}
+
+.dispatch-card:hover .dispatch-card-actions,
+.dispatch-card:focus-within .dispatch-card-actions {
+  max-height: 40px;
+  opacity: 1;
+  pointer-events: auto;
+  margin-top: 3px;
+}
+
+.dispatch-action {
+  min-height: 26px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dispatch-action:hover {
+  background: color-mix(in srgb, var(--panel-2) 72%, transparent);
+  border-color: color-mix(in srgb, var(--agent-color) 36%, var(--line));
+}
+
+.dispatch-card-empty {
+  min-height: 38px;
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dispatch-load-more {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 2px;
+  border: 0;
+  border-top: 1px dashed var(--line-soft);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  font-size: 11px;
+}
+
+.dispatch-load-more:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel-2) 72%, transparent);
+}
+
+.dispatch-card-main strong {
+  grid-column: 1;
+  font-size: 11px;
+}
+
+.dispatch-card-main span,
+.dispatch-card-main small {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.app-shell.mock-mobile .dispatch-card-actions,
+.app-shell.mock-mobile .dispatch-card:focus-within .dispatch-card-actions,
+.app-shell.mock-mobile .dispatch-card:hover .dispatch-card-actions {
+  max-height: none;
+  opacity: 1;
+  margin-top: 3px;
+  pointer-events: auto;
 }
 
 .task-board-head {

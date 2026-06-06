@@ -226,6 +226,8 @@ const SESSION_GROUP_PAGE_SIZE = 80;
 const SESSION_GROUP_INITIAL_SIZE = 80;
 const MESSAGE_WINDOW_SIZE = 420;
 const MESSAGE_WINDOW_STEP = 220;
+const DISPATCH_BOARD_BATCH_SIZE = 6;
+const DISPATCH_BOARD_ACTIVE_TASK_STATUSES = new Set(["queued", "running"]);
 const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 const workspaceQueryParams = ["workspace", "cwd"];
 const sessionQueryParams = ["session", "path"];
@@ -800,6 +802,49 @@ function sendPrimitiveLabel(agent) {
   if (agent === "codex") return "codex exec -";
   if (agent === "qodercli") return "qodercli -p";
   return agent;
+}
+
+function normalizeSessionTargetKey(session = {}) {
+  const sessionId = String(session.sessionId || "").trim();
+  const agent = String(session.agent || "").trim();
+  if (!agent || !sessionId) {
+    return "";
+  }
+  return `${agent}:session:${sessionId}`;
+}
+
+function buildSessionActionCommand(action = {}, fallbackCommand = "") {
+  if (typeof action.command === "string" && action.command.trim()) {
+    return action.command.trim();
+  }
+  if (Array.isArray(action.cliArgs) && action.cliArgs.length > 0) {
+    return `kage ${action.cliArgs.map(shellQuote).join(" ")}`;
+  }
+  return fallbackCommand;
+}
+
+function sessionDispatchSearchText(session) {
+  return [
+    session.shortTitle,
+    session.title,
+    session.cwd,
+    session.path,
+    session.sessionId,
+    ...(session.recentUserMessages || []),
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+}
+
+function actionLabel(type) {
+  if (type === "fork") return "Fork";
+  if (type === "bridge") return "Bridge";
+  return "Resume";
+}
+
+function sessionDispatchStatusLabel(session, hasActiveTask) {
+  return hasActiveTask ? "Running" : "Idle";
 }
 
 function compactDate(value) {
@@ -3515,21 +3560,100 @@ function Composer({ session, compact = false, allowReply = true }) {
 }
 
 function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget, onReplyTarget, allowReply = false }) {
+  const [actionByPath, setActionByPath] = useState(new Map());
+  const [agentSearchByAgent, setAgentSearchByAgent] = useState(() => Object.fromEntries(sendAgents.map((agent) => [agent, ""])));
+  const [agentVisibleByAgent, setAgentVisibleByAgent] = useState(() => Object.fromEntries(sendAgents.map((agent) => [agent, DISPATCH_BOARD_BATCH_SIZE])));
+  const tasks = useStore((state) => state.tasks);
+  const activeSessionKeys = useMemo(
+    () => new Set(tasks.filter((task) => DISPATCH_BOARD_ACTIVE_TASK_STATUSES.has(task.status)).map((task) => task.targetKey || "")),
+    [tasks],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDispatchActions = async () => {
+      try {
+        const data = await api("/api/actions");
+        const nextActions = Array.isArray(data.actions) ? data.actions : [];
+        const nextActionByPath = new Map();
+        for (const action of nextActions) {
+          if (!action?.sessionPath || action.type === "replay") {
+            continue;
+          }
+          const existing = nextActionByPath.get(action.sessionPath) || [];
+          existing.push(action);
+          nextActionByPath.set(action.sessionPath, existing);
+        }
+        if (!cancelled) {
+          setActionByPath(nextActionByPath);
+        }
+      } catch {
+        if (!cancelled) {
+          setActionByPath(new Map());
+        }
+      }
+    };
+    void loadDispatchActions();
+    const timer = window.setInterval(loadDispatchActions, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const setAgentSearch = (agent, query) => {
+    setAgentSearchByAgent((prev) => ({
+      ...prev,
+      [agent]: query,
+    }));
+    setAgentVisibleByAgent((prev) => ({
+      ...prev,
+      [agent]: DISPATCH_BOARD_BATCH_SIZE,
+    }));
+  };
+
+  const loadMoreAgentSessions = (agent) => {
+    setAgentVisibleByAgent((prev) => ({
+      ...prev,
+      [agent]: (prev[agent] || DISPATCH_BOARD_BATCH_SIZE) + DISPATCH_BOARD_BATCH_SIZE,
+    }));
+  };
+
+  const copyActionCommand = async (event, action, type, fallbackCommand = "") => {
+    event.preventDefault();
+    event.stopPropagation();
+    const command = buildSessionActionCommand(action, fallbackCommand);
+    if (!command) {
+      useStore.getState().showToast(`${type} command unavailable`);
+      return;
+    }
+    await copyText(command, `${type} command copied`);
+  };
+
   const groupedSessions = useMemo(
     () =>
-      sendAgents.map((agent) => ({
-        agent,
-        sessions: sessions
+      sendAgents.map((agent) => {
+        const query = (agentSearchByAgent[agent] || "").trim().toLowerCase();
+        const allAgentSessions = sessions
           .filter((session) => session.agent === agent)
           .sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0))
-          .slice(0, 1),
-      })),
-    [sessions],
+          .filter((session) => !query || sessionDispatchSearchText(session).includes(query));
+        const visibleCount = Math.max(DISPATCH_BOARD_BATCH_SIZE, agentVisibleByAgent[agent] || DISPATCH_BOARD_BATCH_SIZE);
+        return {
+          agent,
+          sessions: allAgentSessions.slice(0, visibleCount),
+          totalCount: allAgentSessions.length,
+          hasMore: allAgentSessions.length > visibleCount,
+          query,
+          isFiltered: query.length > 0,
+        };
+      }),
+    [sessions, agentSearchByAgent, agentVisibleByAgent],
   );
 
   return (
     <div className="dispatch-board" aria-label="Agent dispatch board">
-      {groupedSessions.map(({ agent, sessions: agentSessions }) => {
+      {groupedSessions.map(({ agent, sessions: agentSessions, hasMore }) => {
         const meta = agentMeta[agent];
         return (
           <section key={agent} className="dispatch-column" style={{ "--agent-color": meta.color }}>
@@ -3537,6 +3661,17 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
               <AgentBadge agent={agent} />
               <code>{sendPrimitiveLabel(agent)}</code>
             </div>
+            <label className="dispatch-search-row" onClick={(event) => event.stopPropagation()}>
+              <Search size={12} />
+              <input
+                type="search"
+                value={agentSearchByAgent[agent] || ""}
+                onChange={(event) => setAgentSearch(agent, event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                placeholder={`Filter ${meta.label} sessions`}
+                aria-label={`Filter ${meta.label} sessions`}
+              />
+            </label>
             <button
               className={cls("dispatch-card", "new", mode === "new" && targetAgent === agent && "active")}
               type="button"
@@ -3546,19 +3681,68 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
               <strong>New session</strong>
               <span>Start from cwd</span>
             </button>
-            {allowReply && agentSessions.map((session) => (
+            {agentSessions.length ? (
+              <div className="dispatch-column-list">
+                {agentSessions.map((session) => {
+                  const isRunning = activeSessionKeys.has(normalizeSessionTargetKey(session));
+                  const actionMap = actionByPath.get(session.path) || [];
+                  const getActionByType = (type) => actionMap.find((action) => action.type === type);
+                  const quickActions = [
+                    { type: "resume", action: getActionByType("resume") || { command: resumeCommand(session), type: "resume" } },
+                    { type: "fork", action: getActionByType("fork") },
+                    { type: "bridge", action: getActionByType("bridge") },
+                  ].filter(({ action }) => Boolean(action?.command || Array.isArray(action?.cliArgs) || action?.type === "resume"));
+
+                  return (
+                    <button
+                      key={`${session.agent}:${session.path}`}
+                      className={cls(
+                        "dispatch-card",
+                        "session",
+                        selectedPath === session.path && mode === "reply" && "active",
+                        isRunning ? "running" : "idle",
+                      )}
+                      type="button"
+                      aria-label={`Reply to ${meta.label} ${session.shortTitle || session.title || "session"}`}
+                      onClick={() => onReplyTarget(session)}
+                    >
+                      <div className="dispatch-card-main">
+                        <strong>{session.shortTitle || session.title || "(untitled)"}</strong>
+                        <span>{session.cwd || ""}</span>
+                        <small>{sessionDispatchStatusLabel(session, isRunning)} · {compactDate(session.updatedAt)}</small>
+                      </div>
+                      <div className="dispatch-card-meta">
+                        <span className={cls("dispatch-status-dot", isRunning ? "running" : "idle")} />
+                        <span>{sessionDispatchStatusLabel(session, isRunning)}</span>
+                      </div>
+                      <div className="dispatch-card-actions" onClick={(event) => event.stopPropagation()}>
+                        {quickActions.map(({ type, action }) => (
+                          <button
+                            key={`${session.path}:${type}`}
+                            type="button"
+                            className="dispatch-action"
+                            onClick={(event) => copyActionCommand(event, action, actionLabel(type), type === "resume" ? resumeCommand(session) : "")}
+                          >
+                            {actionLabel(type)}
+                          </button>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="dispatch-card-empty">{agentSearchByAgent[agent] ? "No matching sessions" : "No local sessions"}</div>
+            )}
+            {hasMore ? (
               <button
-                key={`${session.agent}:${session.path}`}
-                className={cls("dispatch-card", selectedPath === session.path && mode === "reply" && "active")}
                 type="button"
-                aria-label={`Reply to ${meta.label} ${session.shortTitle || session.title || "session"}`}
-                onClick={() => onReplyTarget(session)}
+                className="dispatch-load-more"
+                onClick={() => loadMoreAgentSessions(agent)}
               >
-                <strong>{session.shortTitle || session.title || "(untitled)"}</strong>
-                <span>{session.cwd || ""}</span>
-                <small>{compactDate(session.updatedAt)}</small>
+                Load more sessions
               </button>
-            ))}
+            ) : null}
           </section>
         );
       })}
