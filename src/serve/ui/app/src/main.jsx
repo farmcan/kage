@@ -40,7 +40,9 @@ const config = {
   ...(window.__KAGE_CONFIG__ || {}),
 };
 const query = new URLSearchParams(window.location.search);
-const isMockMobile = query.has("mobile") || query.has("mock-mobile") || query.get("v") === "mobile";
+const forceMockMobile = query.has("mobile") || query.has("mock-mobile") || query.get("v") === "mobile";
+const MOBILE_QUERY = "(max-width: 900px)";
+const TOAST_DURATION_MS = 4500;
 const THEME_STORAGE_KEY = "kageServeTheme.v2";
 const PASSWORD_STORAGE_KEY = "kageServePassword";
 const DEFAULT_THEME = "light";
@@ -76,6 +78,40 @@ function writeStorageValue(key, value) {
   } catch {
     // Local storage can be unavailable in some browser contexts.
   }
+}
+
+function matchMediaMatches(query) {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(query).matches;
+}
+
+function useMobileLayout() {
+  const [isMobileLayout, setIsMobileLayout] = useState(() => forceMockMobile || matchMediaMatches(MOBILE_QUERY));
+
+  useEffect(() => {
+    if (forceMockMobile || !window.matchMedia) return;
+    const media = window.matchMedia(MOBILE_QUERY);
+    const onChange = (event) => {
+      setIsMobileLayout(event.matches);
+    };
+
+    if (media.addEventListener) {
+      media.addEventListener("change", onChange);
+    } else {
+      media.addListener(onChange);
+    }
+    setIsMobileLayout(media.matches);
+
+    return () => {
+      if (media.removeEventListener) {
+        media.removeEventListener("change", onChange);
+      } else {
+        media.removeListener(onChange);
+      }
+    };
+  }, []);
+
+  return isMobileLayout;
 }
 
 function normalizeTheme(value) {
@@ -281,7 +317,7 @@ const useStore = create((set, get) => ({
   showToast(toast) {
     set({ toast });
     clearTimeout(get().toastTimer);
-    const toastTimer = setTimeout(() => set({ toast: "" }), 1800);
+    const toastTimer = setTimeout(() => set({ toast: "" }), TOAST_DURATION_MS);
     set({ toastTimer });
   },
   setProjects(projects) {
@@ -605,6 +641,20 @@ function compactDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatRelativeTime(value, now = Date.now()) {
+  const timestamp = Date.parse(value || 0);
+  if (Number.isNaN(timestamp)) return "unknown";
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return compactDate(value);
 }
 
 function elapsedLabel(startedAt, now = Date.now()) {
@@ -1111,6 +1161,7 @@ function App() {
   const detailOpen = useStore((state) => state.detailOpen);
   const viewMode = useStore((state) => state.viewMode);
   const conversationFullscreen = useStore((state) => state.conversationFullscreen);
+  const isMobileLayout = useMobileLayout();
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
@@ -1137,7 +1188,7 @@ function App() {
 
   return (
     <Tooltip.Provider delayDuration={220}>
-      <div className={cls("app-shell", isMockMobile && "mock-mobile")}>
+      <div className={cls("app-shell", isMobileLayout && "mock-mobile")}>
         <TopBar />
         <main className={cls("workspace", detailOpen && "detail-open", conversationFullscreen && "conversation-fullscreen", viewMode === "board" && "board-mode")}>
           <WorkspaceContent />
@@ -1188,6 +1239,9 @@ function TopBar() {
     : selectedWorkspace
       ? groupLabelForWorkspace(selectedWorkspace)
       : "Current workspace";
+  const subtitle = sessions.length
+    ? `${sessions.length} sessions${workspaceSummary ? ` · ${workspaceSummary}` : ""}`
+    : "No sessions loaded yet";
   const [customWorkspace, setCustomWorkspace] = useState(isAllWorkspaces(selectedWorkspace) ? "" : selectedWorkspace || "");
   const now = useIntervalNow(Boolean(live && activityUpdatedAt), 1000);
   const logoActive = hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt, now });
@@ -1208,8 +1262,8 @@ function TopBar() {
         </div>
         <div className="brand-copy">
           <h1>KAGE Dispatch</h1>
-          <span>
-            {loading ? loadingMessage || "Refreshing session index..." : sessions.length ? `${sessions.length} sessions in ${workspaceSummary}` : "Local agent command center"}
+          <span title={loading ? loadingMessage || subtitle : subtitle}>
+            {loading ? loadingMessage || "Refreshing session index..." : subtitle}
           </span>
         </div>
       </div>
@@ -1341,7 +1395,10 @@ function Sidebar() {
   );
 }
 
-const SessionListItem = memo(function SessionListItem({ session, isActive, isStreaming, activityLabel, onSelectSession }) {
+const SessionListItem = memo(function SessionListItem({ session, isActive, isStreaming, activityLabel, now = Date.now(), onSelectSession }) {
+  const updates = formatRelativeTime(session?.updatedAt, now);
+  const turnCount = Array.isArray(session?.recentUserMessages) ? session.recentUserMessages.length : 0;
+  const turnText = turnCount === 1 ? "1 turn" : `${turnCount} turns`;
   return (
     <button
       className={cls("session-card", isActive && "active", isStreaming && "streaming")}
@@ -1352,6 +1409,10 @@ const SessionListItem = memo(function SessionListItem({ session, isActive, isStr
       <AgentBadge agent={session.agent} label={session.agentLabel} />
       <strong>{sessionDisplayTitle(session)}</strong>
       <span>{session.cwd || ""}</span>
+      <small className="session-meta-line" title={`${turnText} · updated ${updates}`}>
+        <span>{turnText}</span>
+        <span>Updated {updates}</span>
+      </small>
       {isStreaming && (
         <small className="session-live-line">
           <span className="status-dot pulse" />
@@ -1401,6 +1462,7 @@ const SessionListGroup = memo(function SessionListGroup({
             isActive={selectedPath === session.path}
             isStreaming={activePath === session.path}
             activityLabel={activityLabel}
+            now={now}
             onSelectSession={onSelectSession}
           />
         ))}
@@ -1415,11 +1477,13 @@ const SessionListGroup = memo(function SessionListGroup({
 
 function SessionList({ sessions }) {
   const selectedPath = useStore((state) => state.selectedPath);
+  const selectedAgent = useStore((state) => state.selectedAgent);
+  const search = useStore((state) => state.search);
   const live = useStore((state) => state.live);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [visibleGroupSizes, setVisibleGroupSizes] = useState(new Map());
-  const now = useIntervalNow(Boolean(selectedPath && live), 1000);
+  const now = useIntervalNow(Boolean(selectedPath && live) || sessions.length > 0, 60_000);
   const activePath = selectedPath && live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS ? selectedPath : null;
   const groupedSessions = useMemo(() => {
     const groups = new Map();
@@ -1482,12 +1546,30 @@ function SessionList({ sessions }) {
           next.set(group.key, Math.min(group.count, SESSION_GROUP_INITIAL_SIZE));
         }
       }
-      return next;
+    return next;
     });
   }, [groupedSessions]);
 
-  if (sessions.length === 0) {
-    return <div className="empty-state">No sessions match this view.</div>;
+  const hasSearch = search.trim().length > 0;
+  if (!sessions.length) {
+    if (hasSearch || selectedAgent !== "all") {
+      return (
+        <SessionListEmptyState
+          title="No sessions match the current filters"
+          detail="Try clearing search text or switching to All agents."
+          onClearFilters={() => {
+            useStore.getState().setSearch("");
+            useStore.getState().setSelectedAgent("all");
+          }}
+        />
+      );
+    }
+    return (
+      <SessionListEmptyState
+        title="No local sessions found"
+        detail="Start a new prompt in Dispatch Console and a local agent will create the first session here."
+      />
+    );
   }
 
   if (groupedSessions.length === 0) {
@@ -1511,9 +1593,29 @@ function SessionList({ sessions }) {
             onToggleGroup={toggleGroup}
             onLoadMore={loadMoreSessions}
             onSelectSession={selectSessionByPath}
+            now={now}
           />
         );
       })}
+    </div>
+  );
+}
+
+function SessionListEmptyState({ title, detail, onClearFilters }) {
+  return (
+    <div className="empty-state process-state session-empty-state">
+      <Send size={18} className="spin" />
+      <strong>{title}</strong>
+      <span>{detail}</span>
+      {onClearFilters && (
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => onClearFilters()}
+        >
+          Clear filters
+        </button>
+      )}
     </div>
   );
 }
@@ -2265,16 +2367,19 @@ function Composer({ session, compact = false }) {
           body: JSON.stringify(payload),
         });
         clearLocalSendErrors();
-        if (result.stdout && effectiveMode === "reply") {
-          appendLocalTranscriptMessage({ role: "assistant", content: result.stdout });
+        if (result.task) {
+          useStore.getState().upsertTask(result.task);
+          useStore.getState().showToast(effectiveMode === "reply" ? "Reply queued" : "New session queued");
+        } else {
+          useStore.getState().showToast(effectiveMode === "reply" ? "Prompt sent" : "New session prompt sent");
         }
-        useStore.getState().showToast(effectiveMode === "reply" ? "Agent finished processing the prompt" : "New session prompt completed");
         void loadSessions({
           preserveSelection: true,
           silentLoading: true,
         }).catch((error) => {
           useStore.getState().showToast(error.message);
         });
+        void loadTasks({ silent: true });
       } catch (error) {
         if (pendingId) {
           dropPendingMessage(pendingId, { withError: true });

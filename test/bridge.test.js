@@ -1541,10 +1541,15 @@ test("serve send API is enabled by default", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "new arbitrary prompt" }),
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 202);
     const body = await response.json();
     assert.equal(body.mode, "send");
-    assert.equal(body.target, "new");
+    assert.equal(body.task.status, "queued");
+    assert.equal(body.task.agent, "codex");
+    assert.equal(body.task.project, "test");
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
     assert.deepEqual(calls, [
       {
         agent: "codex",
@@ -1604,7 +1609,7 @@ test("serve send API rejects concurrent sends to the same target", async () => {
 
     releaseSend();
     const firstResponse = await firstResponsePromise;
-    assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.status, 202);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

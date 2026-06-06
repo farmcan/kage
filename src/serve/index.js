@@ -517,6 +517,50 @@ async function runDispatchTask(task, body, options) {
   }
 }
 
+async function runSendTask(task, body, options) {
+  task.status = "running";
+  task.progress = 35;
+  task.startedAt = new Date().toISOString();
+  task.updatedAt = task.startedAt;
+  task.logs = [...task.logs, `Sending ${task.agentLabel} request in ${task.project}.`];
+  try {
+    const result = await options.sendRunner({
+      agent: body.agent,
+      sessionId: body.sessionId,
+      cwd: body.cwd,
+      message: body.message,
+      fallbackCwd: options.cwd,
+    });
+    const completedAt = new Date().toISOString();
+    task.status = "completed";
+    task.progress = 100;
+    task.completedAt = completedAt;
+    task.updatedAt = completedAt;
+    task.durationMs = result.durationMs ?? null;
+    task.pid = result.pid ?? null;
+    task.stdout = result.stdout || "";
+    task.stderr = result.stderr || "";
+    task.logs = [...task.logs, result.stdout ? "Agent command returned output." : "Agent command completed."];
+    if (result.stderr) {
+      task.logs = [...task.logs, "stderr captured; open task details for context."];
+    }
+  } catch (error) {
+    const completedAt = new Date().toISOString();
+    task.status = "failed";
+    task.progress = 100;
+    task.completedAt = completedAt;
+    task.updatedAt = completedAt;
+    task.durationMs = error.result?.durationMs ?? null;
+    task.pid = error.result?.pid ?? null;
+    task.stdout = error.result?.stdout || "";
+    task.stderr = error.result?.stderr || "";
+    task.error = error.message;
+    task.logs = [...task.logs, error.message];
+  } finally {
+    options.sendInflight.delete(task.targetKey);
+  }
+}
+
 function markTaskCompleted(task) {
   const now = new Date().toISOString();
   task.status = "completed";
@@ -765,7 +809,17 @@ async function handleSend(request, response, options) {
     return;
   }
   const body = await readJsonBody(request);
-  if (String(body.message ?? "").length > 16_000) {
+  const normalizedAgent = String(body.agent ?? "").trim();
+  const normalizedMessage = String(body.message ?? "");
+  if (!normalizedAgent) {
+    jsonResponse(response, 400, { error: "Agent is required." });
+    return;
+  }
+  if (!normalizedMessage.trim()) {
+    jsonResponse(response, 400, { error: "Message is required." });
+    return;
+  }
+  if (normalizedMessage.length > 16_000) {
     jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
     return;
   }
@@ -779,16 +833,15 @@ async function handleSend(request, response, options) {
     });
     return;
   }
-  options.sendInflight.set(targetKey, { startedAt: Date.now() });
   try {
-    const result = await options.sendRunner({
-      agent: body.agent,
-      sessionId: body.sessionId,
-      cwd: body.cwd,
-      message: body.message,
-      fallbackCwd: options.cwd,
-    });
-    jsonResponse(response, 200, { mode: "send", targetKey, ...result });
+    const task = createTask({ ...body, agent: normalizedAgent, message: normalizedMessage }, options, targetKey);
+    options.tasks.set(task.id, task);
+    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: task.id });
+    trimTaskHistory(options.tasks);
+    setTimeout(() => {
+      void runSendTask(task, body, options);
+    }, 0);
+    jsonResponse(response, 202, { mode: "send", targetKey, task: publicTask(task) });
   } catch (error) {
     jsonResponse(response, 500, {
       mode: "send",
@@ -797,7 +850,6 @@ async function handleSend(request, response, options) {
       targetKey,
       ...(error.result ? { result: error.result } : {}),
     });
-  } finally {
     options.sendInflight.delete(targetKey);
   }
 }

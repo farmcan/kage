@@ -191,7 +191,12 @@ button {
 .conversation-title span {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  text-wrap: balance;
+}
+
+.brand-copy span {
+  max-width: min(58ch, 52vw);
 }
 
 .top-actions {
@@ -303,6 +308,18 @@ button {
 .primary-button:hover {
   border-color: color-mix(in srgb, var(--text) 86%, transparent);
   background: color-mix(in srgb, var(--text) 86%, var(--panel));
+}
+
+button.secondary,
+.task-detail-actions button.secondary {
+  border: 1px solid color-mix(in srgb, var(--text) 30%, var(--line));
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel-3) 92%, transparent);
+}
+
+button.secondary:hover,
+.task-detail-actions button.secondary:hover {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
 }
 
 .status-pill,
@@ -605,6 +622,17 @@ button {
 .session-card small {
   overflow-wrap: anywhere;
   font-size: 12px;
+}
+
+.session-meta-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-meta-line span {
+  white-space: nowrap;
+  color: var(--dim);
 }
 
 .session-live-line {
@@ -2007,6 +2035,10 @@ textarea:disabled {
   max-width: 360px;
   color: var(--muted);
   text-wrap: balance;
+}
+
+.session-empty-state .secondary {
+  min-height: 34px;
 }
 
 .empty-state.error {
