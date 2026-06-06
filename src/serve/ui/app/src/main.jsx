@@ -1541,13 +1541,13 @@ function WorkspaceContent() {
       <Conversation />
       <button type="button" className="mobile-dispatch-fab" onClick={() => setMobileDispatchOpen(true)}>
         <Send size={17} />
-        Dispatch
+        New Task
       </button>
       {mobileDispatchOpen && (
         <button
           type="button"
           className="mobile-dispatch-backdrop"
-          aria-label="Close Dispatch Console"
+          aria-label="Close New Task"
           onClick={() => setMobileDispatchOpen(false)}
         />
       )}
@@ -2626,7 +2626,7 @@ function Conversation() {
       )}
       {selectedSession && (
         <div className="conversation-composer">
-          <Composer session={selectedSession} compact />
+          <Composer session={selectedSession} compact allowReply />
         </div>
       )}
     </section>
@@ -2823,7 +2823,7 @@ function TaskDispatchBar({ workspace }) {
       </label>
       <label className="task-dispatch-prompt">
         <span>Task</span>
-        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Describe a task to dispatch..." />
+        <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Describe a task to run..." />
       </label>
       <button type="submit" disabled={!draft.trim() || submitting}>
         {submitting ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
@@ -2940,13 +2940,13 @@ function DispatchPanel({ mobileOpen = false, onCloseMobile }) {
         <div className="dispatch-console-title">
           <div className="panel-kicker">
             <Terminal size={14} />
-            Dispatch Console
+            New Task
           </div>
-          <button type="button" className="dispatch-sheet-close" onClick={onCloseMobile} aria-label="Close Dispatch Console">
+          <button type="button" className="dispatch-sheet-close" onClick={onCloseMobile} aria-label="Close New Task">
             <X size={16} />
           </button>
         </div>
-        <strong>Assign prompts to local agents</strong>
+        <strong>Start a new local agent task</strong>
           <span>{config.sendEnabled ? "Direct send is enabled for this local runtime." : "Read-only mode is active; restart without --read-only for direct send."}</span>
       </div>
       <div className="dispatch-metrics" aria-label="Dispatch runtime summary">
@@ -2967,7 +2967,7 @@ function DispatchPanel({ mobileOpen = false, onCloseMobile }) {
         <span>workspace</span>
         <code title={runtimeWorkspace}>{runtimeWorkspace}</code>
       </div>
-      <Composer session={selectedSession} />
+      <Composer session={selectedSession} allowReply={false} />
     </aside>
   );
 }
@@ -3294,7 +3294,7 @@ function DisclosureBlock({ icon, title, content, tone = "", defaultOpen = false 
   );
 }
 
-function Composer({ session, compact = false }) {
+function Composer({ session, compact = false, allowReply = true }) {
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState("new");
   const [replySessionPath, setReplySessionPath] = useState(null);
@@ -3305,7 +3305,7 @@ function Composer({ session, compact = false }) {
   const rootCwd = useStore((state) => state.cwd);
   const sessions = useStore((state) => state.sessions);
   const selectedPath = useStore((state) => state.selectedPath);
-  const canReply = Boolean(session && sendAgents.includes(session.agent));
+  const canReply = Boolean(allowReply && session && sendAgents.includes(session.agent));
   const effectiveMode = mode === "reply" && canReply && replySessionPath === session?.path ? "reply" : "new";
   const effectiveAgent = effectiveMode === "reply" ? session.agent : targetAgent;
   const effectiveCwd = (targetCwd.trim() || session?.cwd || rootCwd || ".").trim();
@@ -3316,14 +3316,21 @@ function Composer({ session, compact = false }) {
   useEffect(() => {
     const nextCwd = session?.cwd || rootCwd || "";
     setTargetCwd(nextCwd);
+    if (!allowReply) {
+      setMode("new");
+      setReplySessionPath(null);
+      setTargetAgent(session?.agent || "codex");
+      return;
+    }
     if (!session?.agent || !sendAgents.includes(session.agent)) {
       setTargetAgent("codex");
       setMode("new");
       setReplySessionPath(null);
     }
-  }, [session?.path, session?.agent, session?.cwd, rootCwd]);
+  }, [session?.path, session?.agent, session?.cwd, rootCwd, allowReply]);
 
   function chooseMode(nextMode) {
+    if (!allowReply) return;
     if (nextMode === "reply") {
       if (!canReply) return;
       setMode("reply");
@@ -3344,11 +3351,38 @@ function Composer({ session, compact = false }) {
   }
 
   async function selectReplyTarget(nextSession) {
+    if (!allowReply) return;
     setMode("reply");
     setReplySessionPath(nextSession.path);
     setTargetAgent(nextSession.agent);
     setTargetCwd(nextSession.cwd || rootCwd || "");
     await selectSession(nextSession, { openDetail: true });
+  }
+
+  function parseTimestamp(value) {
+    const parsed = Date.parse(value || 0);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  async function jumpToNewSession(agent, workspace, createdAt, previousPaths) {
+    const createdMs = parseTimestamp(createdAt);
+    const normalizedWorkspace = normalizeWorkspace(workspace);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+      await loadSessions({ preserveSelection: true, silentLoading: true });
+      const candidates = useStore.getState().sessions
+        .filter((candidate) => candidate.agent === agent)
+        .filter((candidate) => normalizeWorkspace(candidate.cwd) === normalizedWorkspace)
+        .filter((candidate) => !previousPaths.has(candidate.path))
+        .filter((candidate) => parseTimestamp(candidate.updatedAt) >= createdMs - 3_000)
+        .sort((left, right) => parseTimestamp(right.updatedAt) - parseTimestamp(left.updatedAt));
+      if (candidates.length > 0) {
+        await selectSession(candidates[0], { openDetail: true });
+        return;
+      }
+    }
   }
 
   async function submit(event) {
@@ -3387,6 +3421,10 @@ function Composer({ session, compact = false }) {
         if (result.task) {
           useStore.getState().upsertTask(result.task);
           useStore.getState().showToast(effectiveMode === "reply" ? "Reply queued" : "New session queued");
+          if (!compact && !allowReply && effectiveMode === "new" && result.task.agent && result.task.cwd) {
+            const previousPaths = new Set(useStore.getState().sessions.map((item) => item.path));
+            void jumpToNewSession(result.task.agent, result.task.cwd, result.task.createdAt, previousPaths);
+          }
         } else {
           useStore.getState().showToast(effectiveMode === "reply" ? "Prompt sent" : "New session prompt sent");
         }
@@ -3416,16 +3454,18 @@ function Composer({ session, compact = false }) {
           <strong>Send a prompt</strong>
           <span>{effectiveMode === "reply" ? `Replying to ${agentMeta[effectiveAgent]?.label || effectiveAgent}` : "Start a new agent session"}</span>
         </div>
-        <Tabs.Root value={effectiveMode} onValueChange={chooseMode}>
-          <Tabs.List className="send-mode-tabs" aria-label="Choose send target">
-            <Tabs.Trigger className="send-mode-tab" value="reply" disabled={!canReply}>
-              Reply
-            </Tabs.Trigger>
-            <Tabs.Trigger className="send-mode-tab" value="new">
-              New
-            </Tabs.Trigger>
-          </Tabs.List>
-        </Tabs.Root>
+        {allowReply ? (
+          <Tabs.Root value={effectiveMode} onValueChange={chooseMode}>
+            <Tabs.List className="send-mode-tabs" aria-label="Choose send target">
+              <Tabs.Trigger className="send-mode-tab" value="reply" disabled={!canReply}>
+                Reply
+              </Tabs.Trigger>
+              <Tabs.Trigger className="send-mode-tab" value="new">
+                New
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
+        ) : null}
       </div>
       {!compact && (
         <>
@@ -3435,6 +3475,7 @@ function Composer({ session, compact = false }) {
               selectedPath={selectedPath}
               mode={effectiveMode}
               targetAgent={targetAgent}
+              allowReply={allowReply}
               onNewTarget={selectNewTarget}
               onReplyTarget={selectReplyTarget}
             />
@@ -3447,7 +3488,7 @@ function Composer({ session, compact = false }) {
             {config.sendEnabled ? (
               <span>
                 <Check size={14} />
-                Direct send can reply or start a new local CLI session
+                {allowReply ? "Direct send can reply or start a new local CLI session." : "Direct send starts a new local session."}
               </span>
             ) : (
                 <span>
@@ -3473,7 +3514,7 @@ function Composer({ session, compact = false }) {
   );
 }
 
-function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget, onReplyTarget }) {
+function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget, onReplyTarget, allowReply = false }) {
   const groupedSessions = useMemo(
     () =>
       sendAgents.map((agent) => ({
@@ -3505,7 +3546,7 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
               <strong>New session</strong>
               <span>Start from cwd</span>
             </button>
-            {agentSessions.map((session) => (
+            {allowReply && agentSessions.map((session) => (
               <button
                 key={`${session.agent}:${session.path}`}
                 className={cls("dispatch-card", selectedPath === session.path && mode === "reply" && "active")}

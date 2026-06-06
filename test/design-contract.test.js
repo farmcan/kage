@@ -101,6 +101,16 @@ test("serve mobile dispatch is a collapsed bottom sheet", async () => {
   assert.doesNotMatch(serveStyles, /\.app-shell\.mock-mobile \.dispatch-panel\s*\{\s*order:\s*1;/u);
 });
 
+test("serve dispatch path prioritizes new-task flow on mobile sheet", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+
+  assert.match(serveMain, /<button type="button" className="mobile-dispatch-fab" onClick=\{\(\) => setMobileDispatchOpen\(true\)\}>[\s\S]*?New Task/u);
+  assert.match(serveMain, /className="dispatch-console-title"[\s\S]*?New Task/u);
+  assert.match(serveMain, /<Composer session=\{selectedSession\} allowReply=\{false\} \/>/u);
+  assert.match(serveMain, /<Composer session=\{selectedSession\} compact allowReply \/>/u);
+  assert.match(serveMain, /"Direct send starts a new local session\."/u);
+});
+
 test("serve grouped session cards receive the current clock value", async () => {
   const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
 
