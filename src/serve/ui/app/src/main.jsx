@@ -39,6 +39,47 @@ const config = {
   sendEnabled: true,
   ...(window.__KAGE_CONFIG__ || {}),
 };
+
+const AGENT_ICONS = {
+  claude: {
+    src: null,
+    label: "Claude",
+    render: () => (
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path fill="currentColor" d="m19.6 66.5 19.7-11 .3-1-.3-.5h-1l-3.3-.2-11.2-.3L14 53l-9.5-.5-2.4-.5L0 49l.2-1.5 2-1.3 2.9.2 6.3.5 9.5.6 6.9.4L38 49.1h1.6l.2-.7-.5-.4-.4-.4L29 41l-10.6-7-5.6-4.1-3-2-1.5-2-.6-4.2 2.7-3 3.7.3.9.2 3.7 2.9 8 6.1L37 36l1.5 1.2.6-.4.1-.3-.7-1.1L33 25l-6-10.4-2.7-4.3-.7-2.6c-.3-1-.4-2-.4-3l3-4.2L28 0l4.2.6L33.8 2l2.6 6 4.1 9.3L47 29.9l2 3.8 1 3.4.3 1h.7v-.5l.5-7.2 1-8.7 1-11.2.3-3.2 1.6-3.8 3-2L61 2.6l2 2.9-.3 1.8-1.1 7.7L59 27.1l-1.5 8.2h.9l1-1.1 4.1-5.4 6.9-8.6 3-3.5L77 13l2.3-1.8h4.3l3.1 4.7-1.4 4.9-4.4 5.6-3.7 4.7-5.3 7.1-3.2 5.7.3.4h.7l12-2.6 6.4-1.1 7.6-1.3 3.5 1.6.4 1.6-1.4 3.4-8.2 2-9.6 2-14.3 3.3-.2.1.2.3 6.4.6 2.8.2h6.8l12.6 1 3.3 2 1.9 2.7-.3 2-5.1 2.6-6.8-1.6-16-3.8-5.4-1.3h-.8v.4l4.6 4.5 8.3 7.5L89 80.1l.5 2.4-1.3 2-1.4-.2-9.2-7-3.6-3-8-6.8h-.5v.7l1.8 2.7 9.8 14.7.5 4.5-.7 1.4-2.6 1-2.7-.6-5.8-8-6-9-4.7-8.2-.5.4-2.9 30.2-1.3 1.5-3 1.2-2.5-2-1.4-3 1.4-6.2 1.6-8 1.3-6.4 1.2-7.9.7-2.6v-.2H49L43 72l-9 12.3-7.2 7.6-1.7.7-3-1.5.3-2.8L24 86l10-12.8 6-7.9 4-4.6-.1-.5h-.3L17.2 77.4l-4.7.6-2-2 .2-3 1-1 8-5.5Z" />
+      </svg>
+    ),
+  },
+  codex: {
+    src: null,
+    label: "Codex",
+    render: () => (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M11.248 18.25q-.825 0-1.568-.314a4.3 4.3 0 0 1-1.32-.874 4 4 0 0 1-1.304.214 4 4 0 0 1-2.046-.544 4.27 4.27 0 0 1-1.518-1.485 4 4 0 0 1-.56-2.095q0-.48.131-1.04A4.4 4.4 0 0 1 2.04 10.71a4.07 4.07 0 0 1 .017-3.4 4.2 4.2 0 0 1 1.056-1.418 3.8 3.8 0 0 1 1.6-.842 3.9 3.9 0 0 1 .76-1.683q.593-.759 1.451-1.188a4.04 4.04 0 0 1 1.832-.429q.825 0 1.567.313.742.314 1.32.875a4 4 0 0 1 1.304-.215q1.106 0 2.046.545a4.14 4.14 0 0 1 1.501 1.485q.578.941.578 2.095 0 .48-.132 1.04.66.61 1.023 1.419.363.792.363 1.666 0 .892-.38 1.717a4.3 4.3 0 0 1-1.072 1.435 3.8 3.8 0 0 1-1.584.825 3.8 3.8 0 0 1-.775 1.683 4.06 4.06 0 0 1-1.436 1.188 4.04 4.04 0 0 1-1.832.429m-4.076-2.062q.825 0 1.435-.347l3.103-1.782a.36.36 0 0 0 .164-.313v-1.42L7.881 14.62a.67.67 0 0 1-.726 0l-3.118-1.798a.5.5 0 0 1-.017.115v.198q0 .841.396 1.551.413.693 1.139 1.089a3.2 3.2 0 0 0 1.617.412m.165-2.69a.4.4 0 0 0 .181.05q.083 0 .165-.05l1.238-.71-3.977-2.31a.7.7 0 0 1-.363-.643v-3.58q-.825.362-1.32 1.122a2.9 2.9 0 0 0-.495 1.65q0 .809.413 1.55.412.743 1.072 1.123zm3.91 3.663q.875 0 1.585-.396a2.96 2.96 0 0 0 1.534-2.64v-3.564a.32.32 0 0 0-.165-.297l-1.254-.726v4.604a.7.7 0 0 1-.363.643l-3.119 1.799a3 3 0 0 0 1.783.577m.627-6.039V8.878L10.01 7.822 8.129 8.878v2.244l1.881 1.056zM7.057 5.859a.7.7 0 0 1 .363-.644l3.119-1.798a3 3 0 0 0-1.782-.578q-.874 0-1.584.396A2.96 2.96 0 0 0 6.05 4.324a3.07 3.07 0 0 0-.396 1.551v3.547q0 .199.165.314l1.237.726zm8.383 7.887q.825-.364 1.303-1.123.495-.758.495-1.65a3.15 3.15 0 0 0-.412-1.55q-.413-.743-1.073-1.123l-3.086-1.782q-.099-.065-.181-.049a.3.3 0 0 0-.165.05l-1.238.692 3.993 2.327a.6.6 0 0 1 .264.264.64.64 0 0 1 .1.363zm-3.317-8.382a.63.63 0 0 1 .726 0l3.135 1.831v-.297q0-.792-.396-1.501a2.86 2.86 0 0 0-1.105-1.155q-.71-.43-1.65-.43-.825 0-1.436.347L8.294 5.941a.36.36 0 0 0-.165.314v1.418z"
+        />
+      </svg>
+    ),
+  },
+  qodercli: {
+    label: "Qoder",
+    render: () => (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="#111113" />
+        <path
+          fill="#2ADB5C"
+          d="M18.5 13.2v3.5c0 1.2-1.3 2-2.4 1.5l-1.9-.9c-1 .6-2.1 1-3.3 1.1-3 .2-5.7-1.5-6.8-4.2-1.2-2.9-.4-6.2 2-8.2 2.5-2.1 6.1-2.3 8.6-.6 2 1.3 3.1 3.5 3.1 5.9v1.7c.3.1.5.2.7.3Z"
+        />
+        <path
+          fill="#FFFFFF"
+          d="M11.4 5.2c2.8 0 5 2.2 5 5v3.2l-3.2-1.5c-.7.7-1.7 1.1-2.8 1.1-2.1 0-3.9-1.7-3.9-3.9s1.8-3.9 3.9-3.9h1Zm-.8 2.6c-.8 0-1.5.7-1.5 1.5s.7 1.5 1.5 1.5 1.5-.7 1.5-1.5-.7-1.5-1.5-1.5Z"
+          opacity=".96"
+        />
+      </svg>
+    ),
+  },
+};
 const query = new URLSearchParams(window.location.search);
 const forceMockMobile = query.has("mobile") || query.has("mock-mobile") || query.get("v") === "mobile";
 const MOBILE_QUERY = "(max-width: 900px)";
@@ -262,6 +303,10 @@ const useStore = create((set, get) => ({
   viewMode: "sessions",
   selectedAgent: "all",
   search: "",
+  searchResults: [],
+  searchLoading: false,
+  searchError: "",
+  searchQuery: "",
   tasks: [],
   selectedTaskId: null,
   selectedPath: null,
@@ -287,6 +332,9 @@ const useStore = create((set, get) => ({
   },
   setSearch(search) {
     set({ search });
+  },
+  setSearchState(nextSearchState) {
+    set(nextSearchState);
   },
   setViewMode(viewMode) {
     set({ viewMode });
@@ -410,6 +458,22 @@ function sessionApiUrl(workspace) {
   return `${url.pathname}${url.search}`;
 }
 
+function searchApiUrl({ query, workspace, agent }) {
+  const normalizedWorkspace = normalizeWorkspace(workspace);
+  const url = new URL("/api/search", window.location.origin);
+  url.searchParams.set("q", query);
+  url.searchParams.set("limit", "60");
+  if (isAllWorkspaces(normalizedWorkspace)) {
+    url.searchParams.set("all", ALL_WORKSPACES_QUERY);
+  } else if (normalizedWorkspace) {
+    url.searchParams.set("workspace", normalizedWorkspace);
+  }
+  if (agent && agent !== "all") {
+    url.searchParams.set("agent", agent);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 async function loadProjects() {
   try {
     useStore.setState({ loadingMessage: "Scanning local agent roots..." });
@@ -431,6 +495,49 @@ async function loadProjects() {
     }
     return projects;
   } catch {
+    return [];
+  }
+}
+
+async function loadTranscriptSearch({ query, workspace, agent }) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
+    useStore.getState().setSearchState({
+      searchResults: [],
+      searchLoading: false,
+      searchError: "",
+      searchQuery: "",
+    });
+    return [];
+  }
+  useStore.getState().setSearchState({
+    searchLoading: true,
+    searchError: "",
+    searchQuery: trimmedQuery,
+  });
+  try {
+    const data = await api(searchApiUrl({ query: trimmedQuery, workspace, agent }));
+    const results = Array.isArray(data.results) ? data.results.map((session) => normalizeSession(session)) : [];
+    if (useStore.getState().search.trim() !== trimmedQuery) {
+      return results;
+    }
+    useStore.getState().setSearchState({
+      searchResults: results,
+      searchLoading: false,
+      searchError: "",
+      searchQuery: trimmedQuery,
+    });
+    return results;
+  } catch (error) {
+    if (useStore.getState().search.trim() !== trimmedQuery) {
+      return [];
+    }
+    useStore.getState().setSearchState({
+      searchResults: [],
+      searchLoading: false,
+      searchError: error.message,
+      searchQuery: trimmedQuery,
+    });
     return [];
   }
 }
@@ -1048,15 +1155,42 @@ function useFilteredSessions() {
   const sessions = useStore((state) => state.sessions);
   const selectedAgent = useStore((state) => state.selectedAgent);
   const search = useStore((state) => state.search);
+  const searchResults = useStore((state) => state.searchResults);
+  const searchQuery = useStore((state) => state.searchQuery);
   return useMemo(() => {
     const query = search.trim().toLowerCase();
-    return sessions.filter((session) => {
+    const serverResultsByPath = new Map();
+    const candidatesByPath = new Map(sessions.map((session) => [session.path, session]));
+    if (query) {
+      searchResults.forEach((result, index) => {
+        if (!result?.path) return;
+        serverResultsByPath.set(result.path, { result, index });
+        if (!candidatesByPath.has(result.path)) {
+          candidatesByPath.set(result.path, result);
+        }
+      });
+    }
+    return Array.from(candidatesByPath.values()).filter((session) => {
       if (selectedAgent !== "all" && session.agent !== selectedAgent) return false;
       if (!query) return true;
       const searchText = session._searchText || buildSessionSearchText(session);
-      return searchText.includes(query);
+      return searchText.includes(query) || serverResultsByPath.has(session.path);
+    }).map((session) => {
+      const serverResult = serverResultsByPath.get(session.path);
+      if (!serverResult) return session;
+      return {
+        ...session,
+        _searchMatch: serverResult.result.match || null,
+        _searchRank: serverResult.index,
+        _searchQuery: searchQuery || search,
+      };
+    }).sort((left, right) => {
+      const leftRank = Number.isFinite(left._searchRank) ? left._searchRank : Number.POSITIVE_INFINITY;
+      const rightRank = Number.isFinite(right._searchRank) ? right._searchRank : Number.POSITIVE_INFINITY;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return (right._updatedAtMs || 0) - (left._updatedAtMs || 0);
     });
-  }, [sessions, selectedAgent, search]);
+  }, [sessions, selectedAgent, search, searchResults, searchQuery]);
 }
 
 function useTranscriptIndex(transcript) {
@@ -1147,26 +1281,12 @@ function normalizedAgent(agent) {
 function AgentMark({ agent, size = 14 }) {
   const normalized = normalizedAgent(agent || "codex");
   const base = { width: size, height: size };
-
-  if (normalized === "claude") {
-    return (
-      <span className="agent-mark agent-mark-claude" style={base}>
-        <span>C</span>
-      </span>
-    );
-  }
-
-  if (normalized === "qodercli") {
-    return (
-      <span className="agent-mark agent-mark-qoder" style={base}>
-        <span>Q{">"}</span>
-      </span>
-    );
-  }
+  const definition = AGENT_ICONS[normalized] || AGENT_ICONS.codex;
+  const markClass = normalized === "claude" ? "agent-mark-claude" : normalized === "qodercli" ? "agent-mark-qoder" : "agent-mark-codex";
 
   return (
-    <span className="agent-mark agent-mark-codex" style={base}>
-      <span>&lt;/&gt;</span>
+    <span className={`agent-mark ${markClass}`} style={base}>
+      {definition.render?.()}
     </span>
   );
 }
@@ -1498,9 +1618,42 @@ function Sidebar() {
   const setSelectedAgent = useStore((state) => state.setSelectedAgent);
   const search = useStore((state) => state.search);
   const setSearch = useStore((state) => state.setSearch);
+  const searchLoading = useStore((state) => state.searchLoading);
+  const searchError = useStore((state) => state.searchError);
+  const searchResults = useStore((state) => state.searchResults);
+  const selectedWorkspace = useStore((state) => state.selectedWorkspace);
   const filteredSessions = useFilteredSessions();
   const counts = useMemo(() => new Map(agents.map((agent) => [agent.agent, agent.sessions.length])), [agents]);
   const tabAgents = ["all", ...agents.map((agent) => agent.agent)];
+  const trimmedSearch = search.trim();
+
+  useEffect(() => {
+    if (!trimmedSearch) {
+      useStore.getState().setSearchState({
+        searchResults: [],
+        searchLoading: false,
+        searchError: "",
+        searchQuery: "",
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void loadTranscriptSearch({
+        query: trimmedSearch,
+        workspace: selectedWorkspace,
+        agent: selectedAgent,
+      }).then(() => {
+        if (cancelled) {
+          return;
+        }
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [trimmedSearch, selectedWorkspace, selectedAgent]);
 
   return (
     <aside className="sidebar">
@@ -1517,16 +1670,58 @@ function Sidebar() {
         </Tabs.Root>
         <div className="search-box">
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sessions, cwd, lineage" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sessions and transcripts" />
           {search && (
             <button type="button" onClick={() => setSearch("")}>
               Clear
             </button>
           )}
         </div>
+        {trimmedSearch && (
+          <div className={cls("search-status", searchError && "error")}>
+            {searchLoading ? (
+              <>
+                <Loader2 size={13} className="spin" />
+                Searching transcript text...
+              </>
+            ) : searchError ? (
+              searchError
+            ) : searchResults.length ? (
+              `${searchResults.length} transcript matches`
+            ) : (
+              "No transcript matches yet"
+            )}
+          </div>
+        )}
       </div>
       <SessionList sessions={filteredSessions} />
     </aside>
+  );
+}
+
+function searchFieldLabel(field) {
+  const text = String(field || "");
+  if (text.startsWith("message:")) {
+    const [, role, index] = text.split(":");
+    return `${role || "message"} #${index || "?"}`;
+  }
+  return text || "transcript";
+}
+
+function HighlightedText({ text, query }) {
+  const content = String(text || "");
+  const needle = String(query || "").trim();
+  if (!needle) return content;
+  const lowerContent = content.toLowerCase();
+  const lowerNeedle = needle.toLowerCase();
+  const index = lowerContent.indexOf(lowerNeedle);
+  if (index === -1) return content;
+  return (
+    <>
+      {content.slice(0, index)}
+      <mark>{content.slice(index, index + needle.length)}</mark>
+      {content.slice(index + needle.length)}
+    </>
   );
 }
 
@@ -1534,6 +1729,7 @@ const SessionListItem = memo(function SessionListItem({ session, isActive, isStr
   const updates = formatRelativeTime(session?.updatedAt, now);
   const turnCount = Array.isArray(session?.recentUserMessages) ? session.recentUserMessages.length : 0;
   const turnText = turnCount === 1 ? "1 turn" : `${turnCount} turns`;
+  const searchMatch = session?._searchMatch;
   return (
     <button
       className={cls("session-card", isActive && "active", isStreaming && "streaming")}
@@ -1548,6 +1744,14 @@ const SessionListItem = memo(function SessionListItem({ session, isActive, isStr
         <span>{turnText}</span>
         <span>Updated {updates}</span>
       </small>
+      {searchMatch?.text && (
+        <small className="session-search-match" title={`${searchFieldLabel(searchMatch.field)}: ${searchMatch.text}`}>
+          <span>{searchFieldLabel(searchMatch.field)}</span>
+          <em>
+            <HighlightedText text={searchMatch.text} query={session._searchQuery} />
+          </em>
+        </small>
+      )}
       {isStreaming && (
         <small className="session-live-line">
           <span className="status-dot pulse" />

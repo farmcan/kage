@@ -1232,6 +1232,95 @@ test("serve sessions API supports all-workspaces mode", async () => {
   }
 });
 
+test("serve search API finds transcript text with workspace, cwd alias, and all-workspaces scope", async () => {
+  const fakeHome = await makeTempDir("serve-search-home");
+  const workspaceA = await makeTempDir("serve-search-workspace-a");
+  const workspaceB = await makeTempDir("serve-search-workspace-b");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions", "2026", "06");
+  await fs.mkdir(codexRoot, { recursive: true });
+
+  await fs.writeFile(
+    path.join(codexRoot, "search-session-a.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T09:00:00.000Z","type":"session_meta","payload":{"id":"search-a","cwd":"${workspaceA}","timestamp":"2026-06-05T09:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T09:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"review the server plan"}]}}\n`,
+      `{"timestamp":"2026-06-05T09:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The transcript-only auth middleware note belongs here."}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  await fs.writeFile(
+    path.join(codexRoot, "search-session-b.jsonl"),
+    [
+      `{"timestamp":"2026-06-05T10:00:00.000Z","type":"session_meta","payload":{"id":"search-b","cwd":"${workspaceB}","timestamp":"2026-06-05T10:00:00.000Z"}}\n`,
+      `{"timestamp":"2026-06-05T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"review the mobile plan"}]}}\n`,
+      `{"timestamp":"2026-06-05T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The remote-phone-marker appears only in workspace B."}]}}\n`,
+    ].join(""),
+    "utf8",
+  );
+
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  const server = createKageServeServer({ cwd: workspaceA });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  try {
+    const { port } = server.address();
+
+    const emptyUrl = new URL(`http://127.0.0.1:${port}/api/search`);
+    const emptyPayload = await (await fetch(emptyUrl)).json();
+    assert.equal(emptyPayload.mode, "search");
+    assert.equal(emptyPayload.query, "");
+    assert.deepEqual(emptyPayload.results, []);
+
+    const workspaceUrl = new URL(`http://127.0.0.1:${port}/api/search`);
+    workspaceUrl.searchParams.set("q", "auth middleware");
+    workspaceUrl.searchParams.set("workspace", workspaceA);
+    const workspacePayload = await (await fetch(workspaceUrl)).json();
+    assert.equal(workspacePayload.mode, "search");
+    assert.equal(workspacePayload.results.length, 1);
+    assert.equal(workspacePayload.results[0].sessionId, "search-a");
+    assert.match(workspacePayload.results[0].match.text, /auth middleware/);
+    assert.match(workspacePayload.results[0].match.field, /^message:assistant:/);
+    assert.equal(await canonicalPath(workspacePayload.selectedWorkspace), await canonicalPath(workspaceA));
+
+    const cwdAliasUrl = new URL(`http://127.0.0.1:${port}/api/search`);
+    cwdAliasUrl.searchParams.set("q", "auth middleware");
+    cwdAliasUrl.searchParams.set("cwd", workspaceA);
+    const cwdAliasPayload = await (await fetch(cwdAliasUrl)).json();
+    assert.equal(cwdAliasPayload.results.length, 1);
+    assert.equal(cwdAliasPayload.results[0].sessionId, "search-a");
+    assert.equal(await canonicalPath(cwdAliasPayload.selectedWorkspace), await canonicalPath(workspaceA));
+
+    const workspaceBUrl = new URL(`http://127.0.0.1:${port}/api/search`);
+    workspaceBUrl.searchParams.set("q", "auth middleware");
+    workspaceBUrl.searchParams.set("workspace", workspaceB);
+    const workspaceBPayload = await (await fetch(workspaceBUrl)).json();
+    assert.equal(workspaceBPayload.results.length, 0);
+
+    const allUrl = new URL(`http://127.0.0.1:${port}/api/search`);
+    allUrl.searchParams.set("q", "remote-phone-marker");
+    allUrl.searchParams.set("all", "1");
+    const allPayload = await (await fetch(allUrl)).json();
+    assert.equal(allPayload.selectedWorkspace, "__all_workspaces__");
+    assert.equal(allPayload.results.length, 1);
+    assert.equal(allPayload.results[0].sessionId, "search-b");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
+});
+
 test("serve sessions API accepts cwd alias and returns matching workspace", async () => {
   const fakeHome = await makeTempDir("serve-sessions-cwd-alias-home");
   const cwdAlias = await makeTempDir("serve-sessions-cwd-alias");

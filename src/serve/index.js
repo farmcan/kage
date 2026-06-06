@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { readSessionCwd } from "../adapters/sources/index.js";
 import { walk } from "../core/files.js";
+import { searchSessions } from "../core/search.js";
 import { readTranscript } from "./transcript.js";
 import { runAgentSend } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
@@ -367,6 +368,14 @@ function kageScopeArgs(url, { includeJson = true } = {}) {
   return args;
 }
 
+function boundedNumberQuery(url, name, fallback, { min = 1, max = 200 } = {}) {
+  const value = Number(boundedQuery(url, name, String(fallback)));
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
 function sendTargetKey(body, fallbackCwd) {
   const agent = String(body.agent ?? "").trim() || "unknown";
   const sessionId = String(body.sessionId ?? "").trim();
@@ -634,6 +643,36 @@ function canAcceptLanConnections(host) {
 async function handleApi(request, response, url, options) {
   if (url.pathname === "/api/doctor") {
     jsonResponse(response, 200, await runKageJson(["doctor", "--json"], { cwd: options.cwd }));
+    return;
+  }
+  if (url.pathname === "/api/search") {
+    const query = String(url.searchParams.get("q") ?? "").trim();
+    const selectedAgent = url.searchParams.get("agent");
+    const agent = selectedAgent && selectedAgent !== "all" ? selectedAgent : null;
+    const allWorkspaces = url.searchParams.get("all") === "1" || isAllWorkspaces(url.searchParams.get("workspace"));
+    const requestedWorkspace = workspaceFromSearch(url);
+    const workspace = allWorkspaces ? null : requestedWorkspace ?? options.cwd;
+    if (!query) {
+      jsonResponse(response, 200, {
+        mode: "search",
+        query: "",
+        selectedWorkspace: allWorkspaces ? ALL_WORKSPACES_VALUE : workspace,
+        results: [],
+        agents: [],
+      });
+      return;
+    }
+    const payload = await searchSessions({
+      query,
+      agent,
+      project: workspace,
+      includeSubdirs: url.searchParams.get("includeSubdirs") !== "false",
+      limit: boundedNumberQuery(url, "limit", 50),
+    });
+    jsonResponse(response, 200, {
+      ...payload,
+      selectedWorkspace: allWorkspaces ? ALL_WORKSPACES_VALUE : workspace,
+    });
     return;
   }
   if (url.pathname === "/api/projects") {

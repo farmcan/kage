@@ -63,6 +63,17 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(demoFlow, new RegExp(`fill="${palette.qoder.css}">COMPLETED</text>`, "u"));
 });
 
+test("serve agent marks use bundled SVG brand artwork", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+
+  assert.match(serveMain, /const AGENT_ICONS = \{/u);
+  assert.match(serveMain, /claude:\s*\{[\s\S]*?<svg viewBox="0 0 100 100"[\s\S]*?\n\s*\},\n\s*codex:/u);
+  assert.match(serveMain, /codex:\s*\{[\s\S]*?<svg viewBox="0 0 20 20"[\s\S]*?\n\s*\},\n\s*qodercli:/u);
+  assert.match(serveMain, /qodercli:\s*\{[\s\S]*?<svg viewBox="0 0 24 24"[\s\S]*?\n\s*\},\n\s*\};/u);
+  assert.doesNotMatch(serveMain, /https?:\/\/[^"']+\.(?:svg|png|webp)/u);
+  assert.doesNotMatch(serveMain, /<span>[CQX]<\/span>/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

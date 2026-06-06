@@ -3,19 +3,22 @@ import path from "node:path";
 
 export const supportedAgents = ["claude", "codex", "qodercli", "qoderwork"];
 
-const agentRoots = {
-  claude: path.join(os.homedir(), ".claude", "projects"),
-  codex: path.join(os.homedir(), ".codex", "sessions"),
-  qodercli: path.join(os.homedir(), ".qoder", "projects"),
-  qoderwork: path.join(os.homedir(), ".qoderwork", "projects"),
-};
-
 const agentAliases = {
   c: "claude",
   x: "codex",
   q: "qodercli",
   qw: "qoderwork",
 };
+
+function agentRoots() {
+  const home = os.homedir();
+  return {
+    claude: path.join(home, ".claude", "projects"),
+    codex: path.join(home, ".codex", "sessions"),
+    qodercli: path.join(home, ".qoder", "projects"),
+    qoderwork: path.join(home, ".qoderwork", "projects"),
+  };
+}
 
 export function normalizeAgent(agent) {
   if (!agent) {
@@ -48,12 +51,13 @@ export function detectAgent(sessionPath) {
 
 export function getDefaultRoot(agent = "codex") {
   const resolvedAgent = normalizeAgent(agent);
-  if (!resolvedAgent || !agentRoots[resolvedAgent]) {
+  const roots = agentRoots();
+  if (!resolvedAgent || !roots[resolvedAgent]) {
     throw new Error(`Unsupported agent: ${agent ?? "unknown"}`);
   }
-  return agentRoots[resolvedAgent];
+  return roots[resolvedAgent];
 }
 
 export function listAgentRoots() {
-  return { ...agentRoots };
+  return agentRoots();
 }
