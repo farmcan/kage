@@ -13,7 +13,7 @@ import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import { createKageServeServer, serveAccessUrl, terminalQrCode } from "../src/serve/index.js";
 import { buildAgentSendCommand, runAgentSend } from "../src/serve/send.js";
-import { resolveTranscriptPath } from "../src/serve/transcript.js";
+import { resolveTranscriptPath, resolveTranscriptPathWithin } from "../src/serve/transcript.js";
 import {
   buildStoryPayload,
   detectAgent,
@@ -32,6 +32,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function makeTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
+}
+
+async function withHome(fakeHome, task) {
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
+  try {
+    return await task();
+  } finally {
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
+  }
 }
 
 async function writeExecutable(filePath, content) {
@@ -147,23 +161,31 @@ test("resolveTranscriptPath rejects non-file paths", async () => {
 });
 
 test("serve transcript endpoint rejects invalid transcript paths", async () => {
-  const tmpDir = await makeTempDir("serve-transcript-invalid");
-  const txtPath = path.join(tmpDir, "notes.txt");
+  const fakeHome = await makeTempDir("serve-transcript-invalid");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions");
+  const txtPath = path.join(codexRoot, "notes.txt");
+  await fs.mkdir(codexRoot, { recursive: true });
   await fs.writeFile(txtPath, "hello", "utf8");
-  const result = await withServeServer(async (baseUrl) => {
-    const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(txtPath)}&agent=codex`);
-    return { status, body };
+  const result = await withHome(fakeHome, async () => {
+    return withServeServer(async (baseUrl) => {
+      const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(txtPath)}&agent=codex`);
+      return { status, body };
+    });
   });
   assert.equal(result.status, 400);
   assert.match(result.body, /Invalid transcript format/);
 });
 
 test("serve transcript endpoint returns not found for missing file", async () => {
-  const tmpDir = await makeTempDir("serve-transcript-missing");
-  const missingPath = path.join(tmpDir, "missing.jsonl");
-  const result = await withServeServer(async (baseUrl) => {
-    const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(missingPath)}&agent=codex`);
-    return { status, body };
+  const fakeHome = await makeTempDir("serve-transcript-missing");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions");
+  await fs.mkdir(codexRoot, { recursive: true });
+  const missingPath = path.join(codexRoot, "missing.jsonl");
+  const result = await withHome(fakeHome, async () => {
+    return withServeServer(async (baseUrl) => {
+      const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(missingPath)}&agent=codex`);
+      return { status, body };
+    });
   });
   assert.equal(result.status, 404);
   const payload = JSON.parse(result.body);
@@ -171,15 +193,68 @@ test("serve transcript endpoint returns not found for missing file", async () =>
 });
 
 test("serve stream endpoint validates transcript format", async () => {
-  const tmpDir = await makeTempDir("serve-stream-invalid");
-  const mdPath = path.join(tmpDir, "readme.md");
+  const fakeHome = await makeTempDir("serve-stream-invalid");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions");
+  const mdPath = path.join(codexRoot, "readme.md");
+  await fs.mkdir(codexRoot, { recursive: true });
   await fs.writeFile(mdPath, "hello", "utf8");
-  const result = await withServeServer(async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/stream?path=${encodeURIComponent(mdPath)}&agent=codex`);
-    return { status: response.status, body: await response.text() };
+  const result = await withHome(fakeHome, async () => {
+    return withServeServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/stream?path=${encodeURIComponent(mdPath)}&agent=codex`);
+      return { status: response.status, body: await response.text() };
+    });
   });
   assert.equal(result.status, 400);
   assert.match(result.body, /Invalid transcript format/);
+});
+
+test("resolveTranscriptPathWithin accepts allowed roots and rejects outside paths", async () => {
+  const fakeHome = await makeTempDir("resolve-transcript-root");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions");
+  await fs.mkdir(codexRoot, { recursive: true });
+  const allowedPath = path.join(codexRoot, "allowed.jsonl");
+  await fs.writeFile(allowedPath, "{}", "utf8");
+
+  const outsidePath = path.join(fakeHome, "outside-session.jsonl");
+  await fs.writeFile(outsidePath, "{}", "utf8");
+
+  assert.equal(
+    await resolveTranscriptPathWithin(allowedPath, {
+      allowedRoots: [codexRoot],
+    }),
+    await canonicalPath(allowedPath),
+  );
+  await assert.rejects(() => resolveTranscriptPathWithin(outsidePath, { allowedRoots: [codexRoot] }), {
+    message: "Transcript path is outside allowed session directories",
+  });
+});
+
+test("serve transcript endpoint rejects paths outside allowed roots", async () => {
+  const outsidePath = path.join(os.tmpdir(), `blocked-${Date.now()}.jsonl`);
+  await fs.writeFile(outsidePath, "{}", "utf8");
+  const fakeHome = await makeTempDir("serve-transcript-outside");
+  const result = await withHome(fakeHome, async () => {
+    return withServeServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/transcript?path=${encodeURIComponent(outsidePath)}&agent=codex`);
+      return { status: response.status, body: await response.text() };
+    });
+  });
+  assert.equal(result.status, 403);
+  assert.match(result.body, /outside allowed session directories/);
+});
+
+test("serve stream endpoint rejects paths outside allowed roots", async () => {
+  const outsidePath = path.join(os.tmpdir(), `stream-blocked-${Date.now()}.jsonl`);
+  await fs.writeFile(outsidePath, "{}", "utf8");
+  const fakeHome = await makeTempDir("serve-stream-outside");
+  const result = await withHome(fakeHome, async () => {
+    return withServeServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/stream?path=${encodeURIComponent(outsidePath)}&agent=codex`);
+      return { status: response.status, body: await response.text() };
+    });
+  });
+  assert.equal(result.status, 403);
+  assert.match(result.body, /outside allowed session directories/);
 });
 
 test("supportedAgents exposes the native-export adapter set", () => {
@@ -1084,6 +1159,14 @@ sleep 5
 });
 
 test("serve API returns structured transcript blocks", async () => {
+  const fakeHome = await makeTempDir("serve-transcript-home");
+  const codexRoot = path.join(fakeHome, ".codex", "sessions");
+  const sourceSessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
+  const sessionPath = path.join(codexRoot, "sample-codex-session.jsonl");
+  await fs.mkdir(codexRoot, { recursive: true });
+  await fs.copyFile(sourceSessionPath, sessionPath);
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
   const server = createKageServeServer({ cwd: __dirname });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -1095,7 +1178,6 @@ test("serve API returns structured transcript blocks", async () => {
 
   try {
     const { port } = server.address();
-    const sessionPath = path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl");
     const url = new URL(`http://127.0.0.1:${port}/api/transcript`);
     url.searchParams.set("path", sessionPath);
     url.searchParams.set("agent", "codex");
@@ -1107,11 +1189,24 @@ test("serve API returns structured transcript blocks", async () => {
     assert.equal(payload.messages[0].blocks[0].type, "text");
     assert.equal(typeof payload.messages[0].blocks[0].content, "string");
   } finally {
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
 test("serve API preserves native thinking and tool result blocks", async () => {
+  const fakeHome = await makeTempDir("serve-transcript-home");
+  const claudeRoot = path.join(fakeHome, ".claude", "projects");
+  const sourceSessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
+  const sessionPath = path.join(claudeRoot, "sample-claude-session.jsonl");
+  await fs.mkdir(claudeRoot, { recursive: true });
+  await fs.copyFile(sourceSessionPath, sessionPath);
+  const oldHome = process.env.HOME;
+  process.env.HOME = fakeHome;
   const server = createKageServeServer({ cwd: __dirname });
   await new Promise((resolve, reject) => {
     server.once("error", reject);
@@ -1123,7 +1218,6 @@ test("serve API preserves native thinking and tool result blocks", async () => {
 
   try {
     const { port } = server.address();
-    const sessionPath = path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl");
     const url = new URL(`http://127.0.0.1:${port}/api/transcript`);
     url.searchParams.set("path", sessionPath);
     url.searchParams.set("agent", "claude");
@@ -1134,6 +1228,11 @@ test("serve API preserves native thinking and tool result blocks", async () => {
     assert.deepEqual(assistant.blocks.map((block) => block.type), ["thinking", "text"]);
     assert.ok(payload.messages.find((message) => message.blocks.some((block) => block.type === "tool_result")));
   } finally {
+    if (oldHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = oldHome;
+    }
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -1666,17 +1765,24 @@ test("serve password mode loads the page and protects APIs", async () => {
   try {
     const { port } = server.address();
     const root = await fetch(`http://127.0.0.1:${port}/`);
-    assert.equal(root.status, 200);
-    assert.match(await root.text(), /window\.__KAGE_CONFIG__ = \{"passwordRequired":true,"sendEnabled":true\};/);
+    assert.equal(root.status, 401);
+    assert.deepEqual(await root.json(), { error: "Unauthorized" });
+
+    const unauthorizedManifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
+    assert.equal(unauthorizedManifest.status, 401);
+
+    const passwordAuth = await fetch(`http://127.0.0.1:${port}/?password=1234`);
+    assert.equal(passwordAuth.status, 200);
+    assert.match(await passwordAuth.text(), /window\.__KAGE_CONFIG__ = \{"passwordRequired":true,"sendEnabled":true\};/);
 
     const unauthorized = await fetch(`http://127.0.0.1:${port}/api/doctor`);
     assert.equal(unauthorized.status, 401);
 
-    const authorized = await fetch(`http://127.0.0.1:${port}/api/doctor`, {
+    const apiAuthorized = await fetch(`http://127.0.0.1:${port}/api/doctor`, {
       headers: { Authorization: "Bearer 1234" },
     });
-    assert.equal(authorized.status, 200);
-    assert.equal((await authorized.json()).mode, "doctor");
+    assert.equal(apiAuthorized.status, 200);
+    assert.equal((await apiAuthorized.json()).mode, "doctor");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

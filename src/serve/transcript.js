@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parseSession } from "../adapters/sources/index.js";
 import { joinBlocks } from "../adapters/sources/shared.js";
+import { sameOrSubpath } from "../core/files.js";
 
 const SUPPORTED_TRANSCRIPT_EXTENSIONS = new Set([".jsonl", ".json"]);
 
@@ -218,10 +219,19 @@ export function toStructuredMessages(session) {
   return groupConsecutiveMessages(messages);
 }
 
-export async function resolveTranscriptPath(sessionPath) {
+export async function resolveTranscriptPathWithin(sessionPath, { allowedRoots = [] } = {}) {
   const normalizedSessionPath = ensureReadableTranscriptPath(sessionPath);
   const resolvedSessionPath = path.resolve(normalizedSessionPath);
   const realSessionPath = await fs.realpath(resolvedSessionPath).catch(() => resolvedSessionPath);
+
+  if (allowedRoots.length > 0) {
+    const inAllowedRoot = await Promise.all(allowedRoots.map((root) => sameOrSubpath(realSessionPath, root))).then((matches) =>
+      matches.some(Boolean),
+    );
+    if (!inAllowedRoot) {
+      throw new Error("Transcript path is outside allowed session directories");
+    }
+  }
 
   const stats = await fs.stat(realSessionPath);
   if (!stats.isFile()) {
@@ -230,6 +240,10 @@ export async function resolveTranscriptPath(sessionPath) {
   validateTranscriptExtension(realSessionPath);
 
   return realSessionPath;
+}
+
+export async function resolveTranscriptPath(sessionPath, options = {}) {
+  return resolveTranscriptPathWithin(sessionPath, options);
 }
 
 export async function readTranscript({ sessionPath, agent }) {

@@ -26,11 +26,8 @@
     <rect x="265" y="104" width="190" height="150" rx="31" fill="#f7f2e6"/>
     <rect x="286" y="126" width="148" height="106" rx="16" fill="url(#screen)"/>
 
-    <g font-family="SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="0">
-      <text x="310" y="181" fill="#f2b84b" font-size="34" font-weight="700">&gt;</text>
-      <text x="350" y="181" fill="#f7f2e6" font-size="24">kage</text>
-      <rect x="393" y="198" width="24" height="8" rx="4" fill="#f7f2e6"/>
-    </g>
+    <path d="M311 163l34 27-34 27" fill="none" stroke="#f2b84b" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M364 211h48" fill="none" stroke="#f7f2e6" stroke-width="15" stroke-linecap="round"/>
 
     <circle cx="282" cy="296" r="20" fill="#3b82f6"/>
     <circle cx="360" cy="310" r="20" fill="#15a074"/>

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { readSessionCwd } from "../adapters/sources/index.js";
 import { walk } from "../core/files.js";
 import { searchSessions } from "../core/search.js";
-import { readTranscript, resolveTranscriptPath } from "./transcript.js";
+import { readTranscript, resolveTranscriptPathWithin } from "./transcript.js";
 import { runAgentSend } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
@@ -73,11 +73,15 @@ function transcriptErrorStatus(error) {
   if (error?.code === "ENOENT") {
     return 404;
   }
+  if (message.includes("outside allowed session directories")) {
+    return 403;
+  }
   if (
     message.includes("missing transcript path") ||
     message.includes("invalid transcript path") ||
     message.includes("invalid transcript format") ||
-    message.includes("transcript path must point to a file")
+    message.includes("transcript path must point to a file") ||
+    message.includes("transcript path is outside allowed session directories")
   ) {
     return 400;
   }
@@ -107,14 +111,17 @@ function isAllWorkspaces(value) {
   return String(value ?? "").trim() === ALL_WORKSPACES_VALUE;
 }
 
-function localAgentRoots() {
-  const home = os.homedir();
+function localAgentRoots(home = os.homedir()) {
   return {
     claude: path.join(home, ".claude", "projects"),
     codex: path.join(home, ".codex", "sessions"),
     qodercli: path.join(home, ".qoder", "projects"),
     qoderwork: path.join(home, ".qoderwork", "projects"),
   };
+}
+
+function transcriptAllowedRoots() {
+  return Object.values(localAgentRoots());
 }
 
 function commonWorkspaceRoots(home = os.homedir()) {
@@ -743,7 +750,9 @@ async function handleApi(request, response, url, options) {
   }
   if (url.pathname === "/api/transcript") {
     try {
-      const resolvedPath = await resolveTranscriptPath(url.searchParams.get("path"));
+      const resolvedPath = await resolveTranscriptPathWithin(url.searchParams.get("path"), {
+        allowedRoots: transcriptAllowedRoots(),
+      });
       const payload = await readTranscript({
         sessionPath: resolvedPath,
         agent: url.searchParams.get("agent"),
@@ -949,7 +958,9 @@ async function handleStream(response, url, options) {
 
   let sessionPath = "";
   try {
-    sessionPath = await resolveTranscriptPath(requestPath);
+    sessionPath = await resolveTranscriptPathWithin(requestPath, {
+      allowedRoots: transcriptAllowedRoots(),
+    });
   } catch (error) {
     const statusCode = transcriptErrorStatus(error);
     jsonResponse(response, statusCode, { error: error.message || "Unable to stream transcript." });
@@ -1062,6 +1073,10 @@ export function createKageServeServer(options = {}) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     try {
+      if (!requireAuth(request, serverOptions)) {
+        jsonResponse(response, 401, { error: "Unauthorized" });
+        return;
+      }
       if (url.pathname === "/" || url.pathname === "/index.html") {
         textResponse(
           response,
@@ -1080,10 +1095,6 @@ export function createKageServeServer(options = {}) {
       }
       if (url.pathname === "/sw.js") {
         textResponse(response, 200, renderServeServiceWorker(), "text/javascript; charset=utf-8");
-        return;
-      }
-      if (!requireAuth(request, serverOptions)) {
-        jsonResponse(response, 401, { error: "Unauthorized" });
         return;
       }
       if (url.pathname.startsWith("/api/")) {

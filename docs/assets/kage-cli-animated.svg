@@ -88,11 +88,9 @@
       <rect x="286" y="126" width="148" height="20" fill="#f2b84b" opacity=".14" class="scan"/>
     </g>
 
-    <g class="mono">
-      <text x="306" y="169" fill="#f2b84b" font-size="31" font-weight="700">&gt;</text>
-      <text x="342" y="169" fill="#f7f2e6" font-size="21">kage</text>
-      <rect x="395" y="151" width="13" height="22" rx="3" fill="#f7f2e6" class="cursor"/>
-      <text x="307" y="203" fill="#f7f2e6" fill-opacity=".72" font-size="12">running agents</text>
+    <g>
+      <path d="M311 163l34 27-34 27" fill="none" stroke="#f2b84b" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M364 211h48" fill="none" stroke="#f7f2e6" stroke-width="15" stroke-linecap="round" class="cursor"/>
     </g>
 
     <circle cx="282" cy="296" r="20" fill="#3b82f6" class="dot-blue"/>

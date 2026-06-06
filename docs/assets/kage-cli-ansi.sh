@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+
+reset="$(printf '\033[0m')"
+dim="$(printf '\033[2m')"
+ivory="$(printf '\033[38;2;247;242;230m')"
+amber="$(printf '\033[38;2;242;184;75m')"
+codex="$(printf '\033[38;2;59;130;246m')"
+qoder="$(printf '\033[38;2;21;160;116m')"
+claude="$(printf '\033[38;2;207;118;84m')"
+
+printf '%s      .----------------.%s\n' "$ivory" "$reset"
+printf '%s     /                  \\%s\n' "$ivory" "$reset"
+printf '%s    |       %s>%s    %s_%s       |%s\n' "$ivory" "$amber" "$ivory" "$amber" "$ivory" "$reset"
+printf '%s    |                    |%s\n' "$ivory" "$reset"
+printf '%s    |      %so%s   %so%s   %so%s     |%s\n' "$ivory" "$codex" "$ivory" "$qoder" "$ivory" "$claude" "$ivory" "$reset"
+printf '%s     \\__________________/%s\n\n' "$ivory" "$reset"
+printf '%s%s%s      %s%s%s      %s%s%s\n' "$codex" "codex" "$reset" "$qoder" "qoder" "$reset" "$claude" "claude" "$reset"
+printf '%sready      running    idle%s\n' "$dim" "$reset"

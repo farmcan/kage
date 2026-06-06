@@ -55,8 +55,31 @@ async function realOrResolved(filePath) {
   }
 }
 
+async function realWithMissingSuffix(filePath) {
+  const normalized = path.resolve(filePath);
+  let candidate = normalized;
+  const suffix = [];
+
+  while (true) {
+    try {
+      const realCandidate = await fs.realpath(candidate);
+      if (suffix.length === 0) {
+        return realCandidate;
+      }
+      return path.join(realCandidate, ...suffix);
+    } catch {
+      const parent = path.dirname(candidate);
+      if (parent === candidate) {
+        return normalized;
+      }
+      suffix.unshift(path.basename(candidate));
+      candidate = parent;
+    }
+  }
+}
+
 export async function sameOrSubpath(candidatePath, parentPath) {
-  const [candidate, parent] = await Promise.all([realOrResolved(candidatePath), realOrResolved(parentPath)]);
+  const [candidate, parent] = await Promise.all([realWithMissingSuffix(candidatePath), realOrResolved(parentPath)]);
   if (candidate === parent) {
     return true;
   }

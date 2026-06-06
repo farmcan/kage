@@ -1,0 +1,12 @@
+ANSI color palette for the KAGE CLI mark:
+
+prompt amber:  ESC[38;2;242;184;75m
+codex blue:    ESC[38;2;59;130;246m
+qoder green:   ESC[38;2;21;160;116m
+claude clay:   ESC[38;2;207;118;84m
+ivory text:    ESC[38;2;247;242;230m
+reset:         ESC[0m
+
+Run the preview:
+
+  sh docs/assets/kage-cli-ansi.sh

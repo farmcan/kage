@@ -229,7 +229,7 @@ function parseArgs(argv) {
     serveHost: null,
     servePassword: null,
     serveReadOnly: false,
-    serveAllowSend: false,
+    serveAllowSend: null,
     clean: false,
     cleanConfirm: false,
     cleanOlderThan: null,
@@ -439,9 +439,6 @@ function parseArgs(argv) {
       ...args,
       error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--read-only] [--allow-send]",
     };
-    }
-    if (args.serveAllowSend && args.serveReadOnly) {
-      return { ...args, error: "--allow-send and --read-only are mutually exclusive" };
     }
     return { ...args, serve: true };
   }
@@ -1676,7 +1673,7 @@ async function main() {
       port: args.servePort ?? undefined,
       host: args.serveHost ?? undefined,
       password: args.servePassword,
-      allowSend: args.serveAllowSend || !args.serveReadOnly,
+      allowSend: args.serveAllowSend ?? !args.serveReadOnly,
     });
     return;
   }
@@ -1700,7 +1697,7 @@ async function main() {
     return;
   }
   if (!args.agent || !args.target || !args.exportFormat) {
-    throw new Error("Provide a supported source/target pair or route alias");
+    throw new Error("Unknown command or unsupported source/target pair. Run 'kage --help' for usage.");
   }
   if (args.preview && args.stdout) {
     throw new Error("Use either --preview or --stdout, not both");
