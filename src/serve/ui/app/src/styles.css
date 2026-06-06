@@ -2939,7 +2939,7 @@ textarea:disabled {
   .sidebar,
   .conversation-panel,
   .dispatch-panel {
-    height: calc(100vh - 82px);
+    height: calc(100dvh - 82px);
   }
 
   .dispatch-panel {

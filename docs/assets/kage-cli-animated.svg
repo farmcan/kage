@@ -38,16 +38,22 @@
 
     .dot-blue {
       animation: dot 2.2s ease-in-out infinite;
+      transform-box: fill-box;
+      transform-origin: center;
     }
 
     .dot-green {
       animation: dot 2.2s ease-in-out infinite;
       animation-delay: .28s;
+      transform-box: fill-box;
+      transform-origin: center;
     }
 
     .dot-orange {
       animation: dot 2.2s ease-in-out infinite;
       animation-delay: .56s;
+      transform-box: fill-box;
+      transform-origin: center;
     }
 
     .arc {
