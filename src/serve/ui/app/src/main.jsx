@@ -2516,7 +2516,10 @@ function Conversation() {
   const setConversationFullscreen = useStore((state) => state.setConversationFullscreen);
   const [swipeBackReady, setSwipeBackReady] = useState(false);
   const swipeBackRef = useRef(null);
-  const now = useIntervalNow(Boolean(selectedSession), 1000);
+  const now = useIntervalNow(
+    Boolean(selectedSession && live && activityUpdatedAt && Date.now() - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS),
+    1000,
+  );
   const verb = useRotatingVerb(Boolean(selectedSession && live));
   const activity = useMemo(
     () =>
@@ -2838,6 +2841,7 @@ function TaskDispatchBar({ workspace }) {
       useStore.getState().showToast("Task dispatched");
       void loadTasks({ silent: true });
     } catch (error) {
+      setDraft((current) => current || message);
       useStore.getState().showToast(error.message);
       useStore.getState().upsertTask({
         ...optimisticTask,
@@ -3451,10 +3455,14 @@ function Composer({ session, compact = false, allowReply = true }) {
       await copyText(sendCommand(payload), "Send command copied");
       return;
     }
+    void sendPrompt(payload, message);
+  }
+
+  async function sendPrompt(payload, message) {
     submittingRef.current = true;
     useStore.setState({ sendState: "sending", activityUpdatedAt: Date.now() });
     setDraft("");
-    const pendingId = effectiveMode === "reply" && sessionId ? addPendingTranscriptMessage(payload.message) : null;
+    const pendingId = effectiveMode === "reply" && sessionId ? addPendingTranscriptMessage(message) : null;
     (async () => {
       try {
         const result = await api("/api/send", {
@@ -3481,6 +3489,7 @@ function Composer({ session, compact = false, allowReply = true }) {
         });
         void loadTasks({ silent: true });
       } catch (error) {
+        setDraft((current) => current || message);
         if (pendingId) {
           dropPendingMessage(pendingId, { withError: true });
         }
@@ -3490,6 +3499,31 @@ function Composer({ session, compact = false, allowReply = true }) {
         useStore.setState({ sendState: "idle" });
       }
     })().catch(() => {});
+  }
+
+  function handleComposerKeyDown(event) {
+    if (event.isComposing) return;
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      const nextMessage = draft.trim();
+      if (
+        !nextMessage
+        || disabled
+        || submittingRef.current
+        || useStore.getState().sendState === "sending"
+      ) {
+        return;
+      }
+      void sendPrompt(
+        {
+          agent: effectiveAgent,
+          cwd: effectiveCwd,
+          message: nextMessage,
+          ...(sessionId ? { sessionId } : {}),
+        },
+        nextMessage,
+      );
+    }
   }
 
   return (
@@ -3549,7 +3583,13 @@ function Composer({ session, compact = false, allowReply = true }) {
         </>
       )}
       <div className="composer-row">
-        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write any prompt for the selected target" rows={2} />
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={handleComposerKeyDown}
+          placeholder="Write any prompt for the selected target"
+          rows={2}
+        />
         <button className="send-button" type="submit" disabled={!draft.trim() || disabled}>
           {sendState === "sending" ? <Loader2 size={18} className="spin" /> : sendEnabled ? <Send size={18} /> : <Copy size={18} />}
           {sendEnabled ? "Send" : "Copy"}

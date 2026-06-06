@@ -67,13 +67,13 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
 .password-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 22px;
@@ -465,7 +465,7 @@ button.secondary:hover,
 
 .workspace {
   width: min(1600px, 100%);
-  height: calc(100vh - 66px);
+  height: calc(100dvh - 66px);
   margin: 0 auto;
   min-height: 0;
   padding: 12px;
@@ -2657,7 +2657,7 @@ textarea:disabled {
 }
 
 .bootstrap-error {
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding: 24px;
   display: grid;
@@ -2894,14 +2894,14 @@ textarea:disabled {
 
   .workspace {
     height: auto;
-    min-height: calc(100vh - 82px);
+    min-height: calc(100dvh - 82px);
     padding: 10px;
     grid-template-columns: 1fr;
   }
 
   .task-board-panel {
     height: auto;
-    min-height: calc(100vh - 82px);
+    min-height: calc(100dvh - 82px);
     overflow: visible;
   }
 
@@ -3127,6 +3127,13 @@ textarea:disabled {
     min-height: 44px;
   }
 
+  .view-switch button,
+  .stat-strip > :is(button, .stat-chip),
+  .jump-latest-button,
+  .load-more-sessions {
+    min-height: 44px;
+  }
+
   .dispatch-panel .composer-copy {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -3187,14 +3194,14 @@ textarea:disabled {
 
 .app-shell.mock-mobile .workspace {
   height: auto;
-  min-height: calc(100vh - 82px);
+  min-height: calc(100dvh - 82px);
   padding: 10px;
   grid-template-columns: 1fr;
 }
 
 .app-shell.mock-mobile .task-board-panel {
   height: auto;
-  min-height: calc(100vh - 82px);
+  min-height: calc(100dvh - 82px);
   overflow: visible;
 }
 
@@ -3232,7 +3239,7 @@ textarea:disabled {
 .app-shell.mock-mobile .sidebar,
 .app-shell.mock-mobile .conversation-panel,
 .app-shell.mock-mobile .dispatch-panel {
-  height: calc(100vh - 82px);
+  height: calc(100dvh - 82px);
 }
 
 .app-shell.mock-mobile .dispatch-panel {
@@ -3414,6 +3421,13 @@ textarea:disabled {
 .app-shell.mock-mobile .agent-tab,
 .app-shell.mock-mobile .primary-button,
 .app-shell.mock-mobile .icon-button {
+  min-height: 44px;
+}
+
+.app-shell.mock-mobile .view-switch button,
+.app-shell.mock-mobile .stat-strip > :is(button, .stat-chip),
+.app-shell.mock-mobile .jump-latest-button,
+.app-shell.mock-mobile .load-more-sessions {
   min-height: 44px;
 }
 

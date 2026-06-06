@@ -483,6 +483,15 @@ function parseArgs(argv) {
   ) {
     return inferDefaultExportFormat(applyPreset(args, { agent: first, target: second }));
   }
+  if (first === "help" && !second) {
+    return { ...args, help: true };
+  }
+  if ((first === "version" || first === "v") && !second) {
+    return { ...args, version: true };
+  }
+  if (first && !second) {
+    return { ...args, error: `Unknown command: ${first}. Run 'kage --help' for usage.` };
+  }
 
   return inferDefaultExportFormat(args);
 }
