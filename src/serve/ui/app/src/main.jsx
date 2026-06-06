@@ -33,6 +33,7 @@ import remarkGfm from "remark-gfm";
 import { create } from "zustand";
 
 import { classifyPullToRefresh, classifySwipeBack } from "./mobile-gestures.js";
+import { nextSessionFocus, selectSessionRange, toggleSessionSelection } from "./session-selection.js";
 import "./styles.css";
 
 const config = {
@@ -179,6 +180,10 @@ function isInteractiveGestureTarget(target) {
 
 function isFormGestureTarget(target) {
   return Boolean(target?.closest?.("input, textarea, select"));
+}
+
+function isEditableShortcutTarget(target) {
+  return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
 }
 
 function isStandalonePwa() {
@@ -1446,6 +1451,16 @@ function App() {
   useEffect(() => {
     writeStorageValue(SERVER_ORIGIN_STORAGE_KEY, window.location.origin);
   }, []);
+  useEffect(() => {
+    const closeDetailWithEscape = (event) => {
+      if (event.key !== "Escape" || isEditableShortcutTarget(event.target)) return;
+      if (!useStore.getState().detailOpen) return;
+      event.preventDefault();
+      useStore.setState({ detailOpen: false });
+    };
+    window.addEventListener("keydown", closeDetailWithEscape);
+    return () => window.removeEventListener("keydown", closeDetailWithEscape);
+  }, []);
 
   if (needsPassword) {
     return <PasswordGate />;
@@ -1760,6 +1775,7 @@ function Sidebar() {
   const setSessionSort = useStore((state) => state.setSessionSort);
   const setSessionGroupBy = useStore((state) => state.setSessionGroupBy);
   const filteredSessions = useFilteredSessions();
+  const searchInputRef = useRef(null);
   const counts = useMemo(() => new Map(agents.map((agent) => [agent.agent, agent.sessions.length])), [agents]);
   const tabAgents = ["all", ...agents.map((agent) => agent.agent)];
   const trimmedSearch = search.trim();
@@ -1792,6 +1808,18 @@ function Sidebar() {
     };
   }, [trimmedSearch, selectedWorkspace, selectedAgent]);
 
+  useEffect(() => {
+    const focusSearch = (event) => {
+      const isSearchShortcut = event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k");
+      if (!isSearchShortcut || isEditableShortcutTarget(event.target)) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
+
   return (
     <aside className="sidebar">
       <div className="side-controls">
@@ -1807,7 +1835,7 @@ function Sidebar() {
         </Tabs.Root>
         <div className="search-box">
           <Search size={16} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sessions and transcripts" />
+          <input ref={searchInputRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sessions and transcripts" />
           {search && (
             <button type="button" onClick={() => setSearch("")}>
               Clear
@@ -1884,17 +1912,27 @@ function HighlightedText({ text, query }) {
   );
 }
 
-const SessionListItem = memo(function SessionListItem({ session, isActive, isStreaming, activityLabel, now = Date.now(), onSelectSession }) {
+const SessionListItem = memo(function SessionListItem({
+  session,
+  isActive,
+  isFocused,
+  isSelected,
+  isStreaming,
+  activityLabel,
+  now = Date.now(),
+  onSelectSession,
+}) {
   const updates = formatRelativeTime(session?.updatedAt, now);
   const turnCount = sessionTurnCount(session);
   const turnText = turnCount === 1 ? "1 turn" : `${turnCount} turns`;
   const searchMatch = session?._searchMatch;
   return (
     <button
-      className={cls("session-card", isActive && "active", isStreaming && "streaming")}
+      className={cls("session-card", isActive && "active", isFocused && "focused", isSelected && "selected", isStreaming && "streaming")}
       style={agentColorStyle(session.agent)}
       type="button"
-      onClick={() => onSelectSession(session)}
+      aria-selected={isSelected || isActive}
+      onClick={(event) => onSelectSession(session, event)}
     >
       <AgentBadge agent={session.agent} label={session.agentLabel} />
       <strong>{sessionDisplayTitle(session)}</strong>
@@ -1927,6 +1965,8 @@ const SessionListGroup = memo(function SessionListGroup({
   isCollapsed,
   visibleCount,
   selectedPath,
+  focusedPath,
+  selectedPaths,
   activePath,
   activityLabel,
   onToggleGroup,
@@ -1959,6 +1999,8 @@ const SessionListGroup = memo(function SessionListGroup({
             key={`${session.agent}:${session.path}`}
             session={session}
             isActive={selectedPath === session.path}
+            isFocused={focusedPath === session.path}
+            isSelected={selectedPaths.has(session.path)}
             isStreaming={activePath === session.path}
             activityLabel={activityLabel}
             now={now}
@@ -1987,6 +2029,9 @@ function SessionList({ sessions }) {
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [visibleGroupSizes, setVisibleGroupSizes] = useState(new Map());
   const [pullState, setPullState] = useState({ visible: false, ready: false, refreshing: false, offset: 0 });
+  const [focusedSessionPath, setFocusedSessionPath] = useState(null);
+  const [selectedSessionPaths, setSelectedSessionPaths] = useState([]);
+  const [selectionAnchorPath, setSelectionAnchorPath] = useState(null);
   const pullGestureRef = useRef(null);
   const now = useIntervalNow(Boolean(selectedPath && live) || sessions.length > 0, 60_000);
   const activePath = selectedPath && live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS ? selectedPath : null;
@@ -2018,10 +2063,94 @@ function SessionList({ sessions }) {
     });
   }, [orderedSessions, sessionGroupBy, now]);
 
-  const selectSessionByPath = useCallback((session) => {
+  const visibleSessions = useMemo(() => {
+    const items = [];
+    for (const group of groupedSessions) {
+      if (collapsedGroups.has(group.key)) continue;
+      const visibleCount = visibleGroupSizes.get(group.key) || Math.min(group.count, SESSION_GROUP_INITIAL_SIZE);
+      items.push(...group.sessions.slice(0, visibleCount));
+    }
+    return items;
+  }, [collapsedGroups, groupedSessions, visibleGroupSizes]);
+  const visiblePaths = useMemo(() => visibleSessions.map((session) => session.path).filter(Boolean), [visibleSessions]);
+  const visibleSessionByPath = useMemo(() => new Map(visibleSessions.map((session) => [session.path, session])), [visibleSessions]);
+  const selectedPathSet = useMemo(() => new Set(selectedSessionPaths), [selectedSessionPaths]);
+  const focusedPath = focusedSessionPath && visibleSessionByPath.has(focusedSessionPath)
+    ? focusedSessionPath
+    : selectedPath && visibleSessionByPath.has(selectedPath)
+      ? selectedPath
+      : null;
+
+  const openSession = useCallback((session) => {
     syncSessionToUrl(session?.path || "");
     selectSession(session);
   }, []);
+
+  const handleSelectSession = useCallback((session, event) => {
+    if (!session?.path) return;
+    const path = session.path;
+    setFocusedSessionPath(path);
+    if (event?.shiftKey) {
+      const anchor = selectionAnchorPath || focusedPath || selectedPath || path;
+      setSelectionAnchorPath(anchor);
+      setSelectedSessionPaths(selectSessionRange(visiblePaths, anchor, path));
+      return;
+    }
+    if (event?.metaKey || event?.ctrlKey) {
+      setSelectionAnchorPath(path);
+      setSelectedSessionPaths((previous) => toggleSessionSelection(previous, path));
+      return;
+    }
+    setSelectedSessionPaths([]);
+    setSelectionAnchorPath(path);
+    openSession(session);
+  }, [focusedPath, openSession, selectedPath, selectionAnchorPath, visiblePaths]);
+
+  const handleListKeyDown = useCallback((event) => {
+    if (!visiblePaths.length || isEditableShortcutTarget(event.target)) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const current = focusedPath || selectedPath || null;
+      const nextPath = nextSessionFocus(visiblePaths, current, event.key === "ArrowUp" ? "previous" : "next");
+      if (!nextPath) return;
+      setFocusedSessionPath(nextPath);
+      if (event.shiftKey) {
+        const anchor = selectionAnchorPath || current || nextPath;
+        setSelectionAnchorPath(anchor);
+        setSelectedSessionPaths(selectSessionRange(visiblePaths, anchor, nextPath));
+      } else if (!event.metaKey && !event.ctrlKey) {
+        setSelectedSessionPaths([]);
+        setSelectionAnchorPath(nextPath);
+      }
+      return;
+    }
+    if (event.key === "Enter") {
+      const session = visibleSessionByPath.get(focusedPath || selectedPath || visiblePaths[0]);
+      if (!session) return;
+      event.preventDefault();
+      setSelectedSessionPaths([]);
+      setSelectionAnchorPath(session.path);
+      setFocusedSessionPath(session.path);
+      openSession(session);
+      return;
+    }
+    if (event.key === "Escape") {
+      if (selectedSessionPaths.length) {
+        event.preventDefault();
+        setSelectedSessionPaths([]);
+        return;
+      }
+      if (useStore.getState().detailOpen) {
+        event.preventDefault();
+        useStore.setState({ detailOpen: false });
+        return;
+      }
+      if (focusedPath) {
+        event.preventDefault();
+        setFocusedSessionPath(null);
+      }
+    }
+  }, [focusedPath, openSession, selectedPath, selectedSessionPaths.length, selectionAnchorPath, visiblePaths, visibleSessionByPath]);
 
   const toggleGroup = useCallback((key) => {
     setCollapsedGroups((previous) => {
@@ -2132,6 +2261,11 @@ function SessionList({ sessions }) {
     });
   }, [groupedSessions]);
 
+  useEffect(() => {
+    if (!focusedPath) return;
+    document.querySelector(".session-card.focused")?.scrollIntoView({ block: "nearest" });
+  }, [focusedPath]);
+
   const pullHandlers = {
     onPointerDown: beginPullRefresh,
     onPointerMove: updatePullRefresh,
@@ -2212,8 +2346,22 @@ function SessionList({ sessions }) {
   }
 
   return (
-    <div className="session-list" {...pullHandlers}>
+    <div
+      className="session-list"
+      role="listbox"
+      tabIndex={0}
+      aria-label="Sessions"
+      aria-multiselectable="true"
+      onKeyDown={handleListKeyDown}
+      {...pullHandlers}
+    >
       {pullIndicator}
+      {selectedSessionPaths.length > 0 && (
+        <div className="session-selection-bar" aria-live="polite">
+          <strong>{selectedSessionPaths.length} selected</strong>
+          <button type="button" onClick={() => setSelectedSessionPaths([])}>Clear</button>
+        </div>
+      )}
       {groupedSessions.map((group) => {
         const isCollapsed = collapsedGroups.has(group.key);
         const visibleCount = visibleGroupSizes.get(group.key) || Math.min(group.count, SESSION_GROUP_INITIAL_SIZE);
@@ -2224,11 +2372,13 @@ function SessionList({ sessions }) {
             isCollapsed={isCollapsed}
             visibleCount={visibleCount}
             selectedPath={selectedPath}
+            focusedPath={focusedPath}
+            selectedPaths={selectedPathSet}
             activePath={activePath}
             activityLabel={activePath ? elapsedLabel(activityUpdatedAt, now) : ""}
             onToggleGroup={toggleGroup}
             onLoadMore={loadMoreSessions}
-            onSelectSession={selectSessionByPath}
+            onSelectSession={handleSelectSession}
             now={now}
           />
         );

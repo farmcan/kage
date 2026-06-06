@@ -121,6 +121,21 @@ test("serve empty states guide first-time and filtered users", async () => {
   assert.match(serveStyles, /\.session-empty-actions/u);
 });
 
+test("serve session list supports keyboard focus and multi-select affordances", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /import \{ nextSessionFocus, selectSessionRange, toggleSessionSelection \}/u);
+  assert.match(serveMain, /event\.key === "ArrowDown" \|\| event\.key === "ArrowUp"/u);
+  assert.match(serveMain, /event\.key === "Enter"/u);
+  assert.match(serveMain, /event\.key === "Escape"/u);
+  assert.match(serveMain, /event\.key === "\/" \|\| \(\(event\.metaKey \|\| event\.ctrlKey\) && event\.key\.toLowerCase\(\) === "k"\)/u);
+  assert.match(serveMain, /aria-multiselectable="true"/u);
+  assert.match(serveMain, /session-selection-bar/u);
+  assert.match(serveStyles, /\.session-card\.focused/u);
+  assert.match(serveStyles, /\.session-card\.selected/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

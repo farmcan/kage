@@ -643,6 +643,40 @@ button.secondary:hover,
   touch-action: pan-y;
 }
 
+.session-list:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 44%, transparent);
+  outline-offset: -2px;
+}
+
+.session-selection-bar {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(14px);
+  padding: 7px 12px;
+}
+
+.session-selection-bar strong {
+  font-size: 12px;
+}
+
+.session-selection-bar button {
+  min-height: 28px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .pull-refresh-indicator {
   position: sticky;
   top: 0;
@@ -774,6 +808,16 @@ button.secondary:hover,
 .session-card.active {
   background: color-mix(in srgb, var(--agent-color) 12%, var(--panel));
   box-shadow: inset 3px 0 0 var(--agent-color);
+}
+
+.session-card.focused {
+  outline: 2px solid color-mix(in srgb, var(--agent-color) 52%, transparent);
+  outline-offset: -2px;
+}
+
+.session-card.selected {
+  background: color-mix(in srgb, var(--agent-color) 16%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--agent-color), inset 0 0 0 1px color-mix(in srgb, var(--agent-color) 28%, transparent);
 }
 
 .session-card.streaming {
