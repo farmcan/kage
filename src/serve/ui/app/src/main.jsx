@@ -1975,6 +1975,7 @@ const SessionListGroup = memo(function SessionListGroup({
 });
 
 function SessionList({ sessions }) {
+  const allSessions = useStore((state) => state.sessions);
   const selectedPath = useStore((state) => state.selectedPath);
   const selectedAgent = useStore((state) => state.selectedAgent);
   const search = useStore((state) => state.search);
@@ -2151,16 +2152,33 @@ function SessionList({ sessions }) {
   );
   const hasSearch = search.trim().length > 0;
   if (!sessions.length) {
-    if (hasSearch || selectedAgent !== "all") {
+    if (hasSearch) {
       return (
         <div className="session-list" {...pullHandlers}>
           {pullIndicator}
           <SessionListEmptyState
-            title="No sessions match the current filters"
-            detail="Try clearing search text or switching to All agents."
+            title="No sessions matching your query"
+            detail="Try a shorter phrase or clear the filter to return to the local timeline."
             onClearFilters={() => {
               useStore.getState().setSearch("");
+            }}
+          />
+        </div>
+      );
+    }
+    if (selectedAgent !== "all" && allSessions.length > 0) {
+      const agentLabel = agentMeta[selectedAgent]?.label || selectedAgent;
+      return (
+        <div className="session-list" {...pullHandlers}>
+          {pullIndicator}
+          <SessionListEmptyState
+            title={`No ${agentLabel} sessions found`}
+            detail={`Start a new ${agentLabel} task in this workspace or switch back to All agents.`}
+            onClearFilters={() => {
               useStore.getState().setSelectedAgent("all");
+            }}
+            onNewSession={() => {
+              useStore.getState().setMobileDispatchOpen(true);
             }}
           />
         </div>
@@ -2171,7 +2189,14 @@ function SessionList({ sessions }) {
         {pullIndicator}
         <SessionListEmptyState
           title="No local sessions found"
-          detail="Start a new prompt in Dispatch Console and a local agent will create the first session here."
+          detail="KAGE finds local AI coding sessions. Start Claude, Codex, or QoderCLI in this directory, then refresh."
+          commandHint="kage doctor"
+          onRefresh={() => {
+            void loadSessions({ preserveSelection: true });
+          }}
+          onNewSession={() => {
+            useStore.getState().setMobileDispatchOpen(true);
+          }}
         />
       </div>
     );
@@ -2212,20 +2237,35 @@ function SessionList({ sessions }) {
   );
 }
 
-function SessionListEmptyState({ title, detail, onClearFilters }) {
+function SessionListEmptyState({ title, detail, commandHint, onClearFilters, onRefresh, onNewSession }) {
   return (
     <div className="empty-state process-state session-empty-state">
-      <Send size={18} className="spin" />
+      <div className="session-empty-illustration">
+        <KageLogoIcon />
+      </div>
       <strong>{title}</strong>
       <span>{detail}</span>
-      {onClearFilters && (
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => onClearFilters()}
-        >
-          Clear filters
-        </button>
+      {commandHint && <code>{commandHint}</code>}
+      {(onRefresh || onNewSession || onClearFilters) && (
+        <div className="session-empty-actions">
+          {onRefresh && (
+            <button type="button" className="secondary" onClick={() => onRefresh()}>
+              <RefreshCw size={15} />
+              Refresh
+            </button>
+          )}
+          {onNewSession && (
+            <button type="button" className="secondary" onClick={() => onNewSession()}>
+              <Send size={15} />
+              New task
+            </button>
+          )}
+          {onClearFilters && (
+            <button type="button" className="secondary" onClick={() => onClearFilters()}>
+              Clear filters
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

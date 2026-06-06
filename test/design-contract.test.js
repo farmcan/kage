@@ -108,6 +108,19 @@ test("serve grouped session cards receive the current clock value", async () => 
   assert.match(serveMain, /<SessionListItem[\s\S]*?\bnow=\{now\}/u);
 });
 
+test("serve empty states guide first-time and filtered users", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /No sessions matching your query/u);
+  assert.match(serveMain, /No \$\{agentLabel\} sessions found/u);
+  assert.match(serveMain, /KAGE finds local AI coding sessions/u);
+  assert.match(serveMain, /commandHint="kage doctor"/u);
+  assert.match(serveMain, /New task/u);
+  assert.match(serveStyles, /\.session-empty-illustration/u);
+  assert.match(serveStyles, /\.session-empty-actions/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");
