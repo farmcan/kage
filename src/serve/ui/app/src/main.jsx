@@ -32,6 +32,7 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { create } from "zustand";
 
+import { classifyPullToRefresh, classifySwipeBack } from "./mobile-gestures.js";
 import "./styles.css";
 
 const config = {
@@ -162,6 +163,22 @@ function useMobileLayout() {
   }, []);
 
   return isMobileLayout;
+}
+
+function isMobileGestureLayout() {
+  return forceMockMobile || matchMediaMatches(MOBILE_QUERY);
+}
+
+function isMobileGesturePointer(event) {
+  return isMobileGestureLayout() && (forceMockMobile || event.pointerType === "touch" || event.pointerType === "pen");
+}
+
+function isInteractiveGestureTarget(target) {
+  return Boolean(target?.closest?.("button, a, input, textarea, select, [role='button'], .conversation-composer"));
+}
+
+function isFormGestureTarget(target) {
+  return Boolean(target?.closest?.("input, textarea, select"));
 }
 
 function isStandalonePwa() {
@@ -1915,6 +1932,7 @@ const SessionListGroup = memo(function SessionListGroup({
   onToggleGroup,
   onLoadMore,
   onSelectSession,
+  now,
 }) {
   const visibleSessions = useMemo(() => group.sessions.slice(0, visibleCount), [group.sessions, visibleCount]);
   const hasMore = visibleCount < group.count;
@@ -1961,11 +1979,14 @@ function SessionList({ sessions }) {
   const selectedAgent = useStore((state) => state.selectedAgent);
   const search = useStore((state) => state.search);
   const live = useStore((state) => state.live);
+  const loading = useStore((state) => state.loading);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const sessionSort = useStore((state) => state.sessionSort);
   const sessionGroupBy = useStore((state) => state.sessionGroupBy);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const [visibleGroupSizes, setVisibleGroupSizes] = useState(new Map());
+  const [pullState, setPullState] = useState({ visible: false, ready: false, refreshing: false, offset: 0 });
+  const pullGestureRef = useRef(null);
   const now = useIntervalNow(Boolean(selectedPath && live) || sessions.length > 0, 60_000);
   const activePath = selectedPath && live && activityUpdatedAt && now - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS ? selectedPath : null;
   const orderedSessions = useMemo(() => sortedSessionsByMode(sessions, sessionSort), [sessions, sessionSort]);
@@ -2024,6 +2045,77 @@ function SessionList({ sessions }) {
     });
   }, []);
 
+  const resetPullState = useCallback(() => {
+    setPullState({ visible: false, ready: false, refreshing: false, offset: 0 });
+  }, []);
+
+  const runPullRefresh = useCallback(async () => {
+    setPullState({ visible: true, ready: true, refreshing: true, offset: 56 });
+    await loadSessions({ preserveSelection: true, silentLoading: true });
+    useStore.getState().showToast("Sessions refreshed");
+    resetPullState();
+  }, [resetPullState]);
+
+  const beginPullRefresh = useCallback((event) => {
+    if (!isMobileGesturePointer(event) || isFormGestureTarget(event.target)) return;
+    pullGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollTop: event.currentTarget.scrollTop,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, []);
+
+  const updatePullRefresh = useCallback((event) => {
+    const gesture = pullGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId || loading) return;
+    const intent = classifyPullToRefresh({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      scrollTop: event.currentTarget.scrollTop,
+    });
+    if (!intent.active) {
+      if (pullState.visible) resetPullState();
+      return;
+    }
+    setPullState({
+      visible: true,
+      ready: intent.ready,
+      refreshing: false,
+      offset: Math.min(62, Math.round(intent.deltaY * 0.45)),
+    });
+  }, [loading, pullState.visible, resetPullState]);
+
+  const finishPullRefresh = useCallback((event) => {
+    const gesture = pullGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const intent = classifyPullToRefresh({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      scrollTop: event.currentTarget.scrollTop,
+    });
+    pullGestureRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (intent.ready && !loading) {
+      void runPullRefresh();
+    } else {
+      resetPullState();
+    }
+  }, [loading, resetPullState, runPullRefresh]);
+
+  const cancelPullRefresh = useCallback((event) => {
+    if (pullGestureRef.current?.pointerId === event.pointerId) {
+      pullGestureRef.current = null;
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      resetPullState();
+    }
+  }, [resetPullState]);
+
   useEffect(() => {
     setVisibleGroupSizes((previous) => {
       const next = new Map();
@@ -2039,34 +2131,64 @@ function SessionList({ sessions }) {
     });
   }, [groupedSessions]);
 
+  const pullHandlers = {
+    onPointerDown: beginPullRefresh,
+    onPointerMove: updatePullRefresh,
+    onPointerUp: finishPullRefresh,
+    onPointerCancel: cancelPullRefresh,
+  };
+  const pullIndicator = (
+    <div
+      className={cls("pull-refresh-indicator", pullState.visible && "visible", pullState.ready && "ready", pullState.refreshing && "refreshing")}
+      style={{ "--pull-offset": `${pullState.offset}px` }}
+      aria-live="polite"
+    >
+      <span>
+        <RefreshCw size={14} className={pullState.refreshing ? "spin" : ""} />
+        {pullState.refreshing ? "Refreshing sessions..." : pullState.ready ? "Release to refresh" : "Pull to refresh"}
+      </span>
+    </div>
+  );
   const hasSearch = search.trim().length > 0;
   if (!sessions.length) {
     if (hasSearch || selectedAgent !== "all") {
       return (
-        <SessionListEmptyState
-          title="No sessions match the current filters"
-          detail="Try clearing search text or switching to All agents."
-          onClearFilters={() => {
-            useStore.getState().setSearch("");
-            useStore.getState().setSelectedAgent("all");
-          }}
-        />
+        <div className="session-list" {...pullHandlers}>
+          {pullIndicator}
+          <SessionListEmptyState
+            title="No sessions match the current filters"
+            detail="Try clearing search text or switching to All agents."
+            onClearFilters={() => {
+              useStore.getState().setSearch("");
+              useStore.getState().setSelectedAgent("all");
+            }}
+          />
+        </div>
       );
     }
     return (
-      <SessionListEmptyState
-        title="No local sessions found"
-        detail="Start a new prompt in Dispatch Console and a local agent will create the first session here."
-      />
+      <div className="session-list" {...pullHandlers}>
+        {pullIndicator}
+        <SessionListEmptyState
+          title="No local sessions found"
+          detail="Start a new prompt in Dispatch Console and a local agent will create the first session here."
+        />
+      </div>
     );
   }
 
   if (groupedSessions.length === 0) {
-    return <div className="empty-state">No sessions match this view.</div>;
+    return (
+      <div className="session-list" {...pullHandlers}>
+        {pullIndicator}
+        <div className="empty-state">No sessions match this view.</div>
+      </div>
+    );
   }
 
   return (
-    <div className="session-list">
+    <div className="session-list" {...pullHandlers}>
+      {pullIndicator}
       {groupedSessions.map((group) => {
         const isCollapsed = collapsedGroups.has(group.key);
         const visibleCount = visibleGroupSizes.get(group.key) || Math.min(group.count, SESSION_GROUP_INITIAL_SIZE);
@@ -2130,6 +2252,8 @@ function Conversation() {
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const conversationFullscreen = useStore((state) => state.conversationFullscreen);
   const setConversationFullscreen = useStore((state) => state.setConversationFullscreen);
+  const [swipeBackReady, setSwipeBackReady] = useState(false);
+  const swipeBackRef = useRef(null);
   const now = useIntervalNow(Boolean(selectedSession), 1000);
   const verb = useRotatingVerb(Boolean(selectedSession && live));
   const activity = useMemo(
@@ -2154,11 +2278,64 @@ function Conversation() {
     tool_result: stats.tool_result || 0,
     thinking: stats.thinking || 0,
   };
+  const closeDetail = useCallback(() => {
+    useStore.setState({ detailOpen: false });
+  }, []);
+  const beginSwipeBack = useCallback((event) => {
+    if (!selectedSession || conversationFullscreen || !isMobileGesturePointer(event) || isInteractiveGestureTarget(event.target)) return;
+    swipeBackRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, [conversationFullscreen, selectedSession]);
+  const updateSwipeBack = useCallback((event) => {
+    const gesture = swipeBackRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const intent = classifySwipeBack({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+    });
+    setSwipeBackReady(intent.ready);
+  }, []);
+  const finishSwipeBack = useCallback((event) => {
+    const gesture = swipeBackRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const intent = classifySwipeBack({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+    });
+    swipeBackRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setSwipeBackReady(false);
+    if (intent.ready) {
+      closeDetail();
+    }
+  }, [closeDetail]);
+  const cancelSwipeBack = useCallback((event) => {
+    if (swipeBackRef.current?.pointerId === event.pointerId) {
+      swipeBackRef.current = null;
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      setSwipeBackReady(false);
+    }
+  }, []);
 
   return (
-    <section className="conversation-panel" style={agentColorStyle(selectedSession?.agent, "--session-color")}>
+    <section
+      className={cls("conversation-panel", swipeBackReady && "swipe-back-ready")}
+      style={agentColorStyle(selectedSession?.agent, "--session-color")}
+      onPointerDown={beginSwipeBack}
+      onPointerMove={updateSwipeBack}
+      onPointerUp={finishSwipeBack}
+      onPointerCancel={cancelSwipeBack}
+    >
       <div className="conversation-head">
-        <button className="back-button" type="button" onClick={() => useStore.setState({ detailOpen: false })}>
+        <button className="back-button" type="button" onClick={closeDetail}>
           <ArrowLeft size={17} />
           Back
         </button>

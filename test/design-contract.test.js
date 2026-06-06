@@ -101,6 +101,13 @@ test("serve mobile dispatch is a collapsed bottom sheet", async () => {
   assert.doesNotMatch(serveStyles, /\.app-shell\.mock-mobile \.dispatch-panel\s*\{\s*order:\s*1;/u);
 });
 
+test("serve grouped session cards receive the current clock value", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+
+  assert.match(serveMain, /const SessionListGroup = memo\(function SessionListGroup\(\{[\s\S]*?\bnow,\s*[\s\S]*?\}\)/u);
+  assert.match(serveMain, /<SessionListItem[\s\S]*?\bnow=\{now\}/u);
+});
+
 test("macOS app icon is generated from the KAGE logo and bundled as AppIcon", async () => {
   const buildIconScript = await readRepoFile("app", "scripts", "build-app-icon.sh");
   const bundleScript = await readRepoFile("app", "bundle.sh");

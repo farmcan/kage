@@ -639,6 +639,48 @@ button.secondary:hover,
 
 .session-list {
   overflow: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+.pull-refresh-indicator {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(var(--pull-offset, 0px) * 0.18));
+  transition: opacity 140ms ease, height 140ms ease, transform 140ms ease;
+}
+
+.pull-refresh-indicator.visible {
+  height: 44px;
+  opacity: 1;
+}
+
+.pull-refresh-indicator span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: 0 12px 34px rgba(21, 28, 35, 0.12);
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pull-refresh-indicator.ready span,
+.pull-refresh-indicator.refreshing span {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
 }
 
 .session-group {
@@ -886,7 +928,36 @@ button.secondary:hover,
 }
 
 .conversation-panel {
+  position: relative;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.conversation-panel::before {
+  content: "Back";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--session-color) 42%, var(--line));
+  border-radius: 999px;
+  color: var(--session-color);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 12px 34px rgba(21, 28, 35, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+  transform: translate(-10px, -50%);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.conversation-panel.swipe-back-ready::before {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .conversation-composer {
