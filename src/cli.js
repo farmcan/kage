@@ -31,7 +31,7 @@ const helpText = `Usage:
   kage search [query] [--agent ${agentUsage}] [--since 7d] [--until 2026-05-25] [--project <path>] [--include-subdirs] [--limit 50] [--json]
   kage actions [--since 90d] [--until 2026-05-25] [--limit 120] [--include-subdirs] [--json]
   kage run-action <id> [--include-subdirs] [--json]
-  kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--read-only]
+kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--read-only] [--allow-send]
   kage clean [--confirm] [--older-than 7d] [--json]
   kage completions bash|zsh|fish
   kage <agent>
@@ -63,33 +63,34 @@ Agent shorthands:
   qw    qoderwork
 
 Options:
-  --agent <agent>
-  --target <agent>
-  --session <path>
-  --session-id <id>
-  --out <path>
-  --output-dir <dir>
+  --agent <agent>             Source agent filter for list/export operations
+  --target <agent>            Target agent for routing and export
+  --session <path>            Explicit source session path
+  --session-id <id>           Explicit source session id
+  --out <path>                Output file path override
+  --output-dir <dir>          Output directory override
   --export codex-session|claude-session|qoder-session|session-story-html
-  --split-recent <n>
-  --fork <prompt>
-  --fork-file <path>
-  --preview
-  --run
-  --older-than <duration>
-  --since <date|duration>
-  --until <date|duration>
-  --limit <n>
-  --project <path>
-  --include-subdirs
-  --port <number>
-  --host <address>
-  --password <pin>
-  --read-only
-  --allow-send
-  --stdout
-  --json
-  --version
-  --help`;
+                              Export format to generate
+  --split-recent <n>          Keep only the latest N turns
+  --fork <prompt>             Inject fork prompt for exported payloads
+  --fork-file <path>          Read fork prompt from file
+  --preview                   Show planned export without writing files
+  --run                       Execute resume commands after export
+  --older-than <duration>     Filter items older than this value
+  --since <date|duration>     Set lower bound for time-filtered views
+  --until <date|duration>     Set upper bound for time-filtered views
+  --limit <n>                 Limit query/export result count
+  --project <path>            Filter by project workspace
+  --include-subdirs            Include nested directories in workspace scans
+  --port <number>             Serve port (default 9876)
+  --host <address>            Serve bind address
+  --password <pin>            Password for protected serve access
+  --read-only                  Disable live send/dispatch APIs
+  --allow-send                Re-enable send APIs in a read-only flow
+  --stdout                    Print export output directly
+  --json                      Emit JSON output where supported
+  --version                   Print version string
+  --help                      Show help text and exit`;
 
 const completionCommands = [
   "update",
@@ -434,7 +435,10 @@ function parseArgs(argv) {
   }
   if (first === "serve") {
     if (second) {
-      return { ...args, error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--read-only]" };
+    return {
+      ...args,
+      error: "Usage: kage serve [--port 9876] [--host 0.0.0.0] [--password <pin>] [--read-only] [--allow-send]",
+    };
     }
     if (args.serveAllowSend && args.serveReadOnly) {
       return { ...args, error: "--allow-send and --read-only are mutually exclusive" };
@@ -1663,7 +1667,7 @@ async function main() {
       port: args.servePort ?? undefined,
       host: args.serveHost ?? undefined,
       password: args.servePassword,
-      allowSend: !args.serveReadOnly,
+      allowSend: args.serveAllowSend || !args.serveReadOnly,
     });
     return;
   }

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { readSessionCwd } from "../adapters/sources/index.js";
 import { walk } from "../core/files.js";
 import { searchSessions } from "../core/search.js";
-import { readTranscript } from "./transcript.js";
+import { readTranscript, resolveTranscriptPath } from "./transcript.js";
 import { runAgentSend } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
@@ -66,6 +66,22 @@ function runKageJson(args, { cwd }) {
       }
     });
   });
+}
+
+function transcriptErrorStatus(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (error?.code === "ENOENT") {
+    return 404;
+  }
+  if (
+    message.includes("missing transcript path") ||
+    message.includes("invalid transcript path") ||
+    message.includes("invalid transcript format") ||
+    message.includes("transcript path must point to a file")
+  ) {
+    return 400;
+  }
+  return 500;
 }
 
 function workspaceFromSearch(url) {
@@ -726,14 +742,17 @@ async function handleApi(request, response, url, options) {
     return;
   }
   if (url.pathname === "/api/transcript") {
-    jsonResponse(
-      response,
-      200,
-      await readTranscript({
-        sessionPath: url.searchParams.get("path"),
+    try {
+      const resolvedPath = await resolveTranscriptPath(url.searchParams.get("path"));
+      const payload = await readTranscript({
+        sessionPath: resolvedPath,
         agent: url.searchParams.get("agent"),
-      }),
-    );
+      });
+      jsonResponse(response, 200, payload);
+    } catch (error) {
+      const statusCode = transcriptErrorStatus(error);
+      jsonResponse(response, statusCode, { error: error.message || "Unable to read transcript." });
+    }
     return;
   }
   if (url.pathname === "/api/stream") {
@@ -921,12 +940,23 @@ async function handleSend(request, response, options) {
 }
 
 async function handleStream(response, url, options) {
-  const sessionPath = url.searchParams.get("path");
+  const requestPath = url.searchParams.get("path");
   const agent = url.searchParams.get("agent");
-  if (!sessionPath) {
+  if (!requestPath) {
     jsonResponse(response, 400, { error: "Missing transcript path" });
     return;
   }
+
+  let sessionPath = "";
+  try {
+    sessionPath = await resolveTranscriptPath(requestPath);
+  } catch (error) {
+    const statusCode = transcriptErrorStatus(error);
+    jsonResponse(response, statusCode, { error: error.message || "Unable to stream transcript." });
+    return;
+  }
+
+  const pollIntervalMs = Math.max(500, Number(options.pollIntervalMs) || 2000);
 
   response.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -937,27 +967,59 @@ async function handleStream(response, url, options) {
   let closed = false;
   let lastMtimeMs = 0;
   let watchClose = null;
+  let debounceTimer = null;
+  let pendingRefresh = false;
+  let sending = false;
 
   const sendTranscript = async () => {
-    if (closed) {
+    if (sending) {
+      pendingRefresh = true;
       return;
     }
+    if (closed) return;
+    sending = true;
     try {
-      const stat = await fs.promises.stat(sessionPath);
-      lastMtimeMs = stat.mtimeMs;
       const transcript = await readTranscript({ sessionPath, agent });
-      response.write(`event: transcript\n`);
-      response.write(`data: ${JSON.stringify(transcript)}\n\n`);
+      if (!closed) {
+        response.write(`event: transcript\n`);
+        response.write(`data: ${JSON.stringify(transcript)}\n\n`);
+      }
+      try {
+        const stat = await fs.promises.stat(sessionPath);
+        lastMtimeMs = stat.mtimeMs;
+      } catch {
+        // Ignore; keep previous mtime and fall back to periodic polling errors.
+      }
     } catch (error) {
-      response.write(`event: error\n`);
-      response.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      if (!closed) {
+        response.write(`event: error\n`);
+        response.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      }
+    } finally {
+      sending = false;
+      if (!closed && pendingRefresh) {
+        pendingRefresh = false;
+        queueSend();
+      }
     }
   };
 
-  await sendTranscript();
+  const queueSend = () => {
+    if (closed) {
+      return;
+    }
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (closed) return;
+      void sendTranscript();
+    }, 120);
+  };
+
+  queueSend();
 
   try {
-    const watcher = fs.watch(sessionPath, { persistent: false }, sendTranscript);
+    const watcher = fs.watch(sessionPath, { persistent: false }, queueSend);
     watchClose = () => watcher.close();
   } catch {
     watchClose = null;
@@ -968,15 +1030,19 @@ async function handleStream(response, url, options) {
       const stat = await fs.promises.stat(sessionPath);
       if (stat.mtimeMs !== lastMtimeMs) {
         lastMtimeMs = stat.mtimeMs;
-        await sendTranscript();
+        queueSend();
       }
     } catch {
       // The stream reports parse/read errors through the transcript send path.
     }
-  }, options.pollIntervalMs);
+  }, pollIntervalMs);
 
   response.on("close", () => {
     closed = true;
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     clearInterval(poller);
     watchClose?.();
   });

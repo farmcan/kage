@@ -1,5 +1,28 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { parseSession } from "../adapters/sources/index.js";
 import { joinBlocks } from "../adapters/sources/shared.js";
+
+const SUPPORTED_TRANSCRIPT_EXTENSIONS = new Set([".jsonl", ".json"]);
+
+function ensureReadableTranscriptPath(sessionPath) {
+  const text = String(sessionPath ?? "").trim();
+  if (!text) {
+    throw new Error("Missing transcript path");
+  }
+  if (text.includes("\0")) {
+    throw new Error("Invalid transcript path");
+  }
+  return text;
+}
+
+function validateTranscriptExtension(resolvedPath) {
+  const dotIndex = resolvedPath.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? resolvedPath.slice(dotIndex).toLowerCase() : "";
+  if (!SUPPORTED_TRANSCRIPT_EXTENSIONS.has(extension)) {
+    throw new Error("Invalid transcript format");
+  }
+}
 
 function textValue(value) {
   if (typeof value === "string") {
@@ -195,11 +218,23 @@ export function toStructuredMessages(session) {
   return groupConsecutiveMessages(messages);
 }
 
-export async function readTranscript({ sessionPath, agent }) {
-  if (!sessionPath) {
-    throw new Error("Missing transcript path");
+export async function resolveTranscriptPath(sessionPath) {
+  const normalizedSessionPath = ensureReadableTranscriptPath(sessionPath);
+  const resolvedSessionPath = path.resolve(normalizedSessionPath);
+  const realSessionPath = await fs.realpath(resolvedSessionPath).catch(() => resolvedSessionPath);
+
+  const stats = await fs.stat(realSessionPath);
+  if (!stats.isFile()) {
+    throw new Error("Transcript path must point to a file");
   }
-  const session = await parseSession({ sessionPath, agent });
+  validateTranscriptExtension(realSessionPath);
+
+  return realSessionPath;
+}
+
+export async function readTranscript({ sessionPath, agent }) {
+  const realSessionPath = await resolveTranscriptPath(sessionPath);
+  const session = await parseSession({ sessionPath: realSessionPath, agent });
   return {
     mode: "transcript",
     agent: session.agent,

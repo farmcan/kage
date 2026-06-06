@@ -13,6 +13,7 @@ import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import { createKageServeServer, serveAccessUrl, terminalQrCode } from "../src/serve/index.js";
 import { buildAgentSendCommand, runAgentSend } from "../src/serve/send.js";
+import { resolveTranscriptPath } from "../src/serve/transcript.js";
 import {
   buildStoryPayload,
   detectAgent,
@@ -44,6 +45,36 @@ async function canonicalPath(filePath) {
   } catch {
     return path.resolve(filePath);
   }
+}
+
+async function withServeServer(testCallback, { cwd = process.cwd(), pollIntervalMs = 150 } = {}) {
+  const server = createKageServeServer({ cwd, pollIntervalMs });
+  const port = await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      resolve(typeof address === "object" ? address.port : 9876);
+    });
+  });
+
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try {
+    return await testCallback(baseUrl);
+  } finally {
+    await new Promise((resolve) => {
+      server.close(resolve);
+    });
+  }
+}
+
+async function serveFetch(baseUrl, input, options = {}) {
+  const response = await fetch(`${baseUrl}${input}`, {
+    method: options.method,
+    headers: options.headers,
+    body: options.body,
+  });
+  const body = await response.text();
+  return { status: response.status, body };
 }
 
 function toProjectKey(cwd) {
@@ -96,6 +127,59 @@ test("buildClaudeResumeCommand scopes resume to cwd and shell-quotes values", ()
     buildClaudeResumeCommand("session-1", "/tmp/can't"),
     "cd '/tmp/can'\\''t' && claude --resume session-1",
   );
+});
+
+test("resolveTranscriptPath validates missing paths", async () => {
+  await assert.rejects(() => resolveTranscriptPath(), { message: "Missing transcript path" });
+  await assert.rejects(() => resolveTranscriptPath(""), { message: "Missing transcript path" });
+});
+
+test("resolveTranscriptPath rejects unsupported transcript extension", async () => {
+  const tmpDir = await makeTempDir("transcript-ext");
+  const txtPath = path.join(tmpDir, "session.txt");
+  await fs.writeFile(txtPath, "not a transcript", "utf8");
+  await assert.rejects(() => resolveTranscriptPath(txtPath), { message: "Invalid transcript format" });
+});
+
+test("resolveTranscriptPath rejects non-file paths", async () => {
+  const tmpDir = await makeTempDir("transcript-dir");
+  await assert.rejects(() => resolveTranscriptPath(tmpDir), { message: "Transcript path must point to a file" });
+});
+
+test("serve transcript endpoint rejects invalid transcript paths", async () => {
+  const tmpDir = await makeTempDir("serve-transcript-invalid");
+  const txtPath = path.join(tmpDir, "notes.txt");
+  await fs.writeFile(txtPath, "hello", "utf8");
+  const result = await withServeServer(async (baseUrl) => {
+    const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(txtPath)}&agent=codex`);
+    return { status, body };
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body, /Invalid transcript format/);
+});
+
+test("serve transcript endpoint returns not found for missing file", async () => {
+  const tmpDir = await makeTempDir("serve-transcript-missing");
+  const missingPath = path.join(tmpDir, "missing.jsonl");
+  const result = await withServeServer(async (baseUrl) => {
+    const { status, body } = await serveFetch(baseUrl, `/api/transcript?path=${encodeURIComponent(missingPath)}&agent=codex`);
+    return { status, body };
+  });
+  assert.equal(result.status, 404);
+  const payload = JSON.parse(result.body);
+  assert.equal(payload.error.includes("no such file"), true);
+});
+
+test("serve stream endpoint validates transcript format", async () => {
+  const tmpDir = await makeTempDir("serve-stream-invalid");
+  const mdPath = path.join(tmpDir, "readme.md");
+  await fs.writeFile(mdPath, "hello", "utf8");
+  const result = await withServeServer(async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/stream?path=${encodeURIComponent(mdPath)}&agent=codex`);
+    return { status: response.status, body: await response.text() };
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body, /Invalid transcript format/);
 });
 
 test("supportedAgents exposes the native-export adapter set", () => {
