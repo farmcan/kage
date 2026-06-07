@@ -2729,7 +2729,8 @@ textarea:disabled {
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: max(12px, env(safe-area-inset-bottom));
+  top: max(12px, env(safe-area-inset-top));
+  bottom: auto;
   z-index: 55;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto auto;
@@ -2780,6 +2781,8 @@ textarea:disabled {
 
 .install-banner .install-dismiss {
   width: 34px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   color: var(--muted);
   background: var(--panel-3);
