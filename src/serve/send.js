@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const supportedSendAgents = new Set(["claude", "codex", "qodercli"]);
 const maxCapturedOutputBytes = 512 * 1024;
+const codexUnattendedArgs = ["--dangerously-bypass-approvals-and-sandbox"];
 
 function requireText(value, name) {
   const text = String(value ?? "").trim();
@@ -73,7 +74,7 @@ export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallback
   if (normalizedAgent === "codex") {
     return {
       command: "codex",
-      args: normalizedSessionId ? ["exec", "resume", normalizedSessionId, "-"] : ["exec", "-"],
+      args: normalizedSessionId ? ["exec", ...codexUnattendedArgs, "resume", normalizedSessionId, "-"] : ["exec", ...codexUnattendedArgs, "-"],
       cwd: workingDirectory,
       stdin: normalizedMessage,
       target,

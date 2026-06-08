@@ -25,7 +25,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -228,6 +228,10 @@ const MESSAGE_WINDOW_SIZE = 420;
 const MESSAGE_WINDOW_STEP = 220;
 const DISPATCH_BOARD_BATCH_SIZE = 6;
 const TRANSCRIPT_CONNECT_FALLBACK_MS = 5000;
+const TRANSCRIPT_SNAPSHOT_TIMEOUT_MS = 3500;
+const TRANSCRIPT_RECONNECT_BASE_MS = 2500;
+const TRANSCRIPT_RECONNECT_MAX_MS = 20000;
+const TASK_POLL_INTERVAL_MS = 10000;
 const DISPATCH_BOARD_ACTIVE_TASK_STATUSES = new Set(["queued", "running"]);
 const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 const workspaceQueryParams = ["workspace", "cwd"];
@@ -291,28 +295,46 @@ function agentColorStyle(agent, property = "--agent-color") {
 }
 
 function KageLogoIcon() {
+  const idBase = useId().replace(/[^a-zA-Z0-9_-]/gu, "");
+  const badgeId = `kage-logo-badge-${idBase}`;
+  const screenId = `kage-logo-screen-${idBase}`;
+  const screenClipId = `kage-logo-screen-clip-${idBase}`;
   return (
     <svg className="kage-logo-icon" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
       <defs>
-        <linearGradient id="kage-logo-badge" x1="96" y1="72" x2="416" y2="440" gradientUnits="userSpaceOnUse">
+        <linearGradient id={badgeId} x1="96" y1="72" x2="416" y2="440" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#182026" />
           <stop offset="1" stopColor="#0b1013" />
         </linearGradient>
-        <linearGradient id="kage-logo-screen" x1="152" y1="140" x2="360" y2="310" gradientUnits="userSpaceOnUse">
+        <linearGradient id={screenId} x1="152" y1="140" x2="360" y2="310" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#202b32" />
           <stop offset="1" stopColor="#12191e" />
         </linearGradient>
+        <clipPath id={screenClipId}>
+          <rect x="168" y="158" width="176" height="126" rx="19" />
+        </clipPath>
       </defs>
-      <rect x="56" y="56" width="400" height="400" rx="104" fill="url(#kage-logo-badge)" />
+      <rect x="56" y="56" width="400" height="400" rx="104" fill={`url(#${badgeId})`} />
       <rect x="144" y="133" width="224" height="176" rx="36" fill="#f7f2e6" />
-      <rect x="168" y="158" width="176" height="126" rx="19" fill="url(#kage-logo-screen)" />
+      <rect x="168" y="158" width="176" height="126" rx="19" fill={`url(#${screenId})`} />
+      <g className="kage-logo-scan-group" clipPath={`url(#${screenClipId})`}>
+        <rect className="kage-logo-scan" x="168" y="158" width="176" height="28" fill="#f2b84b" />
+      </g>
       <path className="kage-logo-prompt" d="M195 198l45 36-45 36" fill="none" stroke="#f2b84b" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
       <path className="kage-logo-cursor" d="M267 267h72" fill="none" stroke="#f7f2e6" strokeWidth="24" strokeLinecap="round" />
       <circle className="kage-logo-dot kage-logo-dot-blue" cx="164" cy="360" r="24" fill="#3b82f6" />
       <circle className="kage-logo-dot kage-logo-dot-green" cx="256" cy="376" r="24" fill="#15a074" />
       <circle className="kage-logo-dot kage-logo-dot-warm" cx="348" cy="360" r="24" fill="#cf7654" />
-      <path d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" strokeWidth="16" strokeLinecap="round" opacity="0.56" />
+      <path className="kage-logo-arc" d="M183 363c44 33 119 34 164 0" fill="none" stroke="#f7f2e6" strokeWidth="16" strokeLinecap="round" opacity="0.56" />
     </svg>
+  );
+}
+
+function RunningKageMark({ compact = false }) {
+  return (
+    <span className={cls("running-kage-mark", compact && "compact")} aria-hidden="true">
+      <KageLogoIcon />
+    </span>
   );
 }
 
@@ -439,7 +461,24 @@ function authUrl(path) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(authUrl(path), options);
+  const { timeoutMs, ...fetchOptions } = options;
+  let timeoutId = null;
+  if (timeoutMs && !fetchOptions.signal) {
+    const controller = new AbortController();
+    fetchOptions.signal = controller.signal;
+    timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  }
+  let response;
+  try {
+    response = await fetch(authUrl(path), fetchOptions);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Request timed out.");
+    }
+    throw error;
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
   if (!response.ok) {
     if (response.status === 401 && config.passwordRequired) {
       removeStorageValue(PASSWORD_STORAGE_KEY);
@@ -790,7 +829,7 @@ function sendCommand({ agent, sessionId, cwd, message }) {
     return `${cd}claude ${sessionId ? `-r ${shellQuote(sessionId)} ` : ""}-p ${shellQuote(message)}`;
   }
   if (agent === "codex") {
-    return `${cd}printf %s ${shellQuote(message)} | codex exec ${sessionId ? `resume ${shellQuote(sessionId)} ` : ""}-`;
+    return `${cd}printf %s ${shellQuote(message)} | codex exec --dangerously-bypass-approvals-and-sandbox ${sessionId ? `resume ${shellQuote(sessionId)} ` : ""}-`;
   }
   if (agent === "qodercli") {
     return `qodercli -w ${shellQuote(cwd || ".")} ${sessionId ? `-r ${shellQuote(sessionId)} ` : ""}-p ${shellQuote(message)}`;
@@ -800,7 +839,7 @@ function sendCommand({ agent, sessionId, cwd, message }) {
 
 function sendPrimitiveLabel(agent) {
   if (agent === "claude") return "claude -p";
-  if (agent === "codex") return "codex exec -";
+  if (agent === "codex") return "codex exec --dangerously-bypass-approvals-and-sandbox -";
   if (agent === "qodercli") return "qodercli -p";
   return agent;
 }
@@ -1019,9 +1058,12 @@ function deriveConversationActivity({ selectedSession, transcript, live, sendSta
       return `Opening transcript stream for ${conversationAgentLabel(selectedSession?.agent, selectedSession?.agentLabel)}...`;
     }
     if (waitMs < 8000) {
-      return "Parsing transcript history; long sessions can take a moment on first load.";
+      return "Reading the latest transcript snapshot from disk; long sessions can take a moment.";
     }
-    return "No stream event yet. Loading latest snapshot from disk.";
+    if (waitMs < 20000) {
+      return "Still waiting for transcript events; KAGE is keeping the local file watch open.";
+    }
+    return "Still watching this session. The agent may be quiet, or the transcript may not have changed yet.";
   };
   if (!selectedSession) {
     return {
@@ -1040,12 +1082,25 @@ function deriveConversationActivity({ selectedSession, transcript, live, sendSta
     };
   }
   if (!transcript) {
+    const startedAt = activityUpdatedAt || now;
+    const waitMs = Number.isFinite(startedAt) ? Math.max(0, now - startedAt) : 0;
+    const loadingText = (loadingMessage || "").toLowerCase();
+    let label = "Connecting to transcript stream...";
+    if (waitMs >= 2500 || loadingText.includes("snapshot") || loadingText.includes("reading")) {
+      label = "Reading transcript snapshot...";
+    }
+    if (waitMs >= 8000 || loadingText.includes("waiting") || loadingText.includes("timed out")) {
+      label = "Waiting for transcript updates...";
+    }
+    if (waitMs >= 20000) {
+      label = "Still watching the session...";
+    }
     return {
       tone: "active",
-      label: "Connecting to transcript stream...",
+      label,
       detail: loadingMessage || loadingDetail(),
       active: true,
-      startedAt: activityUpdatedAt || now,
+      startedAt,
     };
   }
   if (sendState === "sending") {
@@ -1150,6 +1205,12 @@ function useRotatingVerb(enabled) {
     return () => window.clearInterval(timer);
   }, [enabled]);
   return SPINNER_VERBS[index % SPINNER_VERBS.length];
+}
+
+function autoGrowTextarea(textarea) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
 }
 
 async function copyText(text, label = "Copied") {
@@ -1300,50 +1361,99 @@ async function selectSession(session, { openDetail = true } = {}) {
   const transcriptPath = `path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`;
   const stream = new EventSource(authUrl(streamPath));
   let seenFirstTranscript = false;
+  let streamConnected = false;
   let fallbackTimer = null;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+  let snapshotLoading = false;
+  const isCurrentStream = () => useStore.getState().stream === stream && useStore.getState().selectedSession?.path === session.path;
   const clearFallback = () => {
     if (fallbackTimer) {
       clearTimeout(fallbackTimer);
       fallbackTimer = null;
     }
   };
-  const streamFallback = async () => {
-    if (seenFirstTranscript) {
+  const clearReconnect = () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+  const scheduleReconnect = () => {
+    if (!isCurrentStream()) return;
+    const delay = Math.min(TRANSCRIPT_RECONNECT_MAX_MS, TRANSCRIPT_RECONNECT_BASE_MS * (2 ** reconnectAttempt));
+    reconnectAttempt += 1;
+    useStore.setState({
+      loadingMessage: `Transcript stream disconnected. Reconnecting in ${Math.ceil(delay / 1000)}s...`,
+      activityUpdatedAt: Date.now(),
+    });
+    reconnectTimer = window.setTimeout(() => {
+      if (isCurrentStream()) {
+        void selectSession(session, { openDetail: false });
+      }
+    }, delay);
+  };
+  const streamFallback = async ({ delayed = false } = {}) => {
+    if (seenFirstTranscript || snapshotLoading) {
       return;
     }
-    const state = useStore.getState();
-    if (state.stream !== stream || state.selectedSession?.path !== session.path) {
+    if (!isCurrentStream()) {
       return;
     }
+    snapshotLoading = true;
     useStore.setState({
       loadingMessage: `Reading latest ${conversationAgentLabel(session.agent, session.agentLabel)} snapshot...`,
       activityUpdatedAt: Date.now(),
     });
     try {
-      const transcript = await api(`/api/transcript?${transcriptPath}`);
+      const transcript = await api(`/api/transcript?${transcriptPath}`, { timeoutMs: TRANSCRIPT_SNAPSHOT_TIMEOUT_MS });
+      if (seenFirstTranscript || !isCurrentStream()) {
+        return;
+      }
       const merged = withPendingTranscriptMessages(transcript);
+      clearFallback();
       useStore.setState({
         transcript: merged.transcript,
         pendingTranscriptMessages: merged.pendingTranscriptMessages,
-        live: false,
+        live: streamConnected || stream.readyState !== EventSource.CLOSED,
         activityUpdatedAt: Date.now(),
         loadingMessage: "",
       });
     } catch {
       if (useStore.getState().stream === stream && useStore.getState().selectedSession?.path === session.path) {
         useStore.setState({
-          loadingMessage: `Transcript snapshot read timed out. Waiting for stream updates...`,
+          loadingMessage: delayed
+            ? `Transcript snapshot read timed out. Waiting for stream updates...`
+            : `Waiting for transcript stream updates...`,
           activityUpdatedAt: Date.now(),
         });
       }
+    } finally {
+      snapshotLoading = false;
     }
   };
-  fallbackTimer = setTimeout(() => {
-    void streamFallback();
-  }, TRANSCRIPT_CONNECT_FALLBACK_MS);
   useStore.setState({ stream });
+  void streamFallback();
+  fallbackTimer = setTimeout(() => {
+    void streamFallback({ delayed: true });
+  }, TRANSCRIPT_CONNECT_FALLBACK_MS);
+  stream.addEventListener("connected", () => {
+    streamConnected = true;
+    if (useStore.getState().stream === stream && useStore.getState().selectedSession?.path === session.path) {
+      const nextState = {
+        live: true,
+        activityUpdatedAt: Date.now(),
+      };
+      if (!useStore.getState().transcript) {
+        nextState.loadingMessage = `Reading latest ${conversationAgentLabel(session.agent, session.agentLabel)} snapshot...`;
+      }
+      useStore.setState(nextState);
+    }
+  });
   stream.addEventListener("transcript", (event) => {
     clearFallback();
+    clearReconnect();
+    reconnectAttempt = 0;
     let transcript;
     try {
       transcript = JSON.parse(event.data);
@@ -1365,13 +1475,18 @@ async function selectSession(session, { openDetail = true } = {}) {
   });
   stream.addEventListener("error", async () => {
     clearFallback();
+    clearReconnect();
+    if (isCurrentStream()) {
+      stream.close();
+    }
     try {
       const transcript = await api(`/api/transcript?${transcriptPath}`);
       const merged = withPendingTranscriptMessages(transcript);
-      useStore.setState({ transcript: merged.transcript, pendingTranscriptMessages: merged.pendingTranscriptMessages, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
+      useStore.setState({ transcript: merged.transcript, pendingTranscriptMessages: merged.pendingTranscriptMessages, live: false, activityUpdatedAt: Date.now() });
     } catch (error) {
-      useStore.setState({ error: error.message, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
+      useStore.setState({ error: error.message, live: false, activityUpdatedAt: Date.now() });
     }
+    scheduleReconnect();
   });
 }
 
@@ -1520,8 +1635,10 @@ function App() {
   const password = useStore((state) => state.password);
   const detailOpen = useStore((state) => state.detailOpen);
   const viewMode = useStore((state) => state.viewMode);
+  const tasks = useStore((state) => state.tasks);
   const conversationFullscreen = useStore((state) => state.conversationFullscreen);
   const isMobileLayout = useMobileLayout();
+  const hasActiveTasks = tasks.some((task) => DISPATCH_BOARD_ACTIVE_TASK_STATUSES.has(task.status));
   const needsPassword = config.passwordRequired && !password;
   useEffect(() => {
     applyTheme(theme);
@@ -1538,11 +1655,23 @@ function App() {
   }, [needsPassword]);
   useEffect(() => {
     if (needsPassword) return undefined;
-    const timer = window.setInterval(() => {
-      void loadTasks({ silent: true });
-    }, 2500);
-    return () => window.clearInterval(timer);
-  }, [needsPassword]);
+    const shouldPollTasks = () => document.visibilityState === "visible" && (
+      useStore.getState().viewMode === "board"
+      || useStore.getState().tasks.some((task) => DISPATCH_BOARD_ACTIVE_TASK_STATUSES.has(task.status))
+    );
+    const pollTasks = () => {
+      if (shouldPollTasks()) {
+        void loadTasks({ silent: true });
+      }
+    };
+    pollTasks();
+    const timer = window.setInterval(pollTasks, TASK_POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", pollTasks);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", pollTasks);
+    };
+  }, [needsPassword, viewMode, hasActiveTasks]);
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -1946,7 +2075,14 @@ function Sidebar() {
         </Tabs.Root>
         <div className="search-box">
           <Search size={16} />
-          <input ref={searchInputRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sessions and transcripts" />
+          <input
+            ref={searchInputRef}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search sessions and transcripts"
+            aria-keyshortcuts="/ Meta+K Control+K"
+          />
+          {!search && <span className="shortcut-hints"><kbd>/</kbd><kbd>Cmd K</kbd></span>}
           {search && (
             <button type="button" onClick={() => setSearch("")}>
               Clear
@@ -2062,7 +2198,7 @@ const SessionListItem = memo(function SessionListItem({
       )}
       {isStreaming && (
         <small className="session-live-line">
-          <span className="status-dot pulse" />
+          <RunningKageMark compact />
           Active — {activityLabel}
         </small>
       )}
@@ -2460,10 +2596,9 @@ function SessionList({ sessions }) {
   return (
     <div
       className="session-list"
-      role="listbox"
+      role="list"
       tabIndex={0}
       aria-label="Sessions"
-      aria-multiselectable="true"
       onKeyDown={handleListKeyDown}
       {...pullHandlers}
     >
@@ -2482,7 +2617,7 @@ function SessionList({ sessions }) {
           onClick={(event) => handleSelectSession(activeSession, event)}
         >
           <div>
-            <span className="status-dot pulse" />
+            <RunningKageMark compact />
             <strong>Active now</strong>
             <small>{elapsedLabel(activityUpdatedAt, now)}</small>
           </div>
@@ -2566,6 +2701,7 @@ function Conversation() {
   const live = useStore((state) => state.live);
   const error = useStore((state) => state.error);
   const sendState = useStore((state) => state.sendState);
+  const loadingMessage = useStore((state) => state.loadingMessage);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const conversationFullscreen = useStore((state) => state.conversationFullscreen);
   const setConversationFullscreen = useStore((state) => state.setConversationFullscreen);
@@ -2827,11 +2963,12 @@ function TaskBoardPanel() {
 function TaskCard({ task, now, active, onSelect }) {
   const verb = useRotatingVerb(task.status === "running");
   const age = elapsedLabel(Date.parse(task.createdAt || 0), now);
-  const rawLastLog = task.logs?.[task.logs.length - 1] || task.error || task.stdout || "Waiting for activity.";
+  const rawLastLog = task.stdout || task.logs?.[task.logs.length - 1] || task.error || "Waiting for activity.";
   const lastLog = useMemo(() => {
-    const value = String(rawLastLog || "").trim().replace(/\s+/gu, " ");
+    const source = task.status === "failed" ? taskFailureText(task) : compactTaskText(task.stdout || rawLastLog, { stripNoise: true, maxChars: 240 });
+    const value = String(source || "").trim().replace(/\s+/gu, " ");
     return value.length > 240 ? `${value.slice(0, 236)}…` : value;
-  }, [rawLastLog]);
+  }, [rawLastLog, task]);
   return (
     <button type="button" className={cls("task-card", task.status, active && "active")} style={agentColorStyle(task.agent)} onClick={onSelect}>
       <div className="task-card-top">
@@ -2845,7 +2982,10 @@ function TaskCard({ task, now, active, onSelect }) {
       </div>
       <div className="task-card-foot">
         <code>{task.project || task.cwd || "project"}</code>
-        <span>{task.status === "running" ? `${verb}...` : taskStatusLabel(task.status)}</span>
+        <span>
+          {task.status === "running" && <RunningKageMark compact />}
+          {task.status === "running" ? `${verb}...` : taskStatusLabel(task.status)}
+        </span>
       </div>
     </button>
   );
@@ -2935,10 +3075,155 @@ function TaskDispatchBar({ workspace }) {
         <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Describe a task to run..." />
       </label>
       <button type="submit" disabled={!draft.trim() || submitting}>
-        {submitting ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+        {submitting ? <RunningKageMark compact /> : <Send size={16} />}
         {config.sendEnabled ? "Dispatch" : "Copy"}
       </button>
     </form>
+  );
+}
+
+const taskDiagnosticNoise = [
+  "WARN codex_core_plugins::manifest",
+  "WARN codex_core_skills::loader",
+];
+
+function isTaskDiagnosticNoise(line) {
+  return taskDiagnosticNoise.some((needle) => line.includes(needle));
+}
+
+function taskTextLineCount(text) {
+  const value = String(text || "").trim();
+  return value ? value.split(/\r?\n/u).length : 0;
+}
+
+function uniqueTaskLines(lines, limit = 8) {
+  const seen = new Set();
+  const values = [];
+  for (const line of lines) {
+    const value = String(line || "").trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    values.push(value);
+    if (values.length >= limit) break;
+  }
+  return values;
+}
+
+function compactTaskText(value, { stripNoise = false, maxChars = 12000 } = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const lines = raw.split(/\r?\n/u);
+  let hiddenNoise = 0;
+  const visibleLines = [];
+  for (const line of lines) {
+    if (stripNoise && isTaskDiagnosticNoise(line)) {
+      hiddenNoise += 1;
+      continue;
+    }
+    visibleLines.push(line);
+  }
+  if (hiddenNoise) {
+    visibleLines.unshift(`[${hiddenNoise} repeated Codex setup warning${hiddenNoise === 1 ? "" : "s"} hidden]`);
+  }
+  let text = visibleLines.join("\n").trim();
+  if (text.length > maxChars) {
+    text = `${text.slice(0, maxChars).trimEnd()}\n\n[truncated ${text.length - maxChars} characters]`;
+  }
+  return text;
+}
+
+function taskFailureText(task) {
+  const source = [task.error, task.stderr, task.stdout].filter(Boolean).join("\n");
+  const lines = String(source || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line && !isTaskDiagnosticNoise(line));
+  const priority = uniqueTaskLines(
+    lines.filter((line) => /(^ERROR:|usage limit|rate limit|command not found|timed out|exited with|exit code|permission denied)/iu.test(line)),
+    8,
+  );
+  if (priority.length) {
+    return priority.join("\n");
+  }
+  return compactTaskText(task.error || task.stderr || "Task failed without captured output.", {
+    stripNoise: true,
+    maxChars: 6000,
+  });
+}
+
+function taskResultSections(task) {
+  const output = compactTaskText(task.stdout, { maxChars: 16000 });
+  const failure = task.status === "failed" ? taskFailureText(task) : "";
+  const diagnostics = compactTaskText(task.stderr, { stripNoise: true, maxChars: 16000 });
+  const activity = compactTaskText((task.logs || []).join("\n"), { stripNoise: true, maxChars: 8000 });
+  const sections = [];
+
+  if (output) {
+    sections.push({ key: "output", title: "Output", text: output, tone: "output" });
+  } else if (failure) {
+    sections.push({ key: "failure", title: "Failure", text: failure, tone: "error" });
+  } else {
+    sections.push({ key: "waiting", title: "Activity", text: activity || "Waiting for activity.", tone: "muted" });
+  }
+
+  if (diagnostics) {
+    sections.push({
+      key: "diagnostics",
+      title: "Diagnostics",
+      meta: `${taskTextLineCount(diagnostics)} lines`,
+      text: diagnostics,
+      tone: "diagnostics",
+      collapsible: true,
+      defaultOpen: !output && !failure,
+    });
+  }
+  if (activity && activity !== sections[0]?.text) {
+    sections.push({
+      key: "activity",
+      title: "Activity",
+      meta: `${taskTextLineCount(activity)} lines`,
+      text: activity,
+      tone: "activity",
+      collapsible: true,
+      defaultOpen: false,
+    });
+  }
+  return sections;
+}
+
+function TaskResultPanel({ task }) {
+  const sections = useMemo(() => taskResultSections(task), [task]);
+  const copyableText = sections.map((section) => `${section.title}\n${section.text}`).join("\n\n");
+  return (
+    <div className="task-result-panel">
+      <div className="task-result-toolbar">
+        <strong>Result</strong>
+        <button type="button" className="icon-text-button" onClick={() => copyText(copyableText, "Task result copied")}>
+          <Copy size={14} />
+          Copy
+        </button>
+      </div>
+      {sections.map((section) => (
+        section.collapsible ? (
+          <details key={section.key} className={cls("task-result-section", section.tone)} open={section.defaultOpen}>
+            <summary>
+              <span>{section.title}</span>
+              {section.meta && <small>{section.meta}</small>}
+              <ChevronDown size={14} />
+            </summary>
+            <pre>{section.text}</pre>
+          </details>
+        ) : (
+          <section key={section.key} className={cls("task-result-section", section.tone)}>
+            <div className="task-result-section-head">
+              <span>{section.title}</span>
+              {section.meta && <small>{section.meta}</small>}
+            </div>
+            <pre>{section.text}</pre>
+          </section>
+        )
+      ))}
+    </div>
   );
 }
 
@@ -2987,7 +3272,10 @@ function TaskDetailPanel({ task, now, onClose }) {
         </button>
       </div>
       <strong>{task.title}</strong>
-      <span>{taskStatusLabel(task.status)} / {elapsedLabel(Date.parse(task.createdAt || 0), now) || compactDate(task.createdAt)}</span>
+      <span>
+        {task.status === "running" && <RunningKageMark compact />}
+        {taskStatusLabel(task.status)} / {elapsedLabel(Date.parse(task.createdAt || 0), now) || compactDate(task.createdAt)}
+      </span>
       <div className="task-progress large">
         <span style={{ width: `${Math.max(0, Math.min(100, task.progress || 0))}%` }} />
       </div>
@@ -3010,15 +3298,7 @@ function TaskDetailPanel({ task, now, onClose }) {
         <div><dt>Created</dt><dd>{new Date(task.createdAt || Date.now()).toLocaleString()}</dd></div>
         {task.pid && <div><dt>PID</dt><dd>{task.pid}</dd></div>}
       </dl>
-      <div className="task-log">
-        <strong>Activity</strong>
-        {(task.logs || []).map((entry, index) => (
-          <code key={`${task.id}-${index}`}>{entry}</code>
-        ))}
-        {task.stdout && <code>{task.stdout}</code>}
-        {task.stderr && <code>{task.stderr}</code>}
-        {task.error && <code>{task.error}</code>}
-      </div>
+      <TaskResultPanel task={task} />
     </aside>
   );
 }
@@ -3085,7 +3365,7 @@ function ConversationStatusBar({ activity, now }) {
   const elapsed = activity?.startedAt ? elapsedLabel(activity.startedAt, now) : "";
   return (
     <div className={cls("conversation-status-bar", activity?.tone, activity?.active && "active")}>
-      <span className={cls("status-dot", activity?.active && "pulse")} />
+      {activity?.active ? <RunningKageMark /> : <span className="status-dot" />}
       <div className="conversation-status-copy">
         <strong>{activity?.label || "Waiting for input"}</strong>
         <span>{activity?.detail || "Ready for the next local agent event."}</span>
@@ -3096,11 +3376,22 @@ function ConversationStatusBar({ activity, now }) {
 }
 
 function ProcessEmptyState({ label, detail }) {
+  const processText = `${label || ""} ${detail || ""}`.toLowerCase();
+  const stage = processText.includes("still") || processText.includes("waiting")
+    ? "watch"
+    : processText.includes("snapshot") || processText.includes("reading") || processText.includes("parsing")
+      ? "snapshot"
+      : "stream";
   return (
     <div className="empty-state process-state">
-      <Loader2 size={18} className="spin" />
+      <RunningKageMark />
       <strong>{label}</strong>
       <span>{detail}</span>
+      <div className="process-state-steps" aria-hidden="true">
+        <span className={cls(stage === "stream" && "active")}>Stream</span>
+        <span className={cls(stage === "snapshot" && "active")}>Snapshot</span>
+        <span className={cls(stage === "watch" && "active")}>Watch</span>
+      </div>
     </div>
   );
 }
@@ -3410,6 +3701,7 @@ function Composer({ session, compact = false, allowReply = true }) {
   const [targetAgent, setTargetAgent] = useState("codex");
   const [targetCwd, setTargetCwd] = useState("");
   const submittingRef = useRef(false);
+  const textareaRef = useRef(null);
   const sendState = useStore((state) => state.sendState);
   const rootCwd = useStore((state) => state.cwd);
   const sessions = useStore((state) => state.sessions);
@@ -3437,6 +3729,10 @@ function Composer({ session, compact = false, allowReply = true }) {
       setReplySessionPath(null);
     }
   }, [session?.path, session?.agent, session?.cwd, rootCwd, allowReply]);
+
+  useEffect(() => {
+    autoGrowTextarea(textareaRef.current);
+  }, [draft, compact]);
 
   function chooseMode(nextMode) {
     if (!allowReply) return;
@@ -3644,15 +3940,21 @@ function Composer({ session, compact = false, allowReply = true }) {
       )}
       <div className="composer-row">
         <textarea
+          ref={textareaRef}
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            autoGrowTextarea(event.target);
+          }}
           onKeyDown={handleComposerKeyDown}
           placeholder="Write any prompt for the selected target"
+          aria-keyshortcuts="Meta+Enter Control+Enter"
           rows={2}
         />
         <button className="send-button" type="submit" disabled={!draft.trim() || disabled}>
-          {sendState === "sending" ? <Loader2 size={18} className="spin" /> : sendEnabled ? <Send size={18} /> : <Copy size={18} />}
+          {sendState === "sending" ? <RunningKageMark compact /> : sendEnabled ? <Send size={18} /> : <Copy size={18} />}
           {sendEnabled ? "Send" : "Copy"}
+          <span className="composer-shortcut">Cmd+Enter</span>
         </button>
       </div>
     </form>
@@ -3812,7 +4114,7 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
                         <small>{sessionDispatchStatusLabel(session, isRunning)} · {compactDate(session.updatedAt)}</small>
                       </div>
                       <div className="dispatch-card-meta">
-                        <span className={cls("dispatch-status-dot", isRunning ? "running" : "idle")} />
+                        {isRunning ? <RunningKageMark compact /> : <span className="dispatch-status-dot idle" />}
                         <span>{sessionDispatchStatusLabel(session, isRunning)}</span>
                       </div>
                       <div className="dispatch-card-actions" onClick={(event) => event.stopPropagation()}>
@@ -3855,4 +4157,38 @@ function Toast() {
   return <div className={cls("toast", toast && "show")}>{toast}</div>;
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <main className="bootstrap-error">
+          <div className="password-logo">
+            <KageLogoIcon />
+          </div>
+          <h1>KAGE Dispatch hit a rendering error</h1>
+          <p>The local server is still running. Reload the page to rebuild the UI state.</p>
+          <button type="button" className="primary-button" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+          <pre>{this.state.error?.stack || this.state.error?.message || String(this.state.error)}</pre>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+);

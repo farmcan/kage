@@ -999,7 +999,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "codex",
-      args: ["exec", "resume", "codex-session", "-"],
+      args: ["exec", "--dangerously-bypass-approvals-and-sandbox", "resume", "codex-session", "-"],
       cwd: __dirname,
       stdin: "hello codex",
       target: "session",
@@ -1014,7 +1014,7 @@ test("serve send command builder uses native non-interactive resume commands", (
     }),
     {
       command: "codex",
-      args: ["exec", "-"],
+      args: ["exec", "--dangerously-bypass-approvals-and-sandbox", "-"],
       cwd: __dirname,
       stdin: "new codex",
       target: "new",

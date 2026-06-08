@@ -974,6 +974,9 @@ async function handleStream(response, url, options) {
     "Cache-Control": "no-store",
     "Connection": "keep-alive",
   });
+  response.flushHeaders?.();
+  response.write(`event: connected\n`);
+  response.write(`data: ${JSON.stringify({ status: "connected" })}\n\n`);
 
   let closed = false;
   let lastMtimeMs = 0;

@@ -109,6 +109,20 @@ test("serve dispatch path prioritizes new-task flow on mobile sheet", async () =
   assert.match(serveMain, /<Composer session=\{selectedSession\} allowReply=\{false\} \/>/u);
   assert.match(serveMain, /<Composer session=\{selectedSession\} compact allowReply \/>/u);
   assert.match(serveMain, /"Direct send starts a new local session\."/u);
+  assert.match(serveMain, /codex exec --dangerously-bypass-approvals-and-sandbox/u);
+});
+
+test("serve task board presents readable results before raw diagnostics", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveMain, /function TaskResultPanel\(\{ task \}\)/u);
+  assert.match(serveMain, /function taskFailureText\(task\)/u);
+  assert.match(serveMain, /repeated Codex setup warning/u);
+  assert.match(serveMain, /<details key=\{section\.key\} className=\{cls\("task-result-section", section\.tone\)\}/u);
+  assert.match(serveStyles, /\.task-result-panel/u);
+  assert.match(serveStyles, /\.task-result-section\.diagnostics/u);
+  assert.match(serveStyles, /\.task-result-section pre/u);
 });
 
 test("serve grouped session cards receive the current clock value", async () => {
@@ -140,10 +154,30 @@ test("serve session list supports keyboard focus and multi-select affordances", 
   assert.match(serveMain, /event\.key === "Enter"/u);
   assert.match(serveMain, /event\.key === "Escape"/u);
   assert.match(serveMain, /event\.key === "\/" \|\| \(\(event\.metaKey \|\| event\.ctrlKey\) && event\.key\.toLowerCase\(\) === "k"\)/u);
-  assert.match(serveMain, /aria-multiselectable="true"/u);
+  assert.match(serveMain, /role="list"/u);
+  assert.doesNotMatch(serveMain, /role="listbox"/u);
+  assert.doesNotMatch(serveMain, /aria-multiselectable="true"/u);
   assert.match(serveMain, /session-selection-bar/u);
   assert.match(serveStyles, /\.session-card\.focused/u);
   assert.match(serveStyles, /\.session-card\.selected/u);
+});
+
+test("serve mobile interaction fixes stay wired", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+  const serveStyles = await readRepoFile("src", "serve", "ui", "app", "src", "styles.css");
+
+  assert.match(serveStyles, /--accent:\s*var\(--codex\)/u);
+  assert.match(serveMain, /function autoGrowTextarea\(textarea\)/u);
+  assert.match(serveMain, /ref=\{textareaRef\}/u);
+  assert.match(serveStyles, /\.composer textarea[\s\S]*?height:\s*auto[\s\S]*?resize:\s*none[\s\S]*?overflow-y:\s*auto/u);
+  assert.match(serveMain, /TRANSCRIPT_RECONNECT_BASE_MS/u);
+  assert.match(serveMain, /class ErrorBoundary extends React\.Component/u);
+  assert.match(serveMain, /<ErrorBoundary>[\s\S]*?<App \/>[\s\S]*?<\/ErrorBoundary>/u);
+  assert.match(serveMain, /aria-keyshortcuts="\/ Meta\+K Control\+K"/u);
+  assert.match(serveMain, /aria-keyshortcuts="Meta\+Enter Control\+Enter"/u);
+  assert.match(serveMain, /Cmd\+Enter/u);
+  assert.match(serveMain, /TASK_POLL_INTERVAL_MS = 10000/u);
+  assert.match(serveMain, /document\.visibilityState === "visible"/u);
 });
 
 test("serve conversation supports focus mode for wide transcript reading", async () => {

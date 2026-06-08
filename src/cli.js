@@ -209,6 +209,15 @@ function applyPreset(args, preset) {
   };
 }
 
+async function waitForServeShutdown(server) {
+  await new Promise((resolve) => {
+    const shutdown = () => resolve();
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
+  });
+  await new Promise((resolve) => server.close(resolve));
+}
+
 function parseArgs(argv) {
   const args = {
     update: false,
@@ -1669,12 +1678,13 @@ async function main() {
     return;
   }
   if (args.serve) {
-    await startServeCommand({
+    const server = await startServeCommand({
       port: args.servePort ?? undefined,
       host: args.serveHost ?? undefined,
       password: args.servePassword,
       allowSend: args.serveAllowSend ?? !args.serveReadOnly,
     });
+    await waitForServeShutdown(server);
     return;
   }
   if (args.clean) {

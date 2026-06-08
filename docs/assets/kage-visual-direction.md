@@ -36,6 +36,7 @@ The CLI visual should feel like the app icon in a running state.
 ## Current Assets
 
 - `kage-main-visual.svg`: hero visual based on the app icon.
+- `kage-logo-running.svg`: animated app-icon-sized running state.
 - `kage-cli-visual.svg`: static CLI visual derived from the app icon.
 - `kage-cli-animated.svg`: running-state CLI visual.
 - `kage-cli-ascii.txt`: plain terminal-safe ASCII mark.
