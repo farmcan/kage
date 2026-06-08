@@ -227,6 +227,7 @@ const SESSION_GROUP_INITIAL_SIZE = 80;
 const MESSAGE_WINDOW_SIZE = 420;
 const MESSAGE_WINDOW_STEP = 220;
 const DISPATCH_BOARD_BATCH_SIZE = 6;
+const TRANSCRIPT_CONNECT_FALLBACK_MS = 5000;
 const DISPATCH_BOARD_ACTIVE_TASK_STATUSES = new Set(["queued", "running"]);
 const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 const workspaceQueryParams = ["workspace", "cwd"];
@@ -1011,7 +1012,17 @@ function hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt
   );
 }
 
-function deriveConversationActivity({ selectedSession, transcript, live, sendState, error, activityUpdatedAt, now, verb }) {
+function deriveConversationActivity({ selectedSession, transcript, live, sendState, error, loadingMessage, activityUpdatedAt, now, verb }) {
+  const loadingDetail = (startedAt = activityUpdatedAt) => {
+    const waitMs = Number.isFinite(startedAt) ? Math.max(0, now - startedAt) : 0;
+    if (waitMs < 2500) {
+      return `Opening transcript stream for ${conversationAgentLabel(selectedSession?.agent, selectedSession?.agentLabel)}...`;
+    }
+    if (waitMs < 8000) {
+      return "Parsing transcript history; long sessions can take a moment on first load.";
+    }
+    return "No stream event yet. Loading latest snapshot from disk.";
+  };
   if (!selectedSession) {
     return {
       tone: "idle",
@@ -1032,7 +1043,7 @@ function deriveConversationActivity({ selectedSession, transcript, live, sendSta
     return {
       tone: "active",
       label: "Connecting to transcript stream...",
-      detail: `Reading ${conversationAgentLabel(selectedSession.agent, selectedSession.agentLabel)} session file`,
+      detail: loadingMessage || loadingDetail(),
       active: true,
       startedAt: activityUpdatedAt || now,
     };
@@ -1286,10 +1297,53 @@ async function selectSession(session, { openDetail = true } = {}) {
   });
 
   const streamPath = `/api/stream?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`;
+  const transcriptPath = `path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`;
   const stream = new EventSource(authUrl(streamPath));
   let seenFirstTranscript = false;
+  let fallbackTimer = null;
+  const clearFallback = () => {
+    if (fallbackTimer) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+  };
+  const streamFallback = async () => {
+    if (seenFirstTranscript) {
+      return;
+    }
+    const state = useStore.getState();
+    if (state.stream !== stream || state.selectedSession?.path !== session.path) {
+      return;
+    }
+    useStore.setState({
+      loadingMessage: `Reading latest ${conversationAgentLabel(session.agent, session.agentLabel)} snapshot...`,
+      activityUpdatedAt: Date.now(),
+    });
+    try {
+      const transcript = await api(`/api/transcript?${transcriptPath}`);
+      const merged = withPendingTranscriptMessages(transcript);
+      useStore.setState({
+        transcript: merged.transcript,
+        pendingTranscriptMessages: merged.pendingTranscriptMessages,
+        live: false,
+        activityUpdatedAt: Date.now(),
+        loadingMessage: "",
+      });
+    } catch {
+      if (useStore.getState().stream === stream && useStore.getState().selectedSession?.path === session.path) {
+        useStore.setState({
+          loadingMessage: `Transcript snapshot read timed out. Waiting for stream updates...`,
+          activityUpdatedAt: Date.now(),
+        });
+      }
+    }
+  };
+  fallbackTimer = setTimeout(() => {
+    void streamFallback();
+  }, TRANSCRIPT_CONNECT_FALLBACK_MS);
   useStore.setState({ stream });
   stream.addEventListener("transcript", (event) => {
+    clearFallback();
     let transcript;
     try {
       transcript = JSON.parse(event.data);
@@ -1310,8 +1364,9 @@ async function selectSession(session, { openDetail = true } = {}) {
     });
   });
   stream.addEventListener("error", async () => {
+    clearFallback();
     try {
-      const transcript = await api(`/api/transcript?path=${encodeURIComponent(session.path)}&agent=${encodeURIComponent(session.agent)}`);
+      const transcript = await api(`/api/transcript?${transcriptPath}`);
       const merged = withPendingTranscriptMessages(transcript);
       useStore.setState({ transcript: merged.transcript, pendingTranscriptMessages: merged.pendingTranscriptMessages, live: false, activityUpdatedAt: Date.now(), loadingMessage: "" });
     } catch (error) {
@@ -1612,11 +1667,11 @@ function TopBar() {
   const selectedSession = useStore((state) => state.selectedSession);
   const live = useStore((state) => state.live);
   const sendState = useStore((state) => state.sendState);
+  const loadingMessage = useStore((state) => state.loadingMessage);
   const activityUpdatedAt = useStore((state) => state.activityUpdatedAt);
   const projects = useStore((state) => state.projects);
   const workspaces = useStore((state) => state.workspaces);
   const loading = useStore((state) => state.loading);
-  const loadingMessage = useStore((state) => state.loadingMessage);
   const selectedWorkspace = useStore((state) => state.selectedWorkspace);
   const workspaceOptions = useMemo(
     () => uniqueNormalizedWorkspaces([...(projects || []), ...(workspaces || []), selectedWorkspace]),
@@ -2529,11 +2584,12 @@ function Conversation() {
         live,
         sendState,
         error,
+        loadingMessage,
         activityUpdatedAt,
         now,
         verb,
       }),
-    [selectedSession, transcript, live, sendState, error, activityUpdatedAt, now, verb],
+    [selectedSession, transcript, live, sendState, error, loadingMessage, activityUpdatedAt, now, verb],
   );
   const transcriptIndex = useTranscriptIndex(transcript);
   const stats = transcriptIndex.counts;
@@ -2771,15 +2827,19 @@ function TaskBoardPanel() {
 function TaskCard({ task, now, active, onSelect }) {
   const verb = useRotatingVerb(task.status === "running");
   const age = elapsedLabel(Date.parse(task.createdAt || 0), now);
-  const lastLog = task.logs?.[task.logs.length - 1] || task.error || task.stdout || "Waiting for activity.";
+  const rawLastLog = task.logs?.[task.logs.length - 1] || task.error || task.stdout || "Waiting for activity.";
+  const lastLog = useMemo(() => {
+    const value = String(rawLastLog || "").trim().replace(/\s+/gu, " ");
+    return value.length > 240 ? `${value.slice(0, 236)}…` : value;
+  }, [rawLastLog]);
   return (
     <button type="button" className={cls("task-card", task.status, active && "active")} style={agentColorStyle(task.agent)} onClick={onSelect}>
       <div className="task-card-top">
         <AgentBadge agent={task.agent} label={task.agentLabel} />
         <span>{age || compactDate(task.createdAt)}</span>
       </div>
-      <strong>{task.title || "Untitled task"}</strong>
-      <p>{lastLog}</p>
+      <strong title={task.title || "Untitled task"}>{task.title || "Untitled task"}</strong>
+      <p title={rawLastLog}>{lastLog}</p>
       <div className="task-progress" aria-label={`Progress ${task.progress || 0}%`}>
         <span style={{ width: `${Math.max(0, Math.min(100, task.progress || 0))}%` }} />
       </div>
