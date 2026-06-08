@@ -1051,7 +1051,27 @@ function hasLogoActivity({ sendState, tasks, transcript, live, activityUpdatedAt
   );
 }
 
-function deriveConversationActivity({ selectedSession, transcript, live, sendState, error, loadingMessage, activityUpdatedAt, now, verb }) {
+function sessionTaskTargetKey(session) {
+  if (!session?.agent || !session?.sessionId) {
+    return "";
+  }
+  return `${session.agent}:session:${session.sessionId}`;
+}
+
+function activeTaskForSession(tasks, session) {
+  const targetKey = sessionTaskTargetKey(session);
+  if (!targetKey) {
+    return null;
+  }
+  return (tasks || []).find((task) => task?.targetKey === targetKey && DISPATCH_BOARD_ACTIVE_TASK_STATUSES.has(task?.status)) || null;
+}
+
+function taskActivityStartedAt(task, fallback) {
+  const startedAt = Date.parse(task?.startedAt || task?.createdAt || "");
+  return Number.isNaN(startedAt) ? fallback : startedAt;
+}
+
+function deriveConversationActivity({ selectedSession, transcript, live, activeTask, sendState, error, loadingMessage, activityUpdatedAt, now, verb }) {
   const loadingDetail = (startedAt = activityUpdatedAt) => {
     const waitMs = Number.isFinite(startedAt) ? Math.max(0, now - startedAt) : 0;
     if (waitMs < 2500) {
@@ -1110,6 +1130,18 @@ function deriveConversationActivity({ selectedSession, transcript, live, sendSta
       detail: "Handing your prompt to the local CLI in the background.",
       active: true,
       startedAt: activityUpdatedAt || now,
+    };
+  }
+  if (activeTask) {
+    const startedAt = taskActivityStartedAt(activeTask, activityUpdatedAt || now);
+    return {
+      tone: "active",
+      label: activeTask.status === "queued" ? "Prompt queued..." : "Agent is running...",
+      detail: activeTask.status === "queued"
+        ? "Waiting for the local CLI worker to pick up this conversation."
+        : "The local CLI is still working; the transcript will update when the reply lands.",
+      active: true,
+      startedAt,
     };
   }
 
@@ -2696,6 +2728,7 @@ function AgentBadge({ agent, label }) {
 function Conversation() {
   const selectedSession = useStore((state) => state.selectedSession);
   const transcript = useStore((state) => state.transcript);
+  const tasks = useStore((state) => state.tasks);
   const messageFilter = useStore((state) => state.messageFilter);
   const setMessageFilter = useStore((state) => state.setMessageFilter);
   const live = useStore((state) => state.live);
@@ -2707,17 +2740,25 @@ function Conversation() {
   const setConversationFullscreen = useStore((state) => state.setConversationFullscreen);
   const [swipeBackReady, setSwipeBackReady] = useState(false);
   const swipeBackRef = useRef(null);
+  const activeTask = useMemo(() => activeTaskForSession(tasks, selectedSession), [tasks, selectedSession]);
   const now = useIntervalNow(
-    Boolean(selectedSession && live && activityUpdatedAt && Date.now() - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS),
+    Boolean(
+      selectedSession
+      && (
+        activeTask
+        || (live && activityUpdatedAt && Date.now() - activityUpdatedAt < ACTIVITY_IDLE_AFTER_MS)
+      ),
+    ),
     1000,
   );
-  const verb = useRotatingVerb(Boolean(selectedSession && live));
+  const verb = useRotatingVerb(Boolean(selectedSession && (live || activeTask)));
   const activity = useMemo(
     () =>
       deriveConversationActivity({
         selectedSession,
         transcript,
         live,
+        activeTask,
         sendState,
         error,
         loadingMessage,
@@ -2725,7 +2766,7 @@ function Conversation() {
         now,
         verb,
       }),
-    [selectedSession, transcript, live, sendState, error, loadingMessage, activityUpdatedAt, now, verb],
+    [selectedSession, transcript, live, activeTask, sendState, error, loadingMessage, activityUpdatedAt, now, verb],
   );
   const transcriptIndex = useTranscriptIndex(transcript);
   const stats = transcriptIndex.counts;

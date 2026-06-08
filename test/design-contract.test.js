@@ -95,8 +95,11 @@ test("serve mobile dispatch is a collapsed bottom sheet", async () => {
   assert.match(serveMain, /className="mobile-dispatch-fab"/u);
   assert.match(serveMain, /className="mobile-dispatch-backdrop"/u);
   assert.match(serveMain, /<DispatchPanel mobileOpen=\{mobileDispatchOpen\}/u);
+  assert.match(serveMain, /className=\{cls\("app-shell", isMobileLayout && "mock-mobile"\)\}/u);
   assert.match(serveStyles, /\.mobile-dispatch-fab/u);
   assert.match(serveStyles, /\.dispatch-panel\.mobile-open/u);
+  assert.match(serveStyles, /\.app-shell\.mock-mobile \.topbar/u);
+  assert.doesNotMatch(serveStyles, /@media \(max-width: (?:900|520)px\)/u);
   assert.doesNotMatch(serveStyles, /@media \(max-width: 900px\)[\s\S]*?\.dispatch-panel\s*\{\s*order:\s*1;/u);
   assert.doesNotMatch(serveStyles, /\.app-shell\.mock-mobile \.dispatch-panel\s*\{\s*order:\s*1;/u);
 });
