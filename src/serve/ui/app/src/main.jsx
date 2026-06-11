@@ -137,6 +137,24 @@ function matchMediaMatches(query) {
   return window.matchMedia(query).matches;
 }
 
+function canReplyToSession(session) {
+  if (!session || !sendAgents.includes(session.agent) || !String(session.sessionId || "").trim()) {
+    return false;
+  }
+  if (session.agent === "qodercli" && session.sessionId === "later" && Number(session.messageCount || 0) === 0) {
+    return false;
+  }
+  return true;
+}
+
+function replyUnavailableReason(session) {
+  if (!session) return "Select a resumable session to reply.";
+  if (!sendAgents.includes(session.agent)) return `${agentMeta[session.agent]?.label || session.agent || "This agent"} is read-only here.`;
+  if (!String(session.sessionId || "").trim()) return "This transcript has no resumable session id; New will start from cwd.";
+  if (session.agent === "qodercli" && session.sessionId === "later" && Number(session.messageCount || 0) === 0) return "This transcript uses a placeholder session id; New will start from cwd.";
+  return "";
+}
+
 function useMobileLayout() {
   const [isMobileLayout, setIsMobileLayout] = useState(() => forceMockMobile || matchMediaMatches(MOBILE_QUERY));
 
@@ -233,6 +251,7 @@ const TRANSCRIPT_RECONNECT_BASE_MS = 2500;
 const TRANSCRIPT_RECONNECT_MAX_MS = 20000;
 const TASK_POLL_INTERVAL_MS = 10000;
 const DISPATCH_BOARD_ACTIVE_TASK_STATUSES = new Set(["queued", "running"]);
+const TASK_TERMINAL_STATUSES = new Set(["completed", "failed", "needs_review"]);
 const ALL_WORKSPACES_VALUE = "__all_workspaces__";
 const workspaceQueryParams = ["workspace", "cwd"];
 const sessionQueryParams = ["session", "path"];
@@ -643,6 +662,19 @@ async function loadTasks({ silent = false } = {}) {
   }
 }
 
+async function waitForTaskTerminal(taskId, { timeoutMs = 2 * 60 * 1000, pollMs = 1200 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, pollMs));
+    const tasks = await loadTasks({ silent: true });
+    const task = tasks.find((item) => item.id === taskId);
+    if (task && TASK_TERMINAL_STATUSES.has(task.status)) {
+      return task;
+    }
+  }
+  return null;
+}
+
 function addPendingTranscriptMessage(message) {
   const normalizedMessage = message && typeof message === "object" ? message : { text: String(message ?? "") };
   const content = typeof normalizedMessage.text === "string" ? normalizedMessage.text : JSON.stringify(normalizedMessage);
@@ -741,7 +773,7 @@ function clearLocalSendErrors() {
   });
 }
 
-function dropPendingMessage(messageId, { withError = false } = {}) {
+function dropPendingMessage(messageId, { withError = false, errorText = "" } = {}) {
   const state = useStore.getState();
   if (!state.transcript || !messageId) {
     return;
@@ -754,7 +786,7 @@ function dropPendingMessage(messageId, { withError = false } = {}) {
         {
           id: `pending-error-${messageId}`,
           role: "system",
-          blocks: [{ type: "text", content: "Previous send did not complete; please retry." }],
+          blocks: [{ type: "text", content: errorText || "Previous send did not complete; please retry." }],
           _localSendError: true,
         },
       ]
@@ -765,7 +797,7 @@ function dropPendingMessage(messageId, { withError = false } = {}) {
       messages: finalMessages,
     },
     pendingTranscriptMessages,
-    error: withError ? "Send failed; your draft has not been sent." : state.error,
+    error: withError ? (errorText || "Send failed; your draft has not been sent.") : state.error,
   });
   if (withError) {
     window.setTimeout(() => {
@@ -807,6 +839,37 @@ function normalizeSession(session) {
     _groupKey: normalizeWorkspace(session?.cwd) || session?.path || "unassigned",
     _searchText: buildSessionSearchText(session),
   };
+}
+
+function fallbackAgentFromSessionPath(sessionPath = "") {
+  const lowerPath = String(sessionPath).toLowerCase();
+  if (lowerPath.includes("/.claude/")) return "claude";
+  if (lowerPath.includes("qoder")) return "qodercli";
+  return "codex";
+}
+
+function fileStem(filePath = "") {
+  return String(filePath).split(/[\\/]/u).pop()?.replace(/\.jsonl$/u, "") || "";
+}
+
+function sessionFromTranscript(transcript, fallbackPath) {
+  const path = transcript?.path || fallbackPath;
+  const agent = transcript?.agent || fallbackAgentFromSessionPath(path);
+  const transcriptSessionId = String(transcript?.sessionId || "").trim();
+  const pathSessionId = fileStem(path);
+  const sessionId = transcriptSessionId || pathSessionId || "";
+  return normalizeSession({
+    agent,
+    agentLabel: transcript?.agentLabel || agent,
+    path,
+    sessionPath: path,
+    sessionId,
+    title: transcript?.title || null,
+    shortTitle: transcript?.title || sessionId || fileStem(path),
+    updatedAt: transcript?.updatedAt || new Date().toISOString(),
+    cwd: transcript?.cwd || "",
+    messageCount: Array.isArray(transcript?.messages) ? transcript.messages.length : 0,
+  });
 }
 
 function shellQuote(value) {
@@ -1318,13 +1381,28 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       ...validProjects,
       selectedWorkspace,
     ]);
-    const preferredPath = sessionPathFromQuery() || previousState.selectedPath || "";
+    const queryPath = sessionPathFromQuery();
+    const preferredPath = queryPath || previousState.selectedPath || "";
     const restoredSession = preferredPath ? sessions.find((session) => session.path === preferredPath) : null;
     const preservedSession = preserveSelection && previousState.selectedPath
       ? sessions.find((session) => session.path === previousState.selectedPath) || null
       : null;
-    const selectedSession = restoredSession || preservedSession;
+    let directSession = null;
+    if (queryPath && !restoredSession) {
+      try {
+        const transcriptPath = new URLSearchParams({ path: queryPath });
+        const transcript = await api(`/api/transcript?${transcriptPath}`, { timeoutMs: TRANSCRIPT_SNAPSHOT_TIMEOUT_MS });
+        directSession = sessionFromTranscript(transcript, queryPath);
+      } catch {
+        directSession = null;
+      }
+    }
+    const selectedSession = restoredSession || directSession || preservedSession;
     const selectedPath = selectedSession ? selectedSession.path : null;
+    const shouldOpenDetail = Boolean(selectedSession && (queryPath || previousState.detailOpen));
+    const stateSessions = directSession && !sessions.some((session) => session.path === directSession.path)
+      ? [directSession, ...sessions]
+      : sessions;
     const keepCurrentStream = Boolean(
       selectedSession
       && preserveSelection
@@ -1332,7 +1410,7 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       && previousState.stream,
     );
     useStore.setState({
-      sessions,
+      sessions: stateSessions,
       agents: data.agents || [],
       cwd: data.cwd,
       workspaces: validProjects,
@@ -1344,10 +1422,11 @@ async function loadSessions({ preserveSelection = false, silentLoading = false, 
       loading: false,
       loadingMessage: "",
       error: "",
+      detailOpen: keepCurrentStream ? shouldOpenDetail : previousState.detailOpen,
     });
 
     if (selectedSession && !keepCurrentStream) {
-      await selectSession(selectedSession, { openDetail: false });
+      await selectSession(selectedSession, { openDetail: shouldOpenDetail });
     }
   } catch (error) {
     useStore.setState({ loading: false, loadingMessage: "", error: error.message });
@@ -1415,13 +1494,14 @@ async function selectSession(session, { openDetail = true } = {}) {
     if (!isCurrentStream()) return;
     const delay = Math.min(TRANSCRIPT_RECONNECT_MAX_MS, TRANSCRIPT_RECONNECT_BASE_MS * (2 ** reconnectAttempt));
     reconnectAttempt += 1;
+    const keepDetailOpen = useStore.getState().detailOpen;
     useStore.setState({
       loadingMessage: `Transcript stream disconnected. Reconnecting in ${Math.ceil(delay / 1000)}s...`,
       activityUpdatedAt: Date.now(),
     });
     reconnectTimer = window.setTimeout(() => {
       if (isCurrentStream()) {
-        void selectSession(session, { openDetail: false });
+        void selectSession(session, { openDetail: keepDetailOpen });
       }
     }, delay);
   };
@@ -1505,6 +1585,25 @@ async function selectSession(session, { openDetail = true } = {}) {
       loadingMessage: "",
     });
   });
+  stream.addEventListener("transcript-error", (event) => {
+    clearFallback();
+    let detail = "The session file is still being written; waiting for the next clean transcript update.";
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload?.error) {
+        detail = `Transcript is updating: ${payload.error}`;
+      }
+    } catch {
+      // Keep the generic detail.
+    }
+    if (isCurrentStream()) {
+      useStore.setState({
+        live: true,
+        loadingMessage: detail,
+        activityUpdatedAt: Date.now(),
+      });
+    }
+  });
   stream.addEventListener("error", async () => {
     clearFallback();
     clearReconnect();
@@ -1512,7 +1611,7 @@ async function selectSession(session, { openDetail = true } = {}) {
       stream.close();
     }
     try {
-      const transcript = await api(`/api/transcript?${transcriptPath}`);
+      const transcript = await api(`/api/transcript?${transcriptPath}`, { timeoutMs: TRANSCRIPT_SNAPSHOT_TIMEOUT_MS });
       const merged = withPendingTranscriptMessages(transcript);
       useStore.setState({ transcript: merged.transcript, pendingTranscriptMessages: merged.pendingTranscriptMessages, live: false, activityUpdatedAt: Date.now() });
     } catch (error) {
@@ -2200,18 +2299,26 @@ const SessionListItem = memo(function SessionListItem({
   activityLabel,
   now = Date.now(),
   onSelectSession,
+  onSendToSession,
 }) {
   const updates = formatRelativeTime(session?.updatedAt, now);
   const turnCount = sessionTurnCount(session);
   const turnText = turnCount === 1 ? "1 turn" : `${turnCount} turns`;
   const searchMatch = session?._searchMatch;
+  const canSend = config.sendEnabled && canReplyToSession(session);
   return (
-    <button
+    <article
       className={cls("session-card", isActive && "active", isFocused && "focused", isSelected && "selected", isStreaming && "streaming")}
       style={agentColorStyle(session.agent)}
-      type="button"
+      role="button"
+      tabIndex={0}
       aria-selected={isSelected || isActive}
       onClick={(event) => onSelectSession(session, event)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelectSession(session, event);
+      }}
     >
       <AgentBadge agent={session.agent} label={session.agentLabel} />
       <strong>{sessionDisplayTitle(session)}</strong>
@@ -2235,7 +2342,21 @@ const SessionListItem = memo(function SessionListItem({
         </small>
       )}
       {lineageLabel(session) && <small>{lineageLabel(session)}</small>}
-    </button>
+      {canSend && (
+        <div className="session-card-actions" onClick={(event) => event.stopPropagation()}>
+          <button
+            type="button"
+            className="session-card-action primary"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSendToSession(session);
+            }}
+          >
+            Send
+          </button>
+        </div>
+      )}
+    </article>
   );
 });
 
@@ -2251,6 +2372,7 @@ const SessionListGroup = memo(function SessionListGroup({
   onToggleGroup,
   onLoadMore,
   onSelectSession,
+  onSendToSession,
   now,
 }) {
   const visibleSessions = useMemo(() => group.sessions.slice(0, visibleCount), [group.sessions, visibleCount]);
@@ -2284,6 +2406,7 @@ const SessionListGroup = memo(function SessionListGroup({
             activityLabel={activityLabel}
             now={now}
             onSelectSession={onSelectSession}
+            onSendToSession={onSendToSession}
           />
         ))}
       {!isCollapsed && hasMore && (
@@ -2365,6 +2488,23 @@ function SessionList({ sessions }) {
     syncSessionToUrl(session?.path || "");
     selectSession(session);
   }, []);
+
+  const focusComposer = useCallback(() => {
+    window.setTimeout(() => {
+      const composerInput = document.querySelector(".conversation-composer textarea");
+      composerInput?.scrollIntoView({ block: "nearest" });
+      composerInput?.focus();
+    }, 0);
+  }, []);
+
+  const sendToSession = useCallback((session) => {
+    if (!session?.path) return;
+    setSelectedSessionPaths([]);
+    setSelectionAnchorPath(session.path);
+    setFocusedSessionPath(session.path);
+    void selectSession(session, { openDetail: true });
+    focusComposer();
+  }, [focusComposer]);
 
   const handleSelectSession = useCallback((session, event) => {
     if (!session?.path) return;
@@ -2673,6 +2813,7 @@ function SessionList({ sessions }) {
             onToggleGroup={toggleGroup}
             onLoadMore={loadMoreSessions}
             onSelectSession={handleSelectSession}
+            onSendToSession={sendToSession}
             now={now}
           />
         );
@@ -3747,7 +3888,8 @@ function Composer({ session, compact = false, allowReply = true }) {
   const rootCwd = useStore((state) => state.cwd);
   const sessions = useStore((state) => state.sessions);
   const selectedPath = useStore((state) => state.selectedPath);
-  const canReply = Boolean(allowReply && session && sendAgents.includes(session.agent));
+  const canReply = Boolean(allowReply && canReplyToSession(session));
+  const replyReason = replyUnavailableReason(session);
   const effectiveMode = mode === "reply" && canReply && replySessionPath === session?.path ? "reply" : "new";
   const effectiveAgent = effectiveMode === "reply" ? session.agent : targetAgent;
   const effectiveCwd = (targetCwd.trim() || session?.cwd || rootCwd || ".").trim();
@@ -3764,12 +3906,16 @@ function Composer({ session, compact = false, allowReply = true }) {
       setTargetAgent(session?.agent || "codex");
       return;
     }
-    if (!session?.agent || !sendAgents.includes(session.agent)) {
-      setTargetAgent("codex");
-      setMode("new");
-      setReplySessionPath(null);
+    if (canReplyToSession(session)) {
+      setMode("reply");
+      setReplySessionPath(session.path);
+      setTargetAgent(session.agent);
+      return;
     }
-  }, [session?.path, session?.agent, session?.cwd, rootCwd, allowReply]);
+    setTargetAgent(session?.agent && sendAgents.includes(session.agent) ? session.agent : "codex");
+    setMode("new");
+    setReplySessionPath(null);
+  }, [session?.path, session?.agent, session?.sessionId, session?.cwd, rootCwd, allowReply]);
 
   useEffect(() => {
     autoGrowTextarea(textareaRef.current);
@@ -3798,6 +3944,10 @@ function Composer({ session, compact = false, allowReply = true }) {
 
   async function selectReplyTarget(nextSession) {
     if (!allowReply) return;
+    if (!canReplyToSession(nextSession)) {
+      useStore.getState().showToast(replyUnavailableReason(nextSession));
+      return;
+    }
     setMode("reply");
     setReplySessionPath(nextSession.path);
     setTargetAgent(nextSession.agent);
@@ -3831,6 +3981,28 @@ function Composer({ session, compact = false, allowReply = true }) {
     }
   }
 
+  async function watchQueuedSendTask(taskId, { pendingId, message, submittedMode = "new", previousPaths = null } = {}) {
+    const task = await waitForTaskTerminal(taskId);
+    if (!task) return;
+    useStore.getState().upsertTask(task);
+    if (task.status === "failed") {
+      const errorText = compactTaskText(task.error || task.stderr || "Send failed.", { stripNoise: true, maxChars: 220 });
+      if (pendingId) {
+        dropPendingMessage(pendingId, { withError: true, errorText });
+      }
+      setDraft((current) => current || message || "");
+      useStore.getState().showToast(errorText);
+      return;
+    }
+    if (task.status === "needs_review") {
+      useStore.getState().showToast("Task needs review");
+    }
+    if (!compact && submittedMode === "new" && previousPaths && task.agent && task.cwd) {
+      await jumpToNewSession(task.agent, task.cwd, task.createdAt, previousPaths);
+    }
+    void loadSessions({ preserveSelection: true, silentLoading: true });
+  }
+
   async function submit(event) {
     event.preventDefault();
     const message = draft.trim();
@@ -3859,7 +4031,9 @@ function Composer({ session, compact = false, allowReply = true }) {
     submittingRef.current = true;
     useStore.setState({ sendState: "sending", activityUpdatedAt: Date.now() });
     setDraft("");
-    const pendingId = effectiveMode === "reply" && sessionId ? addPendingTranscriptMessage(message) : null;
+    const submittedMode = payload.sessionId ? "reply" : "new";
+    const previousPaths = submittedMode === "new" ? new Set(useStore.getState().sessions.map((item) => item.path)) : null;
+    const pendingId = submittedMode === "reply" ? addPendingTranscriptMessage(message) : null;
     (async () => {
       try {
         const result = await api("/api/send", {
@@ -3870,13 +4044,13 @@ function Composer({ session, compact = false, allowReply = true }) {
         clearLocalSendErrors();
         if (result.task) {
           useStore.getState().upsertTask(result.task);
-          useStore.getState().showToast(effectiveMode === "reply" ? "Reply queued" : "New session queued");
-          if (!compact && !allowReply && effectiveMode === "new" && result.task.agent && result.task.cwd) {
-            const previousPaths = new Set(useStore.getState().sessions.map((item) => item.path));
+          useStore.getState().showToast(submittedMode === "reply" ? "Reply queued" : "New session queued");
+          void watchQueuedSendTask(result.task.id, { pendingId, message, submittedMode, previousPaths });
+          if (!compact && submittedMode === "new" && result.task.agent && result.task.cwd && previousPaths) {
             void jumpToNewSession(result.task.agent, result.task.cwd, result.task.createdAt, previousPaths);
           }
         } else {
-          useStore.getState().showToast(effectiveMode === "reply" ? "Prompt sent" : "New session prompt sent");
+          useStore.getState().showToast(submittedMode === "reply" ? "Prompt sent" : "New session prompt sent");
         }
         void loadSessions({
           preserveSelection: true,
@@ -3888,7 +4062,7 @@ function Composer({ session, compact = false, allowReply = true }) {
       } catch (error) {
         setDraft((current) => current || message);
         if (pendingId) {
-          dropPendingMessage(pendingId, { withError: true });
+          dropPendingMessage(pendingId, { withError: true, errorText: error.message });
         }
         useStore.getState().showToast(error.message);
       } finally {
@@ -3928,7 +4102,7 @@ function Composer({ session, compact = false, allowReply = true }) {
       <div className="composer-head">
         <div>
           <strong>Send a prompt</strong>
-          <span>{effectiveMode === "reply" ? `Replying to ${agentMeta[effectiveAgent]?.label || effectiveAgent}` : "Start a new agent session"}</span>
+          <span>{effectiveMode === "reply" ? `Replying to ${agentMeta[effectiveAgent]?.label || effectiveAgent}` : replyReason || "Start a new agent session"}</span>
         </div>
         {allowReply ? (
           <Tabs.Root value={effectiveMode} onValueChange={chooseMode}>
@@ -3972,7 +4146,7 @@ function Composer({ session, compact = false, allowReply = true }) {
                   Restart without <code>--read-only</code> for direct send
                 </span>
               )}
-            <button type="button" onClick={() => copyText(resumeCommand(session), "Resume command copied")} disabled={!session}>
+            <button type="button" onClick={() => copyText(resumeCommand(session), "Resume command copied")} disabled={!canReplyToSession(session)}>
               <Copy size={15} />
               Copy resume
             </button>
@@ -4079,6 +4253,7 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
         const query = (agentSearchByAgent[agent] || "").trim().toLowerCase();
         const allAgentSessions = sessions
           .filter((session) => session.agent === agent)
+          .filter(canReplyToSession)
           .sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0))
           .filter((session) => !query || sessionDispatchSearchText(session).includes(query));
         const visibleCount = Math.max(DISPATCH_BOARD_BATCH_SIZE, agentVisibleByAgent[agent] || DISPATCH_BOARD_BATCH_SIZE);

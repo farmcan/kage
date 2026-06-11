@@ -26,7 +26,7 @@ export function parse(items, sessionPath, agent) {
         return null;
       }
 
-      return { role, text };
+      return { role, text, timestamp: item.timestamp ?? null };
     })
     .filter(Boolean);
 

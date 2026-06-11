@@ -488,8 +488,15 @@ test("renderClaudeResumeExport converts a Codex transcript", async () => {
   assert.equal(exported.sessionId, "11111111-2222-4333-8444-555555555555");
   assert.equal(exported.fileName, "11111111-2222-4333-8444-555555555555.jsonl");
   const lines = exported.content.trim().split("\n").map((line) => JSON.parse(line));
-  assert.equal(lines[0].type, "file-history-snapshot");
-  assert.equal(lines[1].type, "user");
+  assert.equal(lines[0].type, "mode");
+  assert.equal(lines[0].mode, "normal");
+  assert.equal(lines[1].type, "permission-mode");
+  assert.equal(lines[1].permissionMode, "bypassPermissions");
+  assert.equal(lines[2].type, "file-history-snapshot");
+  const userRow = lines.find((line) => line.type === "user");
+  assert.match(userRow.uuid, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  assert.match(userRow.promptId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  assert.equal(userRow.permissionMode, "bypassPermissions");
 });
 
 test("exportSession renders qodercli -> codex", async () => {
@@ -2827,6 +2834,15 @@ test("cli supports c2c as a Claude fork export", async () => {
   assert.equal(lineage.childAgent, "claude");
   assert.equal(lineage.childSessionId, payload.sessionId);
   assert.equal(lineage.childSessionPath, payload.outputPath);
+  const exportedRows = (await fs.readFile(payload.outputPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+  const exportedMessageRows = exportedRows.filter((line) => line.type === "user" || line.type === "assistant");
+  const exportedUserRows = exportedRows.filter((line) => line.type === "user");
+  assert.deepEqual(exportedRows.slice(0, 3).map((line) => line.type), ["mode", "permission-mode", "file-history-snapshot"]);
+  assert.equal(exportedRows[1].permissionMode, "bypassPermissions");
+  assert.ok(exportedMessageRows.every((line) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line.uuid)));
+  assert.ok(exportedUserRows.every((line) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line.promptId)));
+  assert.ok(exportedUserRows.every((line) => line.permissionMode === "bypassPermissions"));
+  assert.equal(exportedUserRows[0].timestamp, "2026-03-20T09:00:00.000Z");
   assert.deepEqual(payload.hints, [
     "Claude Code supports native forks now: cd /workspace/claude-demo && claude --resume claude-session --fork-session",
     "Inside Claude Code, use /branch; /fork is an alias.",

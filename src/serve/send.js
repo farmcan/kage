@@ -18,6 +18,28 @@ function optionalText(value) {
   return text || null;
 }
 
+function agentLabel(agent) {
+  if (agent === "qodercli") return "QoderCLI";
+  if (agent === "codex") return "Codex";
+  if (agent === "claude") return "Claude";
+  return agent;
+}
+
+export function validateAgentSendInput(input = {}) {
+  const normalizedAgent = requireText(input.agent, "agent");
+  if (!supportedSendAgents.has(normalizedAgent)) {
+    throw new Error(normalizedAgent === "qoderwork" ? "QoderWork is read-only in kage serve" : `Unsupported send agent: ${normalizedAgent}`);
+  }
+
+  const normalizedSessionId = optionalText(input.sessionId);
+  const normalizedMessage = requireText(input.message, "message");
+  if (normalizedAgent === "qodercli" && normalizedSessionId === "later") {
+    throw new Error(`${agentLabel(normalizedAgent)} reply requires a real session id; "${normalizedSessionId}" looks like a placeholder. Use New to start from cwd or choose a resumable session.`);
+  }
+
+  return { normalizedAgent, normalizedSessionId, normalizedMessage };
+}
+
 function existingCwd(cwd, fallback) {
   const candidate = cwd || fallback;
   try {
@@ -51,13 +73,7 @@ function sendErrorMessage(commandPlan, { code, signal, stdout, stderr, timedOut,
 }
 
 export function buildAgentSendCommand({ agent, sessionId, cwd, message, fallbackCwd = process.cwd() } = {}) {
-  const normalizedAgent = requireText(agent, "agent");
-  if (!supportedSendAgents.has(normalizedAgent)) {
-    throw new Error(normalizedAgent === "qoderwork" ? "QoderWork is read-only in kage serve" : `Unsupported send agent: ${normalizedAgent}`);
-  }
-
-  const normalizedSessionId = optionalText(sessionId);
-  const normalizedMessage = requireText(message, "message");
+  const { normalizedAgent, normalizedSessionId, normalizedMessage } = validateAgentSendInput({ agent, sessionId, message });
   const workingDirectory = existingCwd(cwd, fallbackCwd);
   const target = normalizedSessionId ? "session" : "new";
 

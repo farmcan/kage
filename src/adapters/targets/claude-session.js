@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 function toClaudeProjectKey(cwd) {
@@ -15,6 +16,18 @@ function toClaudeMessageContent(message) {
   return message.text;
 }
 
+function timestampWithOffset(timestamp, index) {
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) {
+    return timestamp;
+  }
+  return new Date(parsed + index * 1000).toISOString();
+}
+
+function messageTimestamp(message, exportedTimestamp, index) {
+  return message.timestamp ?? timestampWithOffset(exportedTimestamp, index);
+}
+
 export function renderClaudeSessionExport({
   session,
   sessionId,
@@ -23,11 +36,14 @@ export function renderClaudeSessionExport({
 }) {
   const exportedSessionId = sessionId ?? session.sessionId;
   const exportedTimestamp = timestamp ?? session.updatedAt ?? new Date().toISOString();
+  const permissionMode = "bypassPermissions";
   const projectKey = toClaudeProjectKey(session.cwd);
   const fileName = `${exportedSessionId}.jsonl`;
+  let previousUuid = null;
   const baseRows = session.messages.map((message, index) => {
-    const uuid = `m${index + 1}`;
-    const parentUuid = index === 0 ? null : `m${index}`;
+    const uuid = randomUUID();
+    const parentUuid = previousUuid;
+    previousUuid = uuid;
     if (message.role === "assistant") {
       return {
         parentUuid,
@@ -40,7 +56,7 @@ export function renderClaudeSessionExport({
         },
         type: "assistant",
         uuid,
-        timestamp: exportedTimestamp,
+        timestamp: messageTimestamp(message, exportedTimestamp, index),
         cwd: session.cwd,
         sessionId: exportedSessionId,
         version,
@@ -56,15 +72,28 @@ export function renderClaudeSessionExport({
         content: toClaudeMessageContent(message),
       },
       uuid,
-      timestamp: exportedTimestamp,
+      timestamp: messageTimestamp(message, exportedTimestamp, index),
       cwd: session.cwd,
       sessionId: exportedSessionId,
       version,
+      promptId: randomUUID(),
+      permissionMode,
     };
   });
 
   const firstUserRow = baseRows.find((row) => row.type === "user");
-  const rows = [];
+  const rows = [
+    {
+      type: "mode",
+      mode: "normal",
+      sessionId: exportedSessionId,
+    },
+    {
+      type: "permission-mode",
+      permissionMode,
+      sessionId: exportedSessionId,
+    },
+  ];
   if (firstUserRow) {
     rows.push({
       type: "file-history-snapshot",
@@ -72,7 +101,7 @@ export function renderClaudeSessionExport({
       snapshot: {
         messageId: firstUserRow.uuid,
         trackedFileBackups: {},
-        timestamp: exportedTimestamp,
+        timestamp: firstUserRow.timestamp,
       },
       isSnapshotUpdate: false,
     });

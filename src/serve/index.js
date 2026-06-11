@@ -9,7 +9,7 @@ import { readSessionCwd } from "../adapters/sources/index.js";
 import { walk } from "../core/files.js";
 import { searchSessions } from "../core/search.js";
 import { readTranscript, resolveTranscriptPathWithin } from "./transcript.js";
-import { runAgentSend } from "./send.js";
+import { runAgentSend, validateAgentSendInput } from "./send.js";
 import { renderServeManifest, renderServeServiceWorker, renderServeUi } from "./ui/index.js";
 
 const defaultPort = 9876;
@@ -917,6 +917,12 @@ async function handleSend(request, response, options) {
     jsonResponse(response, 400, { error: "Message is too long; keep it under 16000 characters." });
     return;
   }
+  try {
+    validateAgentSendInput({ ...body, agent: normalizedAgent, message: normalizedMessage });
+  } catch (error) {
+    jsonResponse(response, 400, { mode: "send", status: "failed", error: error.message });
+    return;
+  }
   const targetKey = sendTargetKey(body, options.cwd);
   if (options.sendInflight.has(targetKey)) {
     jsonResponse(response, 409, {
@@ -1006,7 +1012,7 @@ async function handleStream(response, url, options) {
       }
     } catch (error) {
       if (!closed) {
-        response.write(`event: error\n`);
+        response.write(`event: transcript-error\n`);
         response.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       }
     } finally {
