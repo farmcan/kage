@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { formatAgentName, getDefaultRoot, supportedAgents } from "./core/agents.js";
@@ -1115,6 +1116,7 @@ export async function chooseSessionCandidate(
   candidates,
   {
     isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    input = process.stdin,
     output = process.stderr,
     prompt = null,
   } = {},
@@ -1140,50 +1142,52 @@ export async function chooseSessionCandidate(
   output.write(`Multiple ${agentLabel} sessions match the current directory:\n`);
   output.write(`\n${formatSessionCandidates(displayCandidates)}\n`);
 
+  let readlineInterface = null;
+  let lineIterator = null;
   const readAnswer = prompt ?? (async (promptText) => {
     output.write(promptText);
-    const chunks = [];
-    for await (const chunk of process.stdin) {
-      chunks.push(chunk);
-      if (String(chunk).includes("\n")) {
-        break;
-      }
-    }
-    return chunks.join("").trim();
+    readlineInterface ??= createInterface({ input, crlfDelay: Infinity });
+    lineIterator ??= readlineInterface[Symbol.asyncIterator]();
+    const line = await lineIterator.next();
+    return line.done ? "" : line.value;
   });
 
-  while (true) {
-    const answer = String(await readAnswer(`Select a session, or run an action (dd <n>) [1-${displayCandidates.length}]: `)).trim();
-    const archiveMatch = answer.match(/^dd\s+(\d+)$/iu);
-    if (archiveMatch) {
-      const archiveIndex = Number(archiveMatch[1]);
-      if (!Number.isInteger(archiveIndex) || archiveIndex < 1 || archiveIndex > displayCandidates.length) {
-        output.write(`Invalid archive selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
+  try {
+    while (true) {
+      const answer = String(await readAnswer(`Select a session, or run an action (dd <n>) [1-${displayCandidates.length}]: `)).trim();
+      const archiveMatch = answer.match(/^dd\s+(\d+)$/iu);
+      if (archiveMatch) {
+        const archiveIndex = Number(archiveMatch[1]);
+        if (!Number.isInteger(archiveIndex) || archiveIndex < 1 || archiveIndex > displayCandidates.length) {
+          output.write(`Invalid archive selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
+          continue;
+        }
+        const candidate = displayCandidates[archiveIndex - 1];
+        const plan = await buildSessionArchivePlan(candidate);
+        const confirmation = String(await readAnswer(formatArchivePreview(plan, candidate, archiveIndex))).trim().toLowerCase();
+        if (confirmation !== "y") {
+          output.write("Archive cancelled.\n");
+          continue;
+        }
+        await archiveSessionWithPlan(plan);
+        output.write(`Archived ${candidate.sessionId} to ${plan.archivedPath}\n`);
+        remainingCandidates = remainingCandidates.filter((item) => item.sessionPath !== candidate.sessionPath);
+        if (remainingCandidates.length === 0) {
+          throw new Error(`No ${agentLabel} session candidates remain after archive.`);
+        }
+        displayCandidates = sortSessionCandidatesForDisplay(remainingCandidates);
+        output.write(`\nRemaining ${agentLabel} sessions:\n`);
+        output.write(`\n${formatSessionCandidates(displayCandidates)}\n`);
         continue;
       }
-      const candidate = displayCandidates[archiveIndex - 1];
-      const plan = await buildSessionArchivePlan(candidate);
-      const confirmation = String(await readAnswer(formatArchivePreview(plan, candidate, archiveIndex))).trim().toLowerCase();
-      if (confirmation !== "y") {
-        output.write("Archive cancelled.\n");
-        continue;
+      const selectedIndex = Number(answer);
+      if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= displayCandidates.length) {
+        return displayCandidates[selectedIndex - 1];
       }
-      await archiveSessionWithPlan(plan);
-      output.write(`Archived ${candidate.sessionId} to ${plan.archivedPath}\n`);
-      remainingCandidates = remainingCandidates.filter((item) => item.sessionPath !== candidate.sessionPath);
-      if (remainingCandidates.length === 0) {
-        throw new Error(`No ${agentLabel} session candidates remain after archive.`);
-      }
-      displayCandidates = sortSessionCandidatesForDisplay(remainingCandidates);
-      output.write(`\nRemaining ${agentLabel} sessions:\n`);
-      output.write(`\n${formatSessionCandidates(displayCandidates)}\n`);
-      continue;
+      output.write(`Invalid selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
     }
-    const selectedIndex = Number(answer);
-    if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= displayCandidates.length) {
-      return displayCandidates[selectedIndex - 1];
-    }
-    output.write(`Invalid selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
+  } finally {
+    readlineInterface?.close();
   }
 }
 

@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import os from "node:os";
+import { PassThrough } from "node:stream";
 
 import { chooseClaudeSessionPath, chooseSessionCandidate, chooseSessionPath } from "../src/cli.js";
 import { joinBlocks } from "../src/adapters/sources/shared.js";
@@ -1031,6 +1032,68 @@ test("chooseSessionCandidate archives numbered sessions with preview and manifes
     assert.match(writes.join(""), /Archive session \[1\] old session\?/);
     assert.match(writes.join(""), new RegExp(`From: ${firstPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"));
     assert.match(writes.join(""), /Remaining Claude sessions/);
+  } finally {
+    if (oldDataDir === undefined) {
+      delete process.env.KAGE_DATA_DIR;
+    } else {
+      process.env.KAGE_DATA_DIR = oldDataDir;
+    }
+  }
+});
+
+test("chooseSessionCandidate keeps stdin open for archive confirmation", async () => {
+  const dataDir = await makeTempDir("kage-archive-stdin-data");
+  const sessionDir = await makeTempDir("kage-archive-stdin-sessions");
+  const firstPath = path.join(sessionDir, "old.jsonl");
+  const secondPath = path.join(sessionDir, "new.jsonl");
+  await fs.writeFile(firstPath, '{"type":"user","sessionId":"old"}\n', "utf8");
+  await fs.writeFile(secondPath, '{"type":"user","sessionId":"new"}\n', "utf8");
+  const oldDataDir = process.env.KAGE_DATA_DIR;
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const writes = [];
+  output.on("data", (chunk) => writes.push(String(chunk)));
+  process.env.KAGE_DATA_DIR = dataDir;
+  try {
+    const selection = chooseSessionCandidate(
+      "Claude",
+      [
+        {
+          agent: "claude",
+          agentLabel: "Claude",
+          sessionPath: secondPath,
+          sessionId: "new",
+          updatedAt: "2026-03-21T12:00:00.000Z",
+          title: "new session",
+          cwd: "/tmp/project",
+        },
+        {
+          agent: "claude",
+          agentLabel: "Claude",
+          sessionPath: firstPath,
+          sessionId: "old",
+          updatedAt: "2026-03-21T10:00:00.000Z",
+          title: "old session",
+          cwd: "/tmp/project",
+        },
+      ],
+      {
+        isInteractive: true,
+        input,
+        output,
+      },
+    );
+    input.write("dd 1\ny\n1\n");
+    const selected = await selection;
+    const manifestPath = path.join(dataDir, "archive", "manifest.jsonl");
+    const manifest = JSON.parse((await fs.readFile(manifestPath, "utf8")).trim());
+
+    assert.equal(selected.sessionId, "new");
+    assert.equal(manifest.sessionId, "old");
+    await assert.rejects(fs.stat(firstPath), /ENOENT/);
+    assert.match(writes.join(""), /Type y to archive, or anything else to cancel:/);
+    assert.match(writes.join(""), /Archived old to /);
+    input.destroy();
   } finally {
     if (oldDataDir === undefined) {
       delete process.env.KAGE_DATA_DIR;
