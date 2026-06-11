@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import os from "node:os";
 
-import { chooseClaudeSessionPath, chooseSessionPath } from "../src/cli.js";
+import { chooseClaudeSessionPath, chooseSessionCandidate, chooseSessionPath } from "../src/cli.js";
 import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
 import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
@@ -887,6 +887,33 @@ test("chooseSessionPath renders candidates as spaced cards with recent user mess
   );
 });
 
+test("chooseSessionPath renders newest session candidates at the bottom", async () => {
+  await assert.rejects(
+    chooseSessionPath(
+      "Claude",
+      [
+        {
+          sessionPath: "/tmp/new.jsonl",
+          sessionId: "new",
+          updatedAt: "2026-03-21T12:00:00.000Z",
+          title: "最新会话",
+        },
+        {
+          sessionPath: "/tmp/old.jsonl",
+          sessionId: "old",
+          updatedAt: "2026-03-21T10:00:00.000Z",
+          title: "旧会话",
+        },
+      ],
+      { isInteractive: false },
+    ),
+    (error) => {
+      assert.match(error.message, /\[1\] 旧会话[\s\S]*\[2\] 最新会话/u);
+      return true;
+    },
+  );
+});
+
 test("chooseSessionPath returns interactive selection", async () => {
   const writes = [];
   const selected = await chooseSessionPath(
@@ -914,6 +941,103 @@ test("chooseSessionPath returns interactive selection", async () => {
 
   assert.equal(selected, "/tmp/b.jsonl");
   assert.match(writes.join(""), /Multiple Codex sessions match the current directory/);
+});
+
+test("chooseSessionCandidate returns the selected session object for interactive resume flows", async () => {
+  const selected = await chooseSessionCandidate(
+    "Claude",
+    [
+      {
+        sessionPath: "/tmp/a.jsonl",
+        sessionId: "aaa",
+        updatedAt: "2026-03-21T10:00:00.000Z",
+        title: "旧会话",
+        agent: "claude",
+        cwd: "/tmp/project",
+      },
+      {
+        sessionPath: "/tmp/b.jsonl",
+        sessionId: "bbb",
+        updatedAt: "2026-03-21T11:00:00.000Z",
+        title: "继续这个",
+        agent: "claude",
+        cwd: "/tmp/project",
+      },
+    ],
+    {
+      isInteractive: true,
+      output: { write: () => {} },
+      prompt: async () => "2",
+    },
+  );
+
+  assert.equal(selected.sessionPath, "/tmp/b.jsonl");
+  assert.equal(buildClaudeResumeCommand(selected.sessionId, selected.cwd), "cd /tmp/project && claude --resume bbb");
+});
+
+test("chooseSessionCandidate archives numbered sessions with preview and manifest", async () => {
+  const dataDir = await makeTempDir("kage-archive-data");
+  const sessionDir = await makeTempDir("kage-archive-sessions");
+  const firstPath = path.join(sessionDir, "old.jsonl");
+  const secondPath = path.join(sessionDir, "new.jsonl");
+  await fs.writeFile(firstPath, '{"type":"user","sessionId":"old"}\n', "utf8");
+  await fs.writeFile(secondPath, '{"type":"user","sessionId":"new"}\n', "utf8");
+  const oldDataDir = process.env.KAGE_DATA_DIR;
+  const writes = [];
+  const answers = ["dd 1", "y", "1"];
+  process.env.KAGE_DATA_DIR = dataDir;
+  try {
+    const selected = await chooseSessionCandidate(
+      "Claude",
+      [
+        {
+          agent: "claude",
+          agentLabel: "Claude",
+          sessionPath: secondPath,
+          sessionId: "new",
+          updatedAt: "2026-03-21T12:00:00.000Z",
+          title: "new session",
+          cwd: "/tmp/project",
+        },
+        {
+          agent: "claude",
+          agentLabel: "Claude",
+          sessionPath: firstPath,
+          sessionId: "old",
+          updatedAt: "2026-03-21T10:00:00.000Z",
+          title: "old session",
+          cwd: "/tmp/project",
+        },
+      ],
+      {
+        isInteractive: true,
+        output: { write: (chunk) => writes.push(chunk) },
+        prompt: async (promptText) => {
+          writes.push(promptText);
+          return answers.shift();
+        },
+      },
+    );
+
+    const manifestPath = path.join(dataDir, "archive", "manifest.jsonl");
+    const manifest = JSON.parse((await fs.readFile(manifestPath, "utf8")).trim());
+    assert.equal(selected.sessionId, "new");
+    await assert.rejects(fs.stat(firstPath), /ENOENT/);
+    assert.equal((await fs.readFile(manifest.archivedPath, "utf8")).trim(), '{"type":"user","sessionId":"old"}');
+    assert.equal(manifest.sessionId, "old");
+    assert.equal(manifest.originalPath, firstPath);
+    assert.equal(manifest.files[0].originalPath, firstPath);
+    assert.match(manifest.sha256, /^[0-9a-f]{64}$/u);
+    assert.match(writes.join(""), /Archive session \[1\] old session\?/);
+    assert.match(writes.join(""), new RegExp(`From: ${firstPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"));
+    assert.match(writes.join(""), /Remaining Claude sessions/);
+  } finally {
+    if (oldDataDir === undefined) {
+      delete process.env.KAGE_DATA_DIR;
+    } else {
+      process.env.KAGE_DATA_DIR = oldDataDir;
+    }
+  }
 });
 
 test("chooseSessionPath shows the selected card even when there is only one candidate", async () => {
@@ -2772,8 +2896,7 @@ test("cli supports single-agent list mode", async () => {
   const result = await spawnCli(["c", "--root", sessionsRoot], { cwd: currentDir });
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Matching Claude sessions for/);
-  assert.match(result.stdout, /\[1\]/);
-  assert.match(result.stdout, /\[2\]/);
+  assert.match(result.stdout, /\[1\] 先看 issue[\s\S]*\[2\] 总结一下上下文/u);
   assert.match(result.stdout, /总结一下上下文/);
   assert.doesNotMatch(result.stdout, /Run:/);
 });

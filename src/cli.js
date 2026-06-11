@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { formatAgentName, getDefaultRoot, supportedAgents } from "./core/agents.js";
+import { archiveSessionWithPlan, buildSessionArchivePlan } from "./core/archive.js";
 import { cleanDuplicateExports } from "./core/clean.js";
 import { findSessionById } from "./core/discovery.js";
 import { exportSession } from "./core/exporting.js";
@@ -1074,8 +1075,17 @@ function formatSessionCandidate(candidate, index) {
   ].join("\n");
 }
 
+function candidateUpdatedAtMs(candidate) {
+  const parsed = Date.parse(candidate.updatedAt ?? 0);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function sortSessionCandidatesForDisplay(candidates) {
+  return [...candidates].sort((left, right) => candidateUpdatedAtMs(left) - candidateUpdatedAtMs(right));
+}
+
 function formatSessionCandidates(candidates) {
-  return candidates.map(formatSessionCandidate).join("\n\n\n");
+  return sortSessionCandidatesForDisplay(candidates).map(formatSessionCandidate).join("\n\n\n");
 }
 
 function emitSelectedSession(output, candidate) {
@@ -1083,7 +1093,24 @@ function emitSelectedSession(output, candidate) {
   output.write(`Selected: ${candidate.sessionId}\n`);
 }
 
-export async function chooseSessionPath(
+function formatArchivePreview(plan, candidate, displayIndex) {
+  const title = formatSessionTitle(candidate.title);
+  const lines = [
+    `Archive session [${displayIndex}] ${title}?`,
+    `Agent: ${candidate.agentLabel ?? formatSessionLabel(candidate.agent)}`,
+    `Session: ${candidate.sessionId}`,
+    "Files:",
+  ];
+  for (const file of plan.files) {
+    lines.push(`  From: ${file.originalPath}`);
+    lines.push(`  To:   ${file.archivedPath}`);
+  }
+  lines.push("");
+  lines.push("Type y to archive, or anything else to cancel: ");
+  return lines.join("\n");
+}
+
+export async function chooseSessionCandidate(
   agentLabel,
   candidates,
   {
@@ -1098,21 +1125,23 @@ export async function chooseSessionPath(
 
   if (candidates.length === 1) {
     emitSelectedSession(output, candidates[0]);
-    return candidates[0].sessionPath;
+    return candidates[0];
   }
+  let remainingCandidates = [...candidates];
+  let displayCandidates = sortSessionCandidatesForDisplay(remainingCandidates);
 
   if (!isInteractive) {
-    const options = formatSessionCandidates(candidates);
+    const options = formatSessionCandidates(displayCandidates);
     throw new Error(
       `Multiple ${agentLabel} sessions match the current directory.\n${options}\nUse --session-id to choose one explicitly.`,
     );
   }
 
   output.write(`Multiple ${agentLabel} sessions match the current directory:\n`);
-  output.write(`\n${formatSessionCandidates(candidates)}\n`);
+  output.write(`\n${formatSessionCandidates(displayCandidates)}\n`);
 
-  const ask = prompt ?? (async () => {
-    output.write(`Select a session [1-${candidates.length}]: `);
+  const readAnswer = prompt ?? (async (promptText) => {
+    output.write(promptText);
     const chunks = [];
     for await (const chunk of process.stdin) {
       chunks.push(chunk);
@@ -1124,13 +1153,43 @@ export async function chooseSessionPath(
   });
 
   while (true) {
-    const answer = String(await ask()).trim();
-    const selectedIndex = Number(answer);
-    if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= candidates.length) {
-      return candidates[selectedIndex - 1].sessionPath;
+    const answer = String(await readAnswer(`Select a session, or run an action (dd <n>) [1-${displayCandidates.length}]: `)).trim();
+    const archiveMatch = answer.match(/^dd\s+(\d+)$/iu);
+    if (archiveMatch) {
+      const archiveIndex = Number(archiveMatch[1]);
+      if (!Number.isInteger(archiveIndex) || archiveIndex < 1 || archiveIndex > displayCandidates.length) {
+        output.write(`Invalid archive selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
+        continue;
+      }
+      const candidate = displayCandidates[archiveIndex - 1];
+      const plan = await buildSessionArchivePlan(candidate);
+      const confirmation = String(await readAnswer(formatArchivePreview(plan, candidate, archiveIndex))).trim().toLowerCase();
+      if (confirmation !== "y") {
+        output.write("Archive cancelled.\n");
+        continue;
+      }
+      await archiveSessionWithPlan(plan);
+      output.write(`Archived ${candidate.sessionId} to ${plan.archivedPath}\n`);
+      remainingCandidates = remainingCandidates.filter((item) => item.sessionPath !== candidate.sessionPath);
+      if (remainingCandidates.length === 0) {
+        throw new Error(`No ${agentLabel} session candidates remain after archive.`);
+      }
+      displayCandidates = sortSessionCandidatesForDisplay(remainingCandidates);
+      output.write(`\nRemaining ${agentLabel} sessions:\n`);
+      output.write(`\n${formatSessionCandidates(displayCandidates)}\n`);
+      continue;
     }
-    output.write(`Invalid selection. Choose a number between 1 and ${candidates.length}.\n`);
+    const selectedIndex = Number(answer);
+    if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= displayCandidates.length) {
+      return displayCandidates[selectedIndex - 1];
+    }
+    output.write(`Invalid selection. Choose a number between 1 and ${displayCandidates.length}.\n`);
   }
+}
+
+export async function chooseSessionPath(agentLabel, candidates, options = {}) {
+  const selected = await chooseSessionCandidate(agentLabel, candidates, options);
+  return selected.sessionPath;
 }
 
 export async function chooseClaudeSessionPath(candidates, options = {}) {
@@ -1701,6 +1760,16 @@ async function main() {
     const candidates = await buildSessionCandidates({ ...args, agent: resolvedAgent });
     if (candidates.length === 0) {
       throw new Error(`No ${formatSessionLabel(resolvedAgent)} sessions match the current directory`);
+    }
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      const selected = await chooseSessionCandidate(formatSessionLabel(resolvedAgent), candidates);
+      const resumeCommand = buildResumeCommandForSession(selected);
+      if (!resumeCommand) {
+        throw new Error(`${formatSessionLabel(resolvedAgent)} sessions cannot be resumed from this command.`);
+      }
+      process.stderr.write(`Run:\n${resumeCommand}\n`);
+      await runResumeCommand({ command: resumeCommand });
+      return;
     }
     process.stdout.write(`Matching ${formatSessionLabel(resolvedAgent)} sessions for ${process.cwd()}:\n\n`);
     process.stdout.write(`${formatSessionCandidates(candidates)}\n`);
