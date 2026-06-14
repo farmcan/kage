@@ -528,6 +528,8 @@ test("exportSession renders qodercli -> claude", async () => {
   });
 
   assert.equal(exported.mode, "claude-session");
+  assert.match(exported.sessionId, uuidPattern);
+  assert.notEqual(exported.sessionId, "qoder-session");
   assert.match(exported.files[0].content, /"type":"user"/);
 });
 
@@ -540,6 +542,8 @@ test("exportSession renders codex -> qodercli", async () => {
   });
 
   assert.equal(exported.mode, "qoder-session");
+  assert.match(exported.sessionId, uuidPattern);
+  assert.notEqual(exported.sessionId, "sample-session");
   assert.equal(exported.files.length, 2);
   assert.match(exported.files[1].fileName, /-session\.json$/);
 });
@@ -553,6 +557,8 @@ test("exportSession renders claude -> qodercli", async () => {
   });
 
   assert.equal(exported.mode, "qoder-session");
+  assert.match(exported.sessionId, uuidPattern);
+  assert.notEqual(exported.sessionId, "claude-session");
   assert.equal(exported.files.length, 2);
 });
 
@@ -2943,7 +2949,7 @@ test("cli shows the selected session card when only one match exists", async () 
   assert.equal(result.code, 0);
   assert.match(result.stderr, /\[1\] QoderCLI Only Session/);
   assert.match(result.stderr, /Selected: qoder-one/);
-  assert.match(result.stdout, new RegExp(`cd ${currentDir} && claude --resume qoder-one`, "u"));
+  assert.match(result.stdout, new RegExp(`cd ${currentDir} && claude --resume ${uuidPatternSource}`, "u"));
 });
 
 test("cli supports single-agent list mode", async () => {
@@ -2988,7 +2994,10 @@ test("cli supports x2c as a Claude session export", async () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "claude-session");
-  assert.equal(payload.resumeCommand, "cd /tmp/demo && claude --resume sample-session");
+  assert.match(payload.sessionId, uuidPattern);
+  assert.notEqual(payload.sessionId, "sample-session");
+  assert.equal(payload.resumeCommand, `cd /tmp/demo && claude --resume ${payload.sessionId}`);
+  assert.equal(payload.outputPath, path.join(fakeHome, ".claude", "projects", "-tmp-demo", `${payload.sessionId}.jsonl`));
 });
 
 test("cli supports c2x as a Codex session export", async () => {
@@ -3085,8 +3094,15 @@ test("cli supports q2x and q2c", async () => {
     env: { ...process.env, HOME: fakeHome },
   });
 
-  assert.equal(JSON.parse(q2x.stdout).mode, "codex-session");
-  assert.equal(JSON.parse(q2c.stdout).mode, "claude-session");
+  const q2xPayload = JSON.parse(q2x.stdout);
+  const q2cPayload = JSON.parse(q2c.stdout);
+  assert.equal(q2xPayload.mode, "codex-session");
+  assert.match(q2xPayload.sessionId, uuidPattern);
+  assert.notEqual(q2xPayload.sessionId, "qoder-session");
+  assert.equal(q2cPayload.mode, "claude-session");
+  assert.match(q2cPayload.sessionId, uuidPattern);
+  assert.notEqual(q2cPayload.sessionId, "qoder-session");
+  assert.match(q2cPayload.resumeCommand, new RegExp(`^cd /workspace/demo && claude --resume ${uuidPatternSource}$`, "u"));
 });
 
 test("cli supports q2q as a qodercli fork export", async () => {
@@ -3216,9 +3232,67 @@ test("cli supports x2q and c2q", async () => {
   const x2qPayload = JSON.parse(x2q.stdout);
   const c2qPayload = JSON.parse(c2q.stdout);
   assert.equal(x2qPayload.mode, "qoder-session");
-  assert.equal(x2qPayload.resumeCommand, `qodercli --cwd ${codexWorkingDir} --resume sample-session`);
+  assert.match(x2qPayload.sessionId, uuidPattern);
+  assert.notEqual(x2qPayload.sessionId, "sample-session");
+  assert.equal(x2qPayload.resumeCommand, `qodercli --cwd ${codexWorkingDir} --resume ${x2qPayload.sessionId}`);
   assert.equal(c2qPayload.mode, "qoder-session");
-  assert.equal(c2qPayload.resumeCommand, `qodercli --cwd ${claudeWorkingDir} --resume claude-session`);
+  assert.match(c2qPayload.sessionId, uuidPattern);
+  assert.notEqual(c2qPayload.sessionId, "claude-session");
+  assert.equal(c2qPayload.resumeCommand, `qodercli --cwd ${claudeWorkingDir} --resume ${c2qPayload.sessionId}`);
+  const x2qSidecar = JSON.parse(await fs.readFile(x2qPayload.sidecarPath, "utf8"));
+  const c2qSidecar = JSON.parse(await fs.readFile(c2qPayload.sidecarPath, "utf8"));
+  assert.equal(x2qSidecar.id, x2qPayload.sessionId);
+  assert.equal(c2qSidecar.id, c2qPayload.sessionId);
+});
+
+test("cli installs cross-agent bridges with target-native UUID session ids", async () => {
+  const fixtures = {
+    claude: path.join(__dirname, "..", "fixtures", "sample-claude-session.jsonl"),
+    codex: path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl"),
+    qodercli: path.join(__dirname, "..", "fixtures", "sample-qoder-session.jsonl"),
+  };
+  const cases = [
+    { alias: "c2x", sessionPath: fixtures.claude, sourceId: "claude-session", target: "codex", mode: "codex-session" },
+    { alias: "x2c", sessionPath: fixtures.codex, sourceId: "sample-session", target: "claude", mode: "claude-session" },
+    { alias: "q2x", sessionPath: fixtures.qodercli, sourceId: "qoder-session", target: "codex", mode: "codex-session" },
+    { alias: "q2c", sessionPath: fixtures.qodercli, sourceId: "qoder-session", target: "claude", mode: "claude-session" },
+    { alias: "x2q", sessionPath: fixtures.codex, sourceId: "sample-session", target: "qodercli", mode: "qoder-session" },
+    { alias: "c2q", sessionPath: fixtures.claude, sourceId: "claude-session", target: "qodercli", mode: "qoder-session" },
+  ];
+
+  for (const bridgeCase of cases) {
+    const fakeHome = await makeTempDir(`${bridgeCase.alias}-native-home`);
+    const result = await spawnCli([bridgeCase.alias, "--session", bridgeCase.sessionPath, "--json"], {
+      env: { ...process.env, HOME: fakeHome },
+    });
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(result.code, 0, bridgeCase.alias);
+    assert.equal(payload.mode, bridgeCase.mode, bridgeCase.alias);
+    assert.match(payload.sessionId, uuidPattern, bridgeCase.alias);
+    assert.notEqual(payload.sessionId, bridgeCase.sourceId, bridgeCase.alias);
+    assert.match(payload.resumeCommand, new RegExp(`${uuidPatternSource}$`, "u"), bridgeCase.alias);
+
+    const lineage = JSON.parse(await fs.readFile(payload.lineagePath, "utf8"));
+    assert.equal(lineage.parentSessionId, bridgeCase.sourceId, bridgeCase.alias);
+    assert.equal(lineage.childSessionId, payload.sessionId, bridgeCase.alias);
+    assert.equal(lineage.childAgent, bridgeCase.target, bridgeCase.alias);
+
+    if (payload.mode === "codex-session") {
+      const meta = JSON.parse((await fs.readFile(payload.outputPath, "utf8")).split("\n")[0]);
+      assert.equal(meta.payload.id, payload.sessionId, bridgeCase.alias);
+      assert.equal(meta.payload.thread_source, "user", bridgeCase.alias);
+    } else if (payload.mode === "claude-session") {
+      const rows = (await fs.readFile(payload.outputPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+      assert.equal(rows[0].sessionId, payload.sessionId, bridgeCase.alias);
+      assert.ok(rows.filter((row) => row.type === "user" || row.type === "assistant").every((row) => row.sessionId === payload.sessionId), bridgeCase.alias);
+    } else if (payload.mode === "qoder-session") {
+      const row = JSON.parse((await fs.readFile(payload.outputPath, "utf8")).split("\n")[0]);
+      const sidecar = JSON.parse(await fs.readFile(payload.sidecarPath, "utf8"));
+      assert.equal(row.sessionId, payload.sessionId, bridgeCase.alias);
+      assert.equal(sidecar.id, payload.sessionId, bridgeCase.alias);
+    }
+  }
 });
 
 test("cli supports c2v, x2v, and q2v as story exports", async () => {
@@ -3534,10 +3608,15 @@ test("cli installs default Claude exports into the real Claude session directory
 
   const payload = JSON.parse(result.stdout);
   assert.equal(result.code, 0);
+  assert.match(payload.sessionId, uuidPattern);
+  assert.notEqual(payload.sessionId, "sample-session");
   assert.equal(
     payload.outputPath,
-    path.join(fakeHome, ".claude", "projects", "-tmp-demo", "sample-session.jsonl"),
+    path.join(fakeHome, ".claude", "projects", "-tmp-demo", `${payload.sessionId}.jsonl`),
   );
+  const rows = (await fs.readFile(payload.outputPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(rows[0].sessionId, payload.sessionId);
+  assert.ok(rows.filter((row) => row.type === "user" || row.type === "assistant").every((row) => row.sessionId === payload.sessionId));
 });
 
 test("cli can emit machine-readable json for codex and claude session exports", async () => {
@@ -3623,8 +3702,12 @@ test("cli can resolve a session by session id", async () => {
 
   assert.equal(result.code, 0);
   const payload = JSON.parse(result.stdout);
-  assert.equal(payload.sessionId, "later");
   assert.equal(payload.mode, "claude-session");
+  assert.match(payload.sessionId, uuidPattern);
+  assert.notEqual(payload.sessionId, "later");
+  const lineage = JSON.parse(await fs.readFile(payload.lineagePath, "utf8"));
+  assert.equal(lineage.parentSessionId, "later");
+  assert.equal(lineage.childSessionId, payload.sessionId);
 });
 
 test("cli can split a session before export", async () => {
@@ -3725,7 +3808,7 @@ test("cli previews exports without writing files", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Export preview/);
   assert.match(result.stdout, /Target: qodercli/);
-  assert.match(result.stdout, /qodercli --cwd .* --resume sample-session/);
+  assert.match(result.stdout, new RegExp(`qodercli --cwd .* --resume ${uuidPatternSource}`, "u"));
   await assert.rejects(fs.access(path.join(fakeHome, ".qoder")), /ENOENT/);
 });
 

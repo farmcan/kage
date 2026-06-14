@@ -16,10 +16,6 @@ function applySessionTransforms(session, options) {
   return nextSession;
 }
 
-function isQoderAgent(agent) {
-  return normalizeAgent(agent) === "qodercli";
-}
-
 function deterministicUuid(value) {
   const bytes = createHash("sha256").update(value).digest();
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
@@ -34,10 +30,24 @@ function deterministicUuid(value) {
   ].join("-");
 }
 
-function buildCodexBridgeSessionId({ sourceAgent, sourceSessionId, sessionPath, cwd, splitRecent }) {
+function targetNativeSessionMode(format, targetAgent) {
+  if (format === "codex-session" && targetAgent === "codex") {
+    return true;
+  }
+  if (format === "claude-session" && targetAgent === "claude") {
+    return true;
+  }
+  if (format === "qoder-session" && targetAgent === "qodercli") {
+    return true;
+  }
+  return false;
+}
+
+function buildBridgeSessionId({ sourceAgent, targetAgent, sourceSessionId, sessionPath, cwd, splitRecent }) {
   return deterministicUuid(JSON.stringify({
-    namespace: "kage.codex-session.v1",
+    namespace: "kage.native-session.v1",
     sourceAgent,
+    targetAgent,
     sourceSessionId,
     sessionPath,
     cwd,
@@ -60,28 +70,20 @@ export async function exportSession({
   const targetKey = normalizeAgent(targetAgent);
   const normalizedSource = formatAgentName(sourceAgent ?? parsedSession.agent);
   const normalizedTarget = formatAgentName(targetAgent);
-  const shouldGenerateCodexForkSessionId =
-    format === "codex-session" &&
-    targetKey === "codex" &&
-    (sourceKey === "codex" || Boolean(forkPrompt));
-  const shouldGenerateCodexBridgeSessionId =
-    format === "codex-session" &&
-    targetKey === "codex" &&
-    sourceKey !== "codex";
-  const shouldGenerateClaudeForkSessionId =
-    format === "claude-session" &&
-    sourceKey === "claude" &&
-    targetKey === "claude";
-  const shouldGenerateQoderForkSessionId =
-    format === "qoder-session" &&
-    isQoderAgent(sourceKey) &&
-    isQoderAgent(targetKey);
+  const shouldGenerateNativeSessionId = targetNativeSessionMode(format, targetKey);
+  const shouldGenerateNativeForkSessionId =
+    shouldGenerateNativeSessionId &&
+    (sourceKey === targetKey || Boolean(forkPrompt));
+  const shouldGenerateNativeBridgeSessionId =
+    shouldGenerateNativeSessionId &&
+    sourceKey !== targetKey;
   let generatedSessionId;
-  if (shouldGenerateCodexForkSessionId || shouldGenerateClaudeForkSessionId || shouldGenerateQoderForkSessionId) {
+  if (shouldGenerateNativeForkSessionId) {
     generatedSessionId = randomUUID();
-  } else if (shouldGenerateCodexBridgeSessionId) {
-    generatedSessionId = buildCodexBridgeSessionId({
+  } else if (shouldGenerateNativeBridgeSessionId) {
+    generatedSessionId = buildBridgeSessionId({
       sourceAgent: sourceKey,
+      targetAgent: targetKey,
       sourceSessionId: parsedSession.sessionId,
       sessionPath,
       cwd: parsedSession.cwd,

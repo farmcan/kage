@@ -541,7 +541,7 @@ Matching rules:
 ~/.codex/sessions/YYYY/MM/DD/...
 ```
 
-Default Codex bridge exports use a Codex-native UUID, such as `rollout-<codex-session-id>.jsonl`, because native `codex resume` expects UUID-like session ids. The UUID is deterministic for the source session, so repeating the same bridge command overwrites the previous installed export instead of creating duplicates. Fork exports still get a fresh session id.
+Default cross-agent bridge exports use a target-native UUID session id instead of reusing the source agent's id. Codex, Claude Code, and QoderCLI all write UUID-shaped native session files, so KAGE generates a deterministic UUID for the imported target session. Repeating the same bridge command overwrites the previous installed export instead of creating duplicates. Fork exports still get a fresh session id.
 
 When the export is installed there, the CLI prints:
 
@@ -556,6 +556,8 @@ codex resume <session-id>
 ~/.claude/projects/<project-key>/...
 ```
 
+Cross-agent Claude exports also use target-native UUID filenames, such as `<claude-session-id>.jsonl`, and keep the original source id in the `.kage-lineage.json` sidecar.
+
 When the export is installed there, the CLI prints:
 
 ```text
@@ -568,6 +570,8 @@ cd <cwd> && claude --resume <session-id>
 ```text
 ~/.qoder/projects/<project-key>/...
 ```
+
+QoderCLI exports write both `<qoder-session-id>.jsonl` and `<qoder-session-id>-session.json`; both files use the same target-native UUID while lineage preserves the source session id.
 
 When the export is installed there, the CLI prints:
 

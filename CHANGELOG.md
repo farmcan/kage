@@ -2,8 +2,8 @@
 
 ## Unreleased / 未发布
 
-- Codex bridge exports now use native UUID session ids and `thread_source: "user"` metadata so `codex resume` can see imported Claude/Qoder sessions more reliably.
-- Codex bridge 导出现在使用原生 UUID session id，并写入 `thread_source: "user"` metadata，让 `codex resume` 更可靠地识别从 Claude/Qoder 导入的 session。
+- Cross-agent bridge exports now use target-native UUID session ids for Codex, Claude Code, and QoderCLI, with Codex also writing `thread_source: "user"` metadata so native resume pickers can see imported sessions more reliably.
+- 跨 agent bridge 导出现在会为 Codex、Claude Code、QoderCLI 使用目标端原生 UUID session id；Codex 同时写入 `thread_source: "user"` metadata，让原生 resume picker 更可靠地识别导入 session。
 
 - KAGE v0.1.16 fixes agent brand colors across the desktop app, app icon, GitHub screenshots, and homepage previews: Codex is blue, Qoder is green, and Claude remains orange.
 - KAGE v0.1.16 修正桌面端、App 图标、GitHub screenshots 和主页预览里的 agent 品牌色：Codex 为蓝色、Qoder 为绿色、Claude 保持橙色。
