@@ -299,15 +299,15 @@ Multiple Claude sessions match the current directory:
    2026-03-20T13:26:27.783Z  33d6decd-7776-4fba-b1d6-50b904c07010
    /Users/you/.claude/projects/-Users-you-wrksp-agentkit/33d6decd-7776-4fba-b1d6-50b904c07010.jsonl
 Select a session [1-3]: 1
-/Users/you/.codex/sessions/2026/03/22/rollout-b3b958d7-4ac8-41c4-8660-7b7f654737c6.jsonl
+/Users/you/.codex/sessions/2026/03/22/rollout-019ec2b1-7f49-5a63-9c38-bb7f02914122.jsonl
 Run:
-codex resume b3b958d7-4ac8-41c4-8660-7b7f654737c6
+codex resume 019ec2b1-7f49-5a63-9c38-bb7f02914122
 ```
 
 Finally, resume it in Codex:
 
 ```bash
-codex resume b3b958d7-4ac8-41c4-8660-7b7f654737c6
+codex resume 019ec2b1-7f49-5a63-9c38-bb7f02914122
 ```
 
 If the export worked, Codex opens in the same project directory and continues from the imported context.
@@ -541,7 +541,7 @@ Matching rules:
 ~/.codex/sessions/YYYY/MM/DD/...
 ```
 
-Default Codex export filenames are stable for the session id, such as `rollout-<session-id>.jsonl`, so repeating the same bridge command overwrites the previous installed export instead of creating duplicates. Fork exports still get a fresh session id.
+Default Codex bridge exports use a Codex-native UUID, such as `rollout-<codex-session-id>.jsonl`, because native `codex resume` expects UUID-like session ids. The UUID is deterministic for the source session, so repeating the same bridge command overwrites the previous installed export instead of creating duplicates. Fork exports still get a fresh session id.
 
 When the export is installed there, the CLI prints:
 

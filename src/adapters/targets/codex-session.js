@@ -25,6 +25,7 @@ export function renderCodexSessionExport({
         originator: "codex_cli_rs",
         cli_version: cliVersion,
         source: "cli",
+        thread_source: "user",
         model_provider: "openai",
         base_instructions: {
           text: "You are Codex, a coding agent based on GPT-5.",

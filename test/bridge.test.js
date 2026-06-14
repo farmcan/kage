@@ -30,6 +30,9 @@ import {
 } from "../src/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uuidPatternSource = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const uuidPattern = new RegExp(`^${uuidPatternSource}$`, "u");
+const codexResumeCommandPattern = new RegExp(`^codex resume ${uuidPatternSource}$`, "u");
 
 async function makeTempDir(prefix) {
   return fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
@@ -475,6 +478,8 @@ test("renderCodexResumeExport converts a Claude transcript", async () => {
   assert.match(exported.fileName, /^rollout-/);
   const lines = exported.content.trim().split("\n").map((line) => JSON.parse(line));
   assert.equal(lines[0].type, "session_meta");
+  assert.equal(lines[0].payload.id, "11111111-2222-4333-8444-555555555555");
+  assert.equal(lines[0].payload.thread_source, "user");
   assert.equal(lines[1].type, "response_item");
 });
 
@@ -509,7 +514,8 @@ test("exportSession renders qodercli -> codex", async () => {
   });
 
   assert.equal(exported.mode, "codex-session");
-  assert.equal(exported.sessionId, "qoder-session");
+  assert.match(exported.sessionId, uuidPattern);
+  assert.notEqual(exported.sessionId, "qoder-session");
   assert.match(exported.files[0].content, /"type":"session_meta"/);
 });
 
@@ -2835,10 +2841,10 @@ test("cli actions and run-action expose menu-bar friendly operations", async () 
   assert.equal(bridgePayload.mode, "run-action");
   assert.equal(bridgePayload.action.id, bridgeAction.id);
   assert.equal(bridgePayload.targetAgent, "codex");
-  assert.equal(bridgePayload.resumeCommand, "codex resume claude-action");
-  assert.match(bridgePayload.outputPath, /rollout-claude-action\.jsonl$/);
+  assert.match(bridgePayload.resumeCommand, codexResumeCommandPattern);
+  assert.match(bridgePayload.outputPath, new RegExp(`rollout-${uuidPatternSource}\\.jsonl$`, "u"));
   assert.ok(Array.isArray(bridgePayload.paths));
-  assert.equal(bridgePayload.result.resumeCommand, "codex resume claude-action");
+  assert.equal(bridgePayload.result.resumeCommand, bridgePayload.resumeCommand);
 
   const forkAction = payload.actions.find((action) => action.id === "fork:c2c:claude-action");
   const forkResult = await spawnCli(["run-action", forkAction.id, "--agent", "claude", "--json"], {
@@ -2901,7 +2907,7 @@ test("cli actions expose QoderWork as replay and bridge source only", async () =
   assert.equal(bridgePayload.action.id, bridgeAction.id);
   assert.equal(bridgePayload.sourceAgent, "qoderwork");
   assert.equal(bridgePayload.targetAgent, "codex");
-  assert.equal(bridgePayload.resumeCommand, "codex resume qoderwork-action");
+  assert.match(bridgePayload.resumeCommand, codexResumeCommandPattern);
 });
 
 test("cli shows the selected session card when only one match exists", async () => {
@@ -2995,7 +3001,9 @@ test("cli supports c2x as a Codex session export", async () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "codex-session");
-  assert.equal(payload.resumeCommand, "codex resume claude-session");
+  assert.match(payload.sessionId, uuidPattern);
+  assert.notEqual(payload.sessionId, "claude-session");
+  assert.match(payload.resumeCommand, codexResumeCommandPattern);
 });
 
 test("cli supports c2c as a Claude fork export", async () => {
@@ -3254,7 +3262,7 @@ test("cli runs correctly when invoked through a symlinked entrypoint", async () 
   });
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /codex resume claude-session/);
+  assert.match(result.stdout, new RegExp(`codex resume ${uuidPatternSource}`, "u"));
 });
 
 test("cli fails clearly for ambiguous Claude sessions in non-interactive mode", async () => {
@@ -3485,6 +3493,11 @@ test("cli installs default Codex exports into the real Codex session directory",
     payload.outputPath,
     path.join(fakeHome, ".codex", "sessions", "2026", "03", "20", payload.fileName),
   );
+  assert.match(payload.sessionId, uuidPattern);
+  const rows = (await fs.readFile(payload.outputPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(rows[0].type, "session_meta");
+  assert.equal(rows[0].payload.id, payload.sessionId);
+  assert.equal(rows[0].payload.thread_source, "user");
   assert.equal(payload.lineagePath, `${payload.outputPath}.kage-lineage.json`);
   const lineage = JSON.parse(await fs.readFile(payload.lineagePath, "utf8"));
   assert.equal(lineage.forkType, "bridge");
@@ -3506,7 +3519,9 @@ test("cli overwrites default Codex exports for the same source session", async (
   const firstPayload = JSON.parse(first.stdout);
   const secondPayload = JSON.parse(second.stdout);
   assert.equal(firstPayload.outputPath, secondPayload.outputPath);
-  assert.equal(firstPayload.fileName, "rollout-claude-session.jsonl");
+  assert.equal(firstPayload.sessionId, secondPayload.sessionId);
+  assert.match(firstPayload.sessionId, uuidPattern);
+  assert.equal(firstPayload.fileName, `rollout-${firstPayload.sessionId}.jsonl`);
   assert.equal((await fs.readdir(path.dirname(firstPayload.outputPath))).length, 2);
 });
 
@@ -3724,7 +3739,7 @@ test("cli can run the generated resume command after export", async () => {
   );
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /codex resume claude-session/);
+  assert.match(result.stdout, new RegExp(`codex resume ${uuidPatternSource}`, "u"));
   assert.match(result.stdout, /RUN_OK/);
 });
 
