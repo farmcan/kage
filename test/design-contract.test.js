@@ -24,9 +24,8 @@ async function readRepoBytes(...parts) {
 test("agent colors stay in sync across desktop app and public assets", async () => {
   const dashboard = await readRepoFile("app", "Sources", "KageMenuBar", "Views", "DesktopDashboardView.swift");
   const homepage = await readRepoFile("docs", "index.html");
+  const readme = await readRepoFile("README.md");
   const logo = await readRepoFile("docs", "assets", "kage-logo.svg");
-  const desktopPreview = await readRepoBytes("docs", "assets", "screenshots", "kage-serve-desktop-real.png");
-  const mobilePreview = await readRepoBytes("docs", "assets", "screenshots", "kage-serve-mobile-real.png");
 
   assert.match(dashboard, /case "codex":\s*return AgentPalette\.codex/u);
   assert.match(dashboard, /case "qodercli", "qoderwork":\s*return AgentPalette\.qoder/u);
@@ -39,18 +38,13 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepage, new RegExp(`--agent-codex: ${palette.codex.css};`, "u"));
   assert.match(homepage, new RegExp(`--agent-qoder: ${palette.qoder.css};`, "u"));
   assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
-  assert.match(homepage, /<img class="hero-screenshot" src="\.\/assets\/screenshots\/kage-serve-desktop-real\.png" alt="">/u);
-  assert.match(homepage, /kage-serve-mobile-real\.png/u);
+  assert.doesNotMatch(homepage, /assets\/screenshots|hero-screenshot|preview-duo/u);
+  assert.doesNotMatch(readme, /## Screenshots|assets\/screenshots/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
   assert.match(logo, new RegExp(`<circle cx="256" cy="376" r="24" fill="${palette.qoder.css}"/>`, "u"));
   assert.match(logo, new RegExp(`<circle cx="348" cy="360" r="24" fill="${palette.claude.css}"/>`, "u"));
-
-  assert.equal(desktopPreview.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
-  assert.equal(mobilePreview.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
-  assert.ok(desktopPreview.length > 150_000, "Desktop screenshot should be a real captured UI image, not a tiny mock asset.");
-  assert.ok(mobilePreview.length > 100_000, "Mobile screenshot should be a real captured UI image, not a tiny mock asset.");
 });
 
 test("serve agent marks use bundled SVG brand artwork", async () => {

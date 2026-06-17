@@ -19,7 +19,7 @@ The README should convert a first-time visitor in this order:
 1. One-line category: local memory layer for AI coding agents.
 2. Pain line: useful agent work is scattered across local transcripts.
 3. Fit check: who should use KAGE and who should skip it for now.
-4. Proof: screenshot or GIF of desktop search and bridge flow.
+4. Proof: fast path commands and concrete workflows that a visitor can try.
 5. Fast path: install, doctor, sessions, search, bridge.
 6. Product boundary: local-first, not a terminal or coding agent.
 7. Support matrix: Claude Code, Codex, QoderCLI, and QoderWork routes.
@@ -41,7 +41,7 @@ The Pages site should be lighter than the README:
 
 - strong one-screen product pitch
 - one terminal demo
-- one visual app screenshot or GIF once available
+- no product screenshot until the real UI is polished enough to improve trust
 - two CTAs: GitHub repo and releases
 - one "why star" section that explains the memory-layer advantage
 - current workflows, not historical implementation plans
@@ -53,10 +53,10 @@ Maintain the homepage as the product changes:
 
 - When a feature ships, update the hero proof chips and the workflow section before adding roadmap copy.
 - When a release ships, update the DMG link, latest-version chip, project-status copy, and release CTA together.
-- When screenshots change, refresh the Pages hero or first proof section before touching lower-page details.
+- When the UI becomes strong enough for public visuals, add one carefully reviewed real capture; otherwise keep the page text-and-command first.
 - When remote access changes, keep the copy explicit about local/LAN-first behavior versus optional relay behavior.
 - When a capability is only planned, phrase it as a direction in Project status, not as a shipped workflow.
-- After each homepage edit, open the page locally, capture a desktop or narrow-window screenshot, and verify the app preview is not clipped.
+- After each homepage edit, open the page locally and verify the install path, CTAs, and responsive layout are not clipped.
 
 ## Releases
 
@@ -65,7 +65,7 @@ Every public release should include:
 - a short user-facing headline
 - unsigned DMG artifact once packaging is ready
 - CLI install command
-- screenshot or GIF
+- a real UI screenshot/GIF only if it improves the release; otherwise use the CLI install path and workflow summary
 - known limitations
 - link to the release checklist
 
@@ -77,7 +77,7 @@ Keep issue templates focused:
 
 - Bug report: repro, agent, OS, sanitized output.
 - Feature request: workflow problem, proposal, product-boundary checks.
-- Growth task: screenshots, launch assets, release packaging, docs.
+- Growth task: launch copy, release packaging, docs, and only polished real visuals.
 
 Use labels to make the public roadmap legible:
 
@@ -90,9 +90,11 @@ Use labels to make the public roadmap legible:
 - `growth`
 - `privacy`
 
-## Social Preview And Screenshots
+## Social Preview And Visuals
 
-Highest priority asset:
+Only add product visuals when they look better than no image. A stiff, cropped, or confusing capture should not appear in README, Pages, or Releases.
+
+Best future asset:
 
 - 15-25 second GIF: open desktop app -> search transcript -> select matched session -> bridge -> show copy/open/show result actions.
 

@@ -133,40 +133,11 @@
         background: var(--paper);
       }
 
-      .hero-visual {
-        position: absolute;
-        inset: 76px 0 52px 48%;
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        pointer-events: none;
-      }
-
-      .hero-visual::before {
-        content: "";
-        position: absolute;
-        inset: 18% 0 12% 26%;
-        border: 1px solid rgba(17, 19, 24, 0.08);
-        border-radius: 24px 0 0 24px;
-        background: #12161c;
-        box-shadow: var(--shadow);
-      }
-
-      .hero-visual img {
-        position: relative;
-        width: min(940px, 58vw);
-        max-width: none;
-        border: 1px solid rgba(255, 255, 255, 0.24);
-        border-radius: 14px;
-        background: #fff;
-        box-shadow: 0 24px 80px rgba(17, 19, 24, 0.24);
-      }
-
       .hero-copy {
         position: relative;
         z-index: 2;
         width: 100%;
-        max-width: 620px;
+        max-width: 780px;
         padding: 72px 0 60px;
       }
 
@@ -477,28 +448,6 @@
         border-bottom-color: rgba(255, 255, 255, 0.1);
       }
 
-      .preview {
-        display: grid;
-        gap: 18px;
-      }
-
-      .preview img {
-        display: block;
-        width: 100%;
-        height: auto;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--surface);
-        box-shadow: var(--shadow);
-      }
-
-      .preview-duo {
-        display: grid;
-        grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-        gap: 18px;
-        align-items: start;
-      }
-
       .route-table {
         width: 100%;
         border-collapse: collapse;
@@ -594,26 +543,8 @@
           padding: 18px 0 34px;
         }
 
-        .hero-visual {
-          position: relative;
-          inset: auto;
-          width: 100%;
-          padding: 0 22px 38px;
-        }
-
-        .hero-visual::before {
-          inset: 14% 0 8% 18%;
-        }
-
-        .hero-visual img {
-          width: min(900px, 100%);
-          max-width: 100%;
-          margin: 0 auto;
-        }
-
         .section-head,
         .install-grid,
-        .preview-duo,
         .footer-cta .shell {
           grid-template-columns: 1fr;
         }
@@ -684,7 +615,7 @@
           <a href="#install">Install</a>
           <a href="#usage">Usage</a>
           <a href="#why">Why</a>
-          <a href="#preview">Preview</a>
+          <a href="#workflows">Workflow</a>
           <a href="#routes">Routes</a>
           <a href="https://github.com/farmcan/kage">GitHub</a>
           <a class="nav-cta" href="https://github.com/farmcan/kage/releases">Download</a>
@@ -734,9 +665,6 @@
           </div>
         </div>
 
-        <div class="hero-visual" aria-hidden="true">
-          <img class="hero-screenshot" src="./assets/screenshots/kage-serve-desktop-real.png" alt="">
-        </div>
       </section>
 
       <section id="usage" class="section">
@@ -898,18 +826,31 @@
         </div>
       </section>
 
-      <section id="preview" class="section">
+      <section id="workflows" class="section">
         <div class="shell">
           <div class="section-head">
-            <h2>A clear workspace for agent memory.</h2>
+            <h2>Concrete flows, no visual hand-waving.</h2>
             <p>
-              Review sessions in the desktop workspace, then open the mobile monitor when you want a
-              trusted LAN monitor for local agent work.
+              KAGE should earn attention by doing useful local work first: find sessions, inspect context,
+              and move memory between agents only when you ask it to.
             </p>
           </div>
-          <div class="preview preview-duo">
-            <img src="./assets/screenshots/kage-serve-desktop-real.png" alt="KAGE desktop workspace with project session list and conversation view">
-            <img src="./assets/screenshots/kage-serve-mobile-real.png" alt="KAGE mobile local session monitor">
+          <div class="feature-grid">
+            <article class="feature">
+              <small>Find</small>
+              <strong>Start from a directory, then narrow by agent.</strong>
+              <p>Use project scope as the main mental model, with Codex, Claude, QoderCLI, and QoderWork filters when needed.</p>
+            </article>
+            <article class="feature">
+              <small>Inspect</small>
+              <strong>Read the session before taking action.</strong>
+              <p>Search titles, recent prompts, transcript text, and dates so you can choose the right memory instead of guessing.</p>
+            </article>
+            <article class="feature">
+              <small>Continue</small>
+              <strong>Resume, fork, bridge, or replay deliberately.</strong>
+              <p>KAGE prepares native commands and exports; launching or changing a live agent still stays explicit.</p>
+            </article>
           </div>
         </div>
       </section>

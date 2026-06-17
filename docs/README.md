@@ -8,7 +8,6 @@ This directory keeps the public GitHub Pages site, release notes, active maintai
 - [KAGE logo](assets/kage-logo.svg)
 - [KAGE mascot](assets/kage-mascot.svg)
 - [KAGE white logo](assets/kage-logo-white.svg)
-- [Screenshot assets](assets/screenshots/)
 
 The old icon concept assets were removed after the Session Portal icon became the current app identity. Git history remains the archive for those experiments.
 

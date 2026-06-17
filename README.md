@@ -43,14 +43,6 @@ Star KAGE if you want AI coding sessions to become searchable, reusable local pr
 
 KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or terminal replacement. It is the local memory and control layer around the agents you already trust.
 
-## Screenshots
-
-Captured from the current `kage serve` UI with sanitized local demo sessions.
-
-![KAGE current local serve workspace with session list, transcript, and dispatch panel](docs/assets/screenshots/kage-serve-desktop-real.png)
-
-![KAGE mobile local session monitor](docs/assets/screenshots/kage-serve-mobile-real.png)
-
 ## Try It In 60 Seconds
 
 Before trying it, KAGE is most useful if you already have at least one Claude Code, Codex, QoderCLI, or QoderWork session on this machine. If you do not, open the desktop app and click `Explore Demo` to inspect sanitized local sample sessions first.
