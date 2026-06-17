@@ -40,6 +40,9 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
   assert.doesNotMatch(homepage, /assets\/screenshots|hero-screenshot|preview-duo/u);
   assert.doesNotMatch(readme, /## Screenshots|assets\/screenshots/u);
+  assert.match(homepage, /id="map" class="memory-band"/u);
+  assert.match(homepage, /One local layer over scattered agent memory/u);
+  assert.match(homepage, /Local stores[\s\S]*?KAGE index[\s\S]*?Explicit actions[\s\S]*?Next surface/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));

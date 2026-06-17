@@ -126,7 +126,7 @@
 
       .hero {
         position: relative;
-        min-height: clamp(680px, 76svh, 800px);
+        min-height: clamp(580px, 66svh, 700px);
         display: flex;
         align-items: center;
         border-bottom: 1px solid var(--line);
@@ -137,7 +137,7 @@
         position: relative;
         z-index: 2;
         width: 100%;
-        max-width: 780px;
+        max-width: 900px;
         padding: 72px 0 60px;
       }
 
@@ -161,7 +161,7 @@
       }
 
       h1 {
-        max-width: 620px;
+        max-width: 720px;
         margin: 0;
         font-size: clamp(54px, 8vw, 104px);
         line-height: 0.95;
@@ -169,7 +169,7 @@
       }
 
       .hero-copy > p {
-        max-width: 590px;
+        max-width: 720px;
         margin: 26px 0 0;
         color: var(--muted);
         font-size: clamp(18px, 2vw, 22px);
@@ -218,7 +218,8 @@
       }
 
       .command-line {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
         gap: 12px;
         padding: 18px 18px 20px;
@@ -231,9 +232,11 @@
       }
 
       .command-line code {
+        display: block;
         min-width: 0;
         white-space: normal;
         overflow-wrap: anywhere;
+        word-break: break-word;
         font-size: 13px;
       }
 
@@ -281,6 +284,142 @@
         border-radius: 8px;
         padding: 7px 10px;
         background: rgba(255, 255, 255, 0.68);
+      }
+
+      .memory-band {
+        border-bottom: 1px solid var(--line);
+        background: #f7f9fb;
+        padding: 46px 0;
+      }
+
+      .memory-band .shell {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.46fr) minmax(0, 1fr);
+        gap: 28px;
+        align-items: start;
+      }
+
+      .memory-copy small {
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .memory-copy h2 {
+        max-width: 440px;
+        margin-top: 12px;
+        font-size: clamp(32px, 4vw, 52px);
+      }
+
+      .memory-copy p {
+        max-width: 440px;
+        margin: 16px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .memory-map {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .memory-column {
+        position: relative;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 14px;
+      }
+
+      .memory-column:not(:last-child)::after {
+        content: "->";
+        position: absolute;
+        top: 22px;
+        right: -14px;
+        z-index: 2;
+        display: grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #f7f9fb;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .memory-column h3 {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .memory-column strong {
+        display: block;
+        margin-top: 10px;
+        font-size: 17px;
+        line-height: 1.15;
+      }
+
+      .memory-column p {
+        margin: 9px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .memory-list {
+        display: grid;
+        gap: 7px;
+        margin-top: 14px;
+      }
+
+      .memory-node {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--agent-codex);
+        border-radius: 8px;
+        padding: 8px 9px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .memory-node span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .memory-node code {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .memory-node.claude {
+        border-left-color: var(--agent-claude);
+      }
+
+      .memory-node.qoder {
+        border-left-color: var(--agent-qoder);
+      }
+
+      .memory-node.neutral {
+        border-left-color: var(--green);
       }
 
       .section {
@@ -545,8 +684,18 @@
 
         .section-head,
         .install-grid,
+        .memory-band .shell,
+        .memory-map,
         .footer-cta .shell {
           grid-template-columns: 1fr;
+        }
+
+        .memory-column:not(:last-child)::after {
+          top: auto;
+          right: auto;
+          bottom: -15px;
+          left: 20px;
+          transform: rotate(90deg);
         }
 
         .feature-grid {
@@ -558,6 +707,10 @@
       @media (max-width: 560px) {
         .shell {
           width: calc(100% - 28px);
+        }
+
+        .nav-links {
+          display: none;
         }
 
         nav {
@@ -574,11 +727,30 @@
         }
 
         .hero-copy > p {
+          max-width: 100%;
+          overflow-wrap: anywhere;
           font-size: 17px;
         }
 
         .install-command {
+          max-width: 100%;
           border-radius: 8px;
+        }
+
+        .hero-actions {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+
+        .button {
+          width: 100%;
+          white-space: normal;
+          text-align: center;
+        }
+
+        .trust-row {
+          display: grid;
+          grid-template-columns: 1fr;
         }
 
         .command-line {
@@ -597,6 +769,15 @@
           min-height: auto;
         }
 
+        .memory-copy h2,
+        .memory-copy p {
+          max-width: 100%;
+        }
+
+        .memory-node code {
+          display: none;
+        }
+
         th,
         td {
           padding: 12px;
@@ -613,6 +794,7 @@
         </a>
         <div class="nav-links">
           <a href="#install">Install</a>
+          <a href="#map">Map</a>
           <a href="#usage">Usage</a>
           <a href="#why">Why</a>
           <a href="#workflows">Workflow</a>
@@ -665,6 +847,61 @@
           </div>
         </div>
 
+      </section>
+
+      <section id="map" class="memory-band" aria-label="KAGE local memory map">
+        <div class="shell">
+          <div class="memory-copy">
+            <small>How KAGE thinks</small>
+            <h2>One local layer over scattered agent memory.</h2>
+            <p>
+              KAGE does not need a hosted index to feel useful. It reads what your tools already write,
+              groups it by project, then prepares explicit actions you can run.
+            </p>
+          </div>
+          <div class="memory-map">
+            <article class="memory-column">
+              <h3>Local stores</h3>
+              <strong>Separate transcripts</strong>
+              <p>Each agent keeps its own files and resume rules.</p>
+              <div class="memory-list">
+                <div class="memory-node claude"><span>Claude</span><code>.claude</code></div>
+                <div class="memory-node"><span>Codex</span><code>.codex</code></div>
+                <div class="memory-node qoder"><span>QoderCLI</span><code>.qoder</code></div>
+              </div>
+            </article>
+            <article class="memory-column">
+              <h3>KAGE index</h3>
+              <strong>Project memory</strong>
+              <p>Directory first, then agent, date, title, and transcript text.</p>
+              <div class="memory-list">
+                <div class="memory-node neutral"><span>Search</span><code>text</code></div>
+                <div class="memory-node neutral"><span>Filter</span><code>agent</code></div>
+                <div class="memory-node neutral"><span>Lineage</span><code>sidecar</code></div>
+              </div>
+            </article>
+            <article class="memory-column">
+              <h3>Explicit actions</h3>
+              <strong>No surprise launches</strong>
+              <p>KAGE prepares commands and exports; you decide what runs.</p>
+              <div class="memory-list">
+                <div class="memory-node neutral"><span>Resume</span><code>native</code></div>
+                <div class="memory-node neutral"><span>Fork</span><code>branch</code></div>
+                <div class="memory-node neutral"><span>Bridge</span><code>c2x</code></div>
+              </div>
+            </article>
+            <article class="memory-column">
+              <h3>Next surface</h3>
+              <strong>Continue where it fits</strong>
+              <p>Use CLI, desktop, or trusted LAN monitor without sending transcripts away.</p>
+              <div class="memory-list">
+                <div class="memory-node"><span>CLI</span><code>script</code></div>
+                <div class="memory-node claude"><span>Desktop</span><code>review</code></div>
+                <div class="memory-node qoder"><span>Serve</span><code>LAN</code></div>
+              </div>
+            </article>
+          </div>
+        </div>
       </section>
 
       <section id="usage" class="section">
