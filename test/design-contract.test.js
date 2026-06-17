@@ -25,9 +25,8 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   const dashboard = await readRepoFile("app", "Sources", "KageMenuBar", "Views", "DesktopDashboardView.swift");
   const homepage = await readRepoFile("docs", "index.html");
   const logo = await readRepoFile("docs", "assets", "kage-logo.svg");
-  const desktopPreview = await readRepoFile("docs", "assets", "screenshots", "kage-desktop-preview.svg");
-  const mobileBoardPreview = await readRepoFile("docs", "assets", "screenshots", "kage-mobile-board-preview.svg");
-  const demoFlow = await readRepoFile("docs", "assets", "screenshots", "kage-demo-flow.svg");
+  const desktopPreview = await readRepoBytes("docs", "assets", "screenshots", "kage-serve-desktop-real.png");
+  const mobilePreview = await readRepoBytes("docs", "assets", "screenshots", "kage-serve-mobile-real.png");
 
   assert.match(dashboard, /case "codex":\s*return AgentPalette\.codex/u);
   assert.match(dashboard, /case "qodercli", "qoderwork":\s*return AgentPalette\.qoder/u);
@@ -40,27 +39,18 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepage, new RegExp(`--agent-codex: ${palette.codex.css};`, "u"));
   assert.match(homepage, new RegExp(`--agent-qoder: ${palette.qoder.css};`, "u"));
   assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
-  assert.match(homepage, /<img class="hero-screenshot" src="\.\/assets\/screenshots\/kage-desktop-preview\.svg" alt="">/u);
-  assert.match(homepage, /kage-mobile-board-preview\.svg/u);
+  assert.match(homepage, /<img class="hero-screenshot" src="\.\/assets\/screenshots\/kage-serve-desktop-real\.png" alt="">/u);
+  assert.match(homepage, /kage-serve-mobile-real\.png/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
   assert.match(logo, new RegExp(`<circle cx="256" cy="376" r="24" fill="${palette.qoder.css}"/>`, "u"));
   assert.match(logo, new RegExp(`<circle cx="348" cy="360" r="24" fill="${palette.claude.css}"/>`, "u"));
 
-  assert.match(desktopPreview, new RegExp(`fill="${palette.codex.css}">CODEX</text>`, "u"));
-  assert.match(desktopPreview, new RegExp(`fill="${palette.qoder.css}">QODERCLI</text>`, "u"));
-  assert.match(desktopPreview, new RegExp(`fill="${palette.claude.css}">CLAUDE</text>`, "u"));
-  assert.match(desktopPreview, new RegExp(`fill="${palette.codex.css}">Codex</text>`, "u"));
-
-  assert.match(mobileBoardPreview, new RegExp(`fill="${palette.codex.css}">CODEX</text>`, "u"));
-  assert.match(mobileBoardPreview, new RegExp(`fill="${palette.claude.css}">CLAUDE</text>`, "u"));
-  assert.match(mobileBoardPreview, new RegExp(`fill="${palette.qoder.css}">QODERCLI</text>`, "u"));
-
-  assert.match(demoFlow, new RegExp(`fill="${palette.codex.css}">Codex</text>`, "u"));
-  assert.match(demoFlow, new RegExp(`fill="${palette.codex.css}">RUNNING</text>`, "u"));
-  assert.match(demoFlow, new RegExp(`fill="${palette.claude.css}">NEEDS REVIEW</text>`, "u"));
-  assert.match(demoFlow, new RegExp(`fill="${palette.qoder.css}">COMPLETED</text>`, "u"));
+  assert.equal(desktopPreview.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(mobilePreview.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.ok(desktopPreview.length > 150_000, "Desktop screenshot should be a real captured UI image, not a tiny mock asset.");
+  assert.ok(mobilePreview.length > 100_000, "Mobile screenshot should be a real captured UI image, not a tiny mock asset.");
 });
 
 test("serve agent marks use bundled SVG brand artwork", async () => {
@@ -99,6 +89,8 @@ test("serve mobile dispatch is a collapsed bottom sheet", async () => {
   assert.match(serveStyles, /\.mobile-dispatch-fab/u);
   assert.match(serveStyles, /\.dispatch-panel\.mobile-open/u);
   assert.match(serveStyles, /\.app-shell\.mock-mobile \.topbar/u);
+  assert.match(serveStyles, /Final mobile task launcher placement[\s\S]*?\.mobile-dispatch-fab[\s\S]*?bottom:\s*max\(14px, env\(safe-area-inset-bottom\)\)/u);
+  assert.match(serveStyles, /Final mobile task launcher placement[\s\S]*?\.dispatch-panel\.mobile-open[\s\S]*?bottom:\s*max\(10px, env\(safe-area-inset-bottom\)\)/u);
   assert.doesNotMatch(serveStyles, /@media \(max-width: (?:900|520)px\)/u);
   assert.doesNotMatch(serveStyles, /@media \(max-width: 900px\)[\s\S]*?\.dispatch-panel\s*\{\s*order:\s*1;/u);
   assert.doesNotMatch(serveStyles, /\.app-shell\.mock-mobile \.dispatch-panel\s*\{\s*order:\s*1;/u);

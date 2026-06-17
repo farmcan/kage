@@ -45,15 +45,11 @@ KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or 
 
 ## Screenshots
 
-Start with the readable desktop and mobile previews to see the main KAGE surfaces.
+Captured from the current `kage serve` UI with sanitized local demo sessions.
 
-![KAGE current light desktop workspace](docs/assets/screenshots/kage-desktop-preview.svg)
+![KAGE current local serve workspace with session list, transcript, and dispatch panel](docs/assets/screenshots/kage-serve-desktop-real.png)
 
-![KAGE mobile task board and queue status](docs/assets/screenshots/kage-mobile-board-preview.svg)
-
-The flow demo below shows search-to-bridge in motion.
-
-![KAGE real search-to-bridge flow (15 seconds)](docs/assets/screenshots/kage-search-to-bridge-demo.gif)
+![KAGE mobile local session monitor](docs/assets/screenshots/kage-serve-mobile-real.png)
 
 ## Try It In 60 Seconds
 
