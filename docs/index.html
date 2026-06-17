@@ -345,6 +345,72 @@
         gap: 14px;
       }
 
+      .quickstart-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .quick-step {
+        display: flex;
+        min-height: 260px;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 20px;
+      }
+
+      .step-kicker {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 8px;
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .step-kicker span {
+        display: grid;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(19, 134, 95, 0.12);
+        color: var(--green);
+      }
+
+      .quick-step h3 {
+        margin: 16px 0 0;
+        font-size: 21px;
+        line-height: 1.18;
+      }
+
+      .quick-step p {
+        margin: 10px 0 18px;
+        color: var(--muted);
+      }
+
+      .quick-command {
+        margin-top: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #111318;
+        color: #edf5f0;
+        overflow: hidden;
+      }
+
+      .quick-command .install-top {
+        min-height: 34px;
+      }
+
+      .quick-command .command-line {
+        padding: 13px;
+      }
+
       .feature {
         border: 1px solid var(--line);
         border-radius: 8px;
@@ -555,6 +621,7 @@
         .feature-grid {
           grid-template-columns: 1fr;
         }
+
       }
 
       @media (max-width: 560px) {
@@ -591,6 +658,14 @@
           padding: 56px 0;
         }
 
+        .quickstart-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .quick-step {
+          min-height: auto;
+        }
+
         th,
         td {
           padding: 12px;
@@ -607,6 +682,7 @@
         </a>
         <div class="nav-links">
           <a href="#install">Install</a>
+          <a href="#usage">Usage</a>
           <a href="#why">Why</a>
           <a href="#preview">Preview</a>
           <a href="#routes">Routes</a>
@@ -660,6 +736,103 @@
 
         <div class="hero-visual" aria-hidden="true">
           <img class="hero-screenshot" src="./assets/screenshots/kage-desktop-preview.svg" alt="">
+        </div>
+      </section>
+
+      <section id="usage" class="section">
+        <div class="shell">
+          <div class="section-head">
+            <h2>Start with the CLI.</h2>
+            <p>
+              Install KAGE, check which local agent stores it can see, then list or search the sessions
+              already on your machine. Bridge only when you are ready to continue context in another agent.
+            </p>
+          </div>
+          <div class="quickstart-grid">
+            <article class="quick-step">
+              <div>
+                <div class="step-kicker"><span>1</span> Install</div>
+                <h3>Install the command line tool.</h3>
+                <p>This downloads the repo package, installs the global <code>kage</code> command, and keeps transcripts local.</p>
+              </div>
+              <div class="quick-command">
+                <div class="install-top">
+                  <span>Terminal</span>
+                  <button
+                    class="copy-button"
+                    type="button"
+                    data-copy="curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash"
+                  >Copy</button>
+                </div>
+                <div class="command-line">
+                  <span class="prompt">$</span>
+                  <code>curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash</code>
+                </div>
+              </div>
+            </article>
+
+            <article class="quick-step">
+              <div>
+                <div class="step-kicker"><span>2</span> Check</div>
+                <h3>See what KAGE can read.</h3>
+                <p>Use doctor first if you are not sure whether Claude Code, Codex, or QoderCLI sessions exist locally.</p>
+              </div>
+              <div class="quick-command">
+                <div class="install-top">
+                  <span>Terminal</span>
+                  <button class="copy-button" type="button" data-copy="kage doctor">Copy</button>
+                </div>
+                <div class="command-line">
+                  <span class="prompt">$</span>
+                  <code>kage doctor</code>
+                </div>
+              </div>
+            </article>
+
+            <article class="quick-step">
+              <div>
+                <div class="step-kicker"><span>3</span> List</div>
+                <h3>Find recent local sessions.</h3>
+                <p>Start with a small recent window, then open the desktop app when you want the visual workspace.</p>
+              </div>
+              <div class="quick-command">
+                <div class="install-top">
+                  <span>Terminal</span>
+                  <button
+                    class="copy-button"
+                    type="button"
+                    data-copy="kage sessions --since 30d --limit 20"
+                  >Copy</button>
+                </div>
+                <div class="command-line">
+                  <span class="prompt">$</span>
+                  <code>kage sessions --since 30d --limit 20</code>
+                </div>
+              </div>
+            </article>
+
+            <article class="quick-step">
+              <div>
+                <div class="step-kicker"><span>4</span> Continue</div>
+                <h3>Search or bridge one useful thread.</h3>
+                <p>Search transcript text first; when a Claude session should continue in Codex, run the bridge.</p>
+              </div>
+              <div class="quick-command">
+                <div class="install-top">
+                  <span>Terminal</span>
+                  <button
+                    class="copy-button"
+                    type="button"
+                    data-copy="kage search &quot;auth&quot; --limit 10&#10;kage c2x"
+                  >Copy</button>
+                </div>
+                <div class="command-line">
+                  <span class="prompt">$</span>
+                  <code>kage search "auth" --limit 10<br>kage c2x</code>
+                </div>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
 
