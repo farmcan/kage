@@ -45,30 +45,19 @@ KAGE is intentionally **not** a hosted coding agent, cloud transcript index, or 
 
 ## Screenshots
 
-![KAGE real search-to-bridge flow (15 seconds)](docs/assets/screenshots/kage-search-to-bridge-demo.gif)
+Start with the readable desktop and mobile previews to see the main KAGE surfaces.
+
+![KAGE current light desktop workspace](docs/assets/screenshots/kage-desktop-preview.svg)
 
 ![KAGE mobile task board and queue status](docs/assets/screenshots/kage-mobile-board-preview.svg)
 
-![KAGE current light desktop workspace](docs/assets/screenshots/kage-desktop-preview.svg)
+The flow demo below shows search-to-bridge in motion.
+
+![KAGE real search-to-bridge flow (15 seconds)](docs/assets/screenshots/kage-search-to-bridge-demo.gif)
 
 ## Try It In 60 Seconds
 
 Before trying it, KAGE is most useful if you already have at least one Claude Code, Codex, QoderCLI, or QoderWork session on this machine. If you do not, open the desktop app and click `Explore Demo` to inspect sanitized local sample sessions first.
-
-Download the macOS desktop app:
-
-```text
-https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
-```
-
-The desktop app is currently unsigned in CI.
-For trusted installs in local testing, use right-click `Open`, or export signing/notarization env vars for `app/package.sh` before publishing:
-
-```bash
-KAGE_CODESIGN_IDENTITY="Developer ID Application: Your Team" \
-KAGE_NOTARY_PROFILE="kage-notary" \
-(cd app && ./package.sh)
-```
 
 Install the CLI:
 
@@ -83,6 +72,21 @@ kage doctor
 kage sessions --since 90d --limit 120
 kage sessions --include-subdirs
 kage search "auth"
+```
+
+Optionally download the macOS desktop app:
+
+```text
+https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
+```
+
+The desktop app is currently unsigned in CI.
+For trusted installs in local testing, use right-click `Open`, or export signing/notarization env vars for `app/package.sh` before publishing:
+
+```bash
+KAGE_CODESIGN_IDENTITY="Developer ID Application: Your Team" \
+KAGE_NOTARY_PROFILE="kage-notary" \
+(cd app && ./package.sh)
 ```
 
 Open the local mobile agent monitor:
