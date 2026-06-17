@@ -40,6 +40,8 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
   assert.doesNotMatch(homepage, /assets\/screenshots|hero-screenshot|preview-duo/u);
   assert.doesNotMatch(readme, /## Screenshots|assets\/screenshots/u);
+  assert.match(homepage, /aria-label="KAGE workflow model"/u);
+  assert.match(homepage, /Workflow model[\s\S]*?Directory is the context[\s\S]*?Resume, fork, or bridge/u);
   assert.match(homepage, /id="map" class="memory-band"/u);
   assert.match(homepage, /One local layer over scattered agent memory/u);
   assert.match(homepage, /Local stores[\s\S]*?KAGE index[\s\S]*?Explicit actions[\s\S]*?Next surface/u);
