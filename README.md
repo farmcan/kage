@@ -329,6 +329,7 @@ Agent shorthands:
 - `qw`: `qoderwork`
 
 You can also run `kage x`, `kage c`, `kage q`, or `kage qw` to list matching sessions for the current directory without exporting.
+When the picker runs interactively, selecting a session prints the native resume command and exits; it does not launch the agent for you.
 
 Use explicit source and target instead of aliases:
 

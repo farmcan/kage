@@ -10,7 +10,7 @@ import { PassThrough } from "node:stream";
 import { chooseClaudeSessionPath, chooseSessionCandidate, chooseSessionPath } from "../src/cli.js";
 import { joinBlocks } from "../src/adapters/sources/shared.js";
 import { exportSession } from "../src/core/exporting.js";
-import { buildClaudeResumeCommand } from "../src/core/resume-commands.js";
+import { buildClaudeResumeCommand, shellQuote } from "../src/core/resume-commands.js";
 import { getExportCapability, inferDefaultExportFormat } from "../src/core/routing.js";
 import { createKageServeServer, serveAccessUrl, terminalQrCode } from "../src/serve/index.js";
 import { buildAgentSendCommand, runAgentSend } from "../src/serve/send.js";
@@ -120,6 +120,41 @@ function spawnCli(args, options = {}) {
       stderr += chunk;
     });
     child.on("error", reject);
+    child.on("exit", (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
+}
+
+function spawnCliInTty(args, options = {}) {
+  const cliPath = path.join(__dirname, "..", "src", "cli.js");
+  const command = [process.execPath, cliPath, ...args].map(shellQuote).join(" ");
+  const scriptArgs =
+    process.platform === "darwin"
+      ? ["-q", "/dev/null", process.execPath, cliPath, ...args]
+      : ["-q", "-e", "-c", command, "/dev/null"];
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("script", scriptArgs, {
+      stdio: ["ignore", "pipe", "pipe"],
+      ...options,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      if (error.code === "ENOENT") {
+        resolve({ code: 127, stdout, stderr, skipped: true });
+        return;
+      }
+      reject(error);
+    });
     child.on("exit", (code) => {
       resolve({ code, stdout, stderr });
     });
@@ -2974,6 +3009,45 @@ test("cli supports single-agent list mode", async () => {
   assert.match(result.stdout, /\[1\] 先看 issue[\s\S]*\[2\] 总结一下上下文/u);
   assert.match(result.stdout, /总结一下上下文/);
   assert.doesNotMatch(result.stdout, /Run:/);
+});
+
+test("cli single-agent picker prints resume command without launching Codex", async (t) => {
+  const currentDir = await makeTempDir("codex-picker-workspace");
+  const sessionsRoot = await makeTempDir("codex-picker-sessions");
+  const binDir = await makeTempDir("codex-picker-bin");
+  const targetDir = path.join(sessionsRoot, "2026", "03", "21");
+  const sentinelPath = path.join(binDir, "codex-was-launched");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    path.join(targetDir, "rollout-2026-03-21T10-00-00-picker-session.jsonl"),
+    [
+      `{"timestamp":"2026-03-21T10:00:00.000Z","type":"session_meta","payload":{"id":"picker-session","cwd":"${currentDir}"}}`,
+      '{"timestamp":"2026-03-21T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"继续这个 Codex session"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  await writeExecutable(
+    path.join(binDir, "codex"),
+    `#!/bin/sh\nprintf 'FAKE_CODEX_LAUNCHED\\n'\n: > ${shellQuote(sentinelPath)}\n`,
+  );
+
+  const result = await spawnCliInTty(["x", "--root", sessionsRoot], {
+    cwd: currentDir,
+    env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+  });
+  if (result.skipped) {
+    t.skip("script command is required for tty picker coverage");
+    return;
+  }
+
+  const combinedOutput = `${result.stdout}\n${result.stderr}`;
+  assert.equal(result.code, 0);
+  assert.match(combinedOutput, /codex resume picker-session/u);
+  assert.match(combinedOutput, new RegExp(`# cwd: ${currentDir.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"));
+  assert.match(combinedOutput, /# source: kage session picker-session/u);
+  assert.match(combinedOutput, /# not launched/u);
+  assert.doesNotMatch(combinedOutput, /FAKE_CODEX_LAUNCHED/u);
+  await assert.rejects(fs.access(sentinelPath), /ENOENT/u);
 });
 
 test("cli supports shorthand positional source and target agents", async () => {

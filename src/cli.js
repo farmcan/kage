@@ -1466,6 +1466,16 @@ function buildResumeCommandForSession(session) {
   return null;
 }
 
+function formatResumeCommandHint(session, resumeCommand) {
+  const lines = [resumeCommand];
+  if (session.cwd) {
+    lines.push(`# cwd: ${session.cwd}`);
+  }
+  lines.push(`# source: kage session ${session.sessionId}`);
+  lines.push("# not launched; paste the command above when you are ready");
+  return `${lines.join("\n")}\n`;
+}
+
 function buildActionList(inventory) {
   const actions = [];
 
@@ -1771,8 +1781,7 @@ async function main() {
       if (!resumeCommand) {
         throw new Error(`${formatSessionLabel(resolvedAgent)} sessions cannot be resumed from this command.`);
       }
-      process.stderr.write(`Run:\n${resumeCommand}\n`);
-      await runResumeCommand({ command: resumeCommand });
+      process.stdout.write(formatResumeCommandHint(selected, resumeCommand));
       return;
     }
     process.stdout.write(`Matching ${formatSessionLabel(resolvedAgent)} sessions for ${process.cwd()}:\n\n`);
