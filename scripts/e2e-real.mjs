@@ -19,10 +19,13 @@ const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "kage-e2e-real-"));
 const mountDir = path.join(tmpRoot, "dmg");
 const tmpHome = path.join(tmpRoot, "home");
 const projectDir = path.join(tmpRoot, "project");
+const sidechainDir = path.join(tmpRoot, "sidechain-project");
 const token = `KAGE_E2E_${Date.now()}`;
 const codexId = `${token.toLowerCase()}-codex`;
 const claudeId = `${token.toLowerCase()}-claude`;
 const qoderId = `${token.toLowerCase()}-qoder`;
+const qoderSidechainAlphaId = `${token.toLowerCase()}-qoder-task-alpha`;
+const qoderSidechainBetaId = `${token.toLowerCase()}-qoder-task-beta`;
 const now = new Date().toISOString();
 const summary = [];
 let mounted = false;
@@ -86,7 +89,9 @@ async function writeJsonl(filePath, rows) {
 
 async function createFixtures() {
   await fs.mkdir(projectDir, { recursive: true });
+  await fs.mkdir(sidechainDir, { recursive: true });
   await fs.writeFile(path.join(projectDir, "README.md"), `# KAGE real E2E\n\n${token}\n`, "utf8");
+  await fs.writeFile(path.join(sidechainDir, "README.md"), `# KAGE sidechain-only cwd\n\n${token}\n`, "utf8");
 
   const key = projectKey(projectDir);
   const codexPath = path.join(tmpHome, ".codex", "sessions", "2026", "06", "03", `${codexId}.jsonl`);
@@ -142,6 +147,19 @@ async function createFixtures() {
   await writeJsonl(qoderPath, [
     {
       type: "user",
+      cwd: sidechainDir,
+      sessionId: qoderId,
+      timestamp: now,
+      message: { role: "user", content: [{ type: "text", text: `${token} sidechain cwd must not select this session.` }] },
+      isSidechain: true,
+      isMeta: false,
+      agentId: "qoder-worker-reused",
+      taskId: qoderSidechainAlphaId,
+      parentUuid: `${qoderId}-main-parent`,
+      uuid: `${qoderSidechainAlphaId}-user`,
+    },
+    {
+      type: "user",
       cwd: projectDir,
       sessionId: qoderId,
       timestamp: now,
@@ -155,6 +173,32 @@ async function createFixtures() {
       timestamp: now,
       message: { role: "assistant", content: [{ type: "text", text: "Qoder fixture response for KAGE real E2E." }] },
       isMeta: false,
+    },
+    {
+      type: "user",
+      cwd: projectDir,
+      sessionId: qoderId,
+      timestamp: now,
+      message: { role: "user", content: [{ type: "text", text: `${token} alpha sidechain context should require explicit opt-in.` }] },
+      isSidechain: true,
+      isMeta: false,
+      agentId: "qoder-worker-reused",
+      taskId: qoderSidechainAlphaId,
+      parentUuid: `${qoderId}-main-parent`,
+      uuid: `${qoderSidechainAlphaId}-user-2`,
+    },
+    {
+      type: "user",
+      cwd: projectDir,
+      sessionId: qoderId,
+      timestamp: now,
+      message: { role: "user", content: [{ type: "text", text: `${token} beta sidechain context should remain separate.` }] },
+      isSidechain: true,
+      isMeta: false,
+      agentId: "qoder-worker-reused",
+      taskId: qoderSidechainBetaId,
+      parentUuid: `${qoderId}-main-parent`,
+      uuid: `${qoderSidechainBetaId}-user`,
     },
   ]);
   await fs.writeFile(
@@ -253,12 +297,65 @@ try {
   }
   summary.push("verified sessions detection across Codex, Claude, and QoderCLI");
 
+  const qoderPicker = run(kageBin, ["q", "--root", path.join(tmpHome, ".qoder", "projects")], {
+    cwd: projectDir,
+    env: e2eEnv(),
+  });
+  requireCondition(qoderPicker.includes(`${token} qoder source asks for action coverage.`), "q picker should show the main Qoder transcript.");
+  requireCondition(!qoderPicker.includes("sidechain cwd must not select this session"), "q picker should not show sidechain-only content.");
+
+  const sidechainPicker = childProcess.spawnSync(kageBin, ["q", "--root", path.join(tmpHome, ".qoder", "projects")], {
+    cwd: sidechainDir,
+    env: e2eEnv(),
+    encoding: "utf8",
+    stdio: "pipe",
+  });
+  requireCondition(sidechainPicker.status !== 0, "q picker should not match a session from sidechain-only cwd.");
+  requireCondition(
+    sidechainPicker.stderr.includes("No QoderCLI sessions match the current directory"),
+    `Expected sidechain-only cwd rejection, got: ${sidechainPicker.stderr}`,
+  );
+  summary.push("verified QoderCLI session picker ignores sidechain-only cwd matches");
+
   const search = runJson(kageBin, ["search", token, "--json", "--include-subdirs", "--limit", "20"], {
     cwd: projectDir,
     env: e2eEnv(),
   });
   requireCondition(search.results.length >= 3, `Expected at least 3 search results for ${token}, got ${search.results.length}.`);
   summary.push("verified transcript search over real JSONL fixtures");
+
+  const qoderDefaultBridge = run(kageBin, ["q2x", "--session", fixtures.qoderPath, "--stdout"], {
+    cwd: projectDir,
+    env: e2eEnv(),
+  });
+  requireCondition(qoderDefaultBridge.includes(`${token} qoder source asks for action coverage.`), "Default q2x should include main Qoder content.");
+  requireCondition(!qoderDefaultBridge.includes("alpha sidechain context"), "Default q2x should exclude alpha sidechain content.");
+  requireCondition(!qoderDefaultBridge.includes("beta sidechain context"), "Default q2x should exclude beta sidechain content.");
+
+  const qoderSidechainList = run(kageBin, ["q2x", "--session", fixtures.qoderPath, "--list-subagents"], {
+    cwd: projectDir,
+    env: e2eEnv(),
+  });
+  requireCondition(qoderSidechainList.includes(qoderSidechainAlphaId), "Qoder sidechain list should include alpha task selector.");
+  requireCondition(qoderSidechainList.includes(qoderSidechainBetaId), "Qoder sidechain list should include beta task selector.");
+  requireCondition(!qoderSidechainList.includes("Selector: qoder-worker-reused"), "Qoder sidechain list should not collapse reused worker agentId.");
+
+  const qoderSidechainOutPath = path.join(tmpRoot, "qoder-sidechain.codex.jsonl");
+  const qoderSidechainBridge = runJson(
+    kageBin,
+    ["q2x", "--session", fixtures.qoderPath, "--include-subagent", qoderSidechainBetaId, "--out", qoderSidechainOutPath, "--json"],
+    {
+      cwd: projectDir,
+      env: e2eEnv(),
+    },
+  );
+  requireCondition(qoderSidechainBridge.outputPath === qoderSidechainOutPath, "Qoder sidechain bridge should use requested output path.");
+  requireCondition(qoderSidechainBridge.includedSubagents?.some((item) => item.id === qoderSidechainBetaId), "Qoder sidechain bridge should report included beta task.");
+  const qoderSidechainContent = await fs.readFile(qoderSidechainOutPath, "utf8");
+  requireCondition(qoderSidechainContent.includes(`[QoderCLI Sidechain: ${qoderSidechainBetaId}]`), "Qoder sidechain export should label beta task.");
+  requireCondition(qoderSidechainContent.includes("beta sidechain context should remain separate"), "Qoder sidechain export should include beta task content.");
+  requireCondition(!qoderSidechainContent.includes("alpha sidechain context should require explicit opt-in"), "Qoder sidechain export should exclude alpha task content.");
+  summary.push("verified packaged q2x sidechain list/include/default exclusion end to end");
 
   const actions = runJson(kageBin, ["actions", "--json", "--include-subdirs", "--since", "1d", "--limit", "20"], {
     cwd: projectDir,
