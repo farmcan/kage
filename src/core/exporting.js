@@ -2,19 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { formatAgentName, normalizeAgent } from "./agents.js";
 import { forkSession, splitSession } from "./session-transforms.js";
+import { appendClaudeSubagentMessages } from "./subagents.js";
 import { parseSession } from "../adapters/sources/index.js";
 import { renderExport } from "../adapters/targets/index.js";
-
-function applySessionTransforms(session, options) {
-  let nextSession = session;
-  if (options.splitRecent) {
-    nextSession = splitSession(nextSession, { recentUserTurns: options.splitRecent });
-  }
-  if (options.forkPrompt) {
-    nextSession = forkSession(nextSession, { prompt: options.forkPrompt });
-  }
-  return nextSession;
-}
 
 function deterministicUuid(value) {
   const bytes = createHash("sha256").update(value).digest();
@@ -62,10 +52,24 @@ export async function exportSession({
   format,
   splitRecent = null,
   forkPrompt = null,
+  includeSubagents = false,
+  includeSubagent = [],
   sessionId = undefined,
 }) {
   const parsedSession = await parseSession({ sessionPath, agent: sourceAgent });
-  const session = applySessionTransforms(parsedSession, { splitRecent, forkPrompt });
+  let session = parsedSession;
+  if (splitRecent) {
+    session = splitSession(session, { recentUserTurns: splitRecent });
+  }
+  const subagentResult = await appendClaudeSubagentMessages(session, {
+    sessionPath,
+    includeSubagents,
+    includeSubagent,
+  });
+  session = subagentResult.session;
+  if (forkPrompt) {
+    session = forkSession(session, { prompt: forkPrompt });
+  }
   const sourceKey = normalizeAgent(sourceAgent ?? parsedSession.agent);
   const targetKey = normalizeAgent(targetAgent);
   const normalizedSource = formatAgentName(sourceAgent ?? parsedSession.agent);
@@ -106,6 +110,7 @@ export async function exportSession({
     sessionPath,
     sessionId: exported.sessionId,
     session,
+    includedSubagents: subagentResult.includedSubagents,
   };
 }
 

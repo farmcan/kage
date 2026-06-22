@@ -331,6 +331,16 @@ Agent shorthands:
 You can also run `kage x`, `kage c`, `kage q`, or `kage qw` to list matching sessions for the current directory without exporting.
 When the picker runs interactively, selecting a session prints the native resume command and exits; it does not launch the agent for you.
 
+Claude `subagents/` transcripts stay excluded from bridge exports by default. Inspect or opt into them explicitly:
+
+```bash
+kage c2q --list-subagents
+kage c2q --include-subagents
+kage c2q --include-subagent agent-alpha
+```
+
+Included subagent content is wrapped with visible `[Claude Subagent: ...]` boundaries in the exported target context.
+
 Use explicit source and target instead of aliases:
 
 ```bash
@@ -356,6 +366,9 @@ If you mistype a route alias such as `q2q`, KAGE reports the unknown alias and p
 --split-recent <n>
 --fork <prompt>
 --fork-file <path>
+--list-subagents
+--include-subagents
+--include-subagent <id|path>
 --preview
 --run
 --older-than <duration>

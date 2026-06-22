@@ -161,6 +161,64 @@ function spawnCliInTty(args, options = {}) {
   });
 }
 
+async function writeClaudeSessionWithSubagents() {
+  const currentDir = await makeTempDir("claude-subagent-workspace");
+  const projectDir = await makeTempDir("claude-subagent-project");
+  const sessionPath = path.join(projectDir, "claude-parent.jsonl");
+  const subagentDir = path.join(projectDir, "claude-parent", "subagents");
+  const alphaPath = path.join(subagentDir, "agent-alpha.jsonl");
+  const betaPath = path.join(subagentDir, "agent-beta.jsonl");
+  await fs.mkdir(subagentDir, { recursive: true });
+
+  const mainRows = [
+    {
+      type: "user",
+      message: { role: "user", content: "main Claude task" },
+      timestamp: "2026-06-22T09:00:00.000Z",
+      cwd: currentDir,
+      sessionId: "claude-parent",
+    },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: "main Claude answer" },
+      timestamp: "2026-06-22T09:00:01.000Z",
+      cwd: currentDir,
+      sessionId: "claude-parent",
+    },
+  ];
+  const alphaRows = [
+    {
+      type: "user",
+      message: { role: "user", content: "alpha exploratory context" },
+      timestamp: "2026-06-22T09:10:00.000Z",
+      cwd: currentDir,
+      sessionId: "claude-parent",
+    },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: "alpha result" },
+      timestamp: "2026-06-22T09:10:01.000Z",
+      cwd: currentDir,
+      sessionId: "claude-parent",
+    },
+  ];
+  const betaRows = [
+    {
+      type: "user",
+      message: { role: "user", content: "beta hidden context" },
+      timestamp: "2026-06-22T09:20:00.000Z",
+      cwd: currentDir,
+      sessionId: "claude-parent",
+    },
+  ];
+
+  await fs.writeFile(sessionPath, `${mainRows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  await fs.writeFile(alphaPath, `${alphaRows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  await fs.writeFile(betaPath, `${betaRows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+
+  return { currentDir, sessionPath, alphaPath, betaPath };
+}
+
 test("joinBlocks handles native transcript content variants", () => {
   assert.equal(joinBlocks("plain string"), "plain string");
   assert.equal(joinBlocks({ text: "single text block" }), "single text block");
@@ -3317,6 +3375,53 @@ test("cli supports x2q and c2q", async () => {
   const c2qSidecar = JSON.parse(await fs.readFile(c2qPayload.sidecarPath, "utf8"));
   assert.equal(x2qSidecar.id, x2qPayload.sessionId);
   assert.equal(c2qSidecar.id, c2qPayload.sessionId);
+});
+
+test("cli excludes Claude subagents from c2q by default", async () => {
+  const { sessionPath } = await writeClaudeSessionWithSubagents();
+  const result = await spawnCli(["c2q", "--session", sessionPath, "--stdout"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /main Claude task/u);
+  assert.doesNotMatch(result.stdout, /alpha exploratory context/u);
+  assert.doesNotMatch(result.stdout, /beta hidden context/u);
+  assert.doesNotMatch(result.stdout, /\[Claude Subagent:/u);
+});
+
+test("cli lists Claude subagents for a selected c2q source session", async () => {
+  const { sessionPath, alphaPath, betaPath } = await writeClaudeSessionWithSubagents();
+  const result = await spawnCli(["c2q", "--session", sessionPath, "--list-subagents"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Claude subagents for claude-parent/u);
+  assert.match(result.stdout, /agent-alpha/u);
+  assert.match(result.stdout, /agent-beta/u);
+  assert.match(result.stdout, new RegExp(alphaPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.match(result.stdout, new RegExp(betaPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+});
+
+test("cli can include all Claude subagents in c2q exports", async () => {
+  const { sessionPath } = await writeClaudeSessionWithSubagents();
+  const result = await spawnCli(["c2q", "--session", sessionPath, "--stdout", "--include-subagents"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /\[Claude Subagent: agent-alpha\]/u);
+  assert.match(result.stdout, /alpha exploratory context/u);
+  assert.match(result.stdout, /\[\/Claude Subagent: agent-alpha\]/u);
+  assert.match(result.stdout, /\[Claude Subagent: agent-beta\]/u);
+  assert.match(result.stdout, /beta hidden context/u);
+  assert.match(result.stdout, /\[\/Claude Subagent: agent-beta\]/u);
+});
+
+test("cli can include one selected Claude subagent in c2q exports", async () => {
+  const { sessionPath } = await writeClaudeSessionWithSubagents();
+  const result = await spawnCli(["c2q", "--session", sessionPath, "--stdout", "--include-subagent", "agent-beta"]);
+
+  assert.equal(result.code, 0);
+  assert.doesNotMatch(result.stdout, /agent-alpha/u);
+  assert.doesNotMatch(result.stdout, /alpha exploratory context/u);
+  assert.match(result.stdout, /\[Claude Subagent: agent-beta\]/u);
+  assert.match(result.stdout, /beta hidden context/u);
 });
 
 test("cli installs cross-agent bridges with target-native UUID session ids", async () => {

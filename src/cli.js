@@ -18,6 +18,7 @@ import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./c
 import { searchSessions } from "./core/search.js";
 import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
 import { compactSessionText } from "./core/session-labels.js";
+import { listClaudeSubagents } from "./core/subagents.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
 import { startServeCommand } from "./serve/index.js";
 
@@ -76,6 +77,9 @@ Options:
   --split-recent <n>          Keep only the latest N turns
   --fork <prompt>             Inject fork prompt for exported payloads
   --fork-file <path>          Read fork prompt from file
+  --list-subagents            List Claude subagent transcripts for the selected source session
+  --include-subagents         Include all Claude subagent transcripts in the export
+  --include-subagent <id|path> Include one Claude subagent transcript in the export
   --preview                   Show planned export without writing files
   --run                       Execute resume commands after export
   --older-than <duration>     Filter items older than this value
@@ -259,6 +263,9 @@ function parseArgs(argv) {
     splitRecent: null,
     forkPrompt: null,
     forkFile: null,
+    listSubagents: false,
+    includeSubagents: false,
+    includeSubagent: [],
     preview: false,
     run: false,
     json: false,
@@ -307,6 +314,13 @@ function parseArgs(argv) {
         i += 1;
       } else if (arg === "--fork-file") {
         args.forkFile = readOptionValue(argv, i, arg);
+        i += 1;
+      } else if (arg === "--list-subagents") {
+        args.listSubagents = true;
+      } else if (arg === "--include-subagents") {
+        args.includeSubagents = true;
+      } else if (arg === "--include-subagent") {
+        args.includeSubagent.push(readOptionValue(argv, i, arg));
         i += 1;
       } else if (arg === "--preview") {
         args.preview = true;
@@ -1605,6 +1619,27 @@ function formatActionsResult(result, asJson) {
   return `${lines.join("\n")}\n`;
 }
 
+function formatSubagentsResult(result, asJson) {
+  if (asJson) {
+    return `${JSON.stringify(result, null, 2)}\n`;
+  }
+
+  const lines = [`Claude subagents for ${result.sessionId}:`];
+  lines.push(`Session: ${result.sessionPath}`);
+  lines.push(`Directory: ${result.subagentDir}`);
+  if (result.subagents.length === 0) {
+    lines.push("No Claude subagent transcripts found.");
+  }
+  for (const subagent of result.subagents) {
+    lines.push("");
+    lines.push(`- ${subagent.id}`);
+    lines.push(`  Path: ${subagent.path}`);
+    lines.push(`  Messages: ${subagent.messageCount}`);
+    lines.push(`  Updated: ${subagent.updatedAt ?? "unknown time"}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 function parseDelegatedJson(stdout) {
   const text = stdout.trim();
   if (!text) {
@@ -1800,6 +1835,32 @@ async function main() {
 
   args.forkPrompt = await resolveForkPrompt(args);
   const sessionPath = await resolveSessionPath(args);
+  if (args.listSubagents) {
+    if (formatAgentName(args.agent) !== "claude") {
+      throw new Error("--list-subagents is only supported for Claude source sessions");
+    }
+    const { parentSession, subagentDir, subagents } = await listClaudeSubagents(sessionPath);
+    process.stdout.write(
+      formatSubagentsResult(
+        {
+          mode: "subagents",
+          sourceAgent: "claude",
+          sessionId: parentSession.sessionId,
+          sessionPath,
+          subagentDir,
+          subagents: subagents.map((subagent) => ({
+            id: subagent.id,
+            path: subagent.path,
+            sessionId: subagent.sessionId,
+            messageCount: subagent.messageCount,
+            updatedAt: subagent.updatedAt,
+          })),
+        },
+        args.json,
+      ),
+    );
+    return;
+  }
   const exported = await exportSession({
     sessionPath,
     sourceAgent: args.agent,
@@ -1807,6 +1868,8 @@ async function main() {
     format: args.exportFormat,
     splitRecent: args.splitRecent,
     forkPrompt: args.forkPrompt,
+    includeSubagents: args.includeSubagents,
+    includeSubagent: args.includeSubagent,
   });
 
   if (args.stdout) {
@@ -1819,6 +1882,7 @@ async function main() {
           targetAgent: exported.targetAgent,
           sessionId: exported.sessionId,
           sessionPath,
+          includedSubagents: exported.includedSubagents,
           ...(exported.files[0] ? { fileName: exported.files[0].fileName } : {}),
         },
         true,
@@ -1866,6 +1930,7 @@ async function main() {
       ...(lineageFile ? { lineagePath: lineageFile.path } : {}),
       ...(installPlan.resumeCommand ? { resumeCommand: installPlan.resumeCommand } : {}),
       ...(hints.length > 0 ? { hints } : {}),
+      ...(exported.includedSubagents.length > 0 ? { includedSubagents: exported.includedSubagents } : {}),
       paths: installPlan.files.map((file) => file.path),
     },
     args.json,
