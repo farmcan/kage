@@ -291,6 +291,92 @@ async function writeQoderSessionWithSidechains() {
   return { currentDir, sessionPath };
 }
 
+async function writeQoderSessionWithSidechainOnlyCwdFirst() {
+  const mainDir = await makeTempDir("qoder-main-workspace");
+  const sidechainDir = await makeTempDir("qoder-sidechain-workspace");
+  const sessionsRoot = await makeTempDir("qoder-sidechain-cwd-root");
+  const sessionPath = path.join(sessionsRoot, "qoder-parent.jsonl");
+  const rows = [
+    {
+      uuid: "sidechain-first",
+      parentUuid: "main-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: sidechainDir,
+      sessionId: "qoder-parent",
+      agentId: "worker-alpha",
+      type: "user",
+      timestamp: "2026-06-22T09:00:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "sidechain cwd should not select this session" }] },
+    },
+    {
+      uuid: "main-user",
+      parentUuid: "",
+      isSidechain: false,
+      isMeta: false,
+      cwd: mainDir,
+      sessionId: "qoder-parent",
+      agentId: "main-agent",
+      type: "user",
+      timestamp: "2026-06-22T09:01:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "main workspace should select this session" }] },
+    },
+  ];
+
+  await fs.writeFile(sessionPath, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  return { mainDir, sidechainDir, sessionsRoot, sessionPath };
+}
+
+async function writeQoderSessionWithSharedAgentSidechainTasks() {
+  const currentDir = await makeTempDir("qoder-shared-worker-workspace");
+  const projectDir = await makeTempDir("qoder-shared-worker-project");
+  const sessionPath = path.join(projectDir, "qoder-shared-worker.jsonl");
+  const rows = [
+    {
+      uuid: "main-user",
+      parentUuid: "",
+      isSidechain: false,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-shared-worker",
+      agentId: "main-agent",
+      type: "user",
+      timestamp: "2026-06-22T09:00:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "main Qoder task" }] },
+    },
+    {
+      uuid: "task-alpha-user",
+      parentUuid: "main-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-shared-worker",
+      agentId: "worker-shared",
+      taskId: "task-alpha",
+      type: "user",
+      timestamp: "2026-06-22T09:10:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "alpha task context" }] },
+    },
+    {
+      uuid: "task-beta-user",
+      parentUuid: "main-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-shared-worker",
+      agentId: "worker-shared",
+      taskId: "task-beta",
+      type: "user",
+      timestamp: "2026-06-22T09:20:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "beta task context" }] },
+    },
+  ];
+
+  await fs.mkdir(projectDir, { recursive: true });
+  await fs.writeFile(sessionPath, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  return { currentDir, sessionPath };
+}
+
 test("joinBlocks handles native transcript content variants", () => {
   assert.equal(joinBlocks("plain string"), "plain string");
   assert.equal(joinBlocks({ text: "single text block" }), "single text block");
@@ -3544,6 +3630,33 @@ test("cli can include one selected QoderCLI sidechain in q2x exports", async () 
   assert.doesNotMatch(result.stdout, /alpha sidechain context/u);
   assert.match(result.stdout, /\[QoderCLI Sidechain: worker-beta\]/u);
   assert.match(result.stdout, /beta sidechain context/u);
+});
+
+test("cli q session discovery ignores sidechain-only cwd matches", async () => {
+  const { mainDir, sidechainDir, sessionsRoot } = await writeQoderSessionWithSidechainOnlyCwdFirst();
+  const mainResult = await spawnCli(["q", "--root", sessionsRoot], { cwd: mainDir });
+  const sidechainResult = await spawnCli(["q", "--root", sessionsRoot], { cwd: sidechainDir });
+
+  assert.equal(mainResult.code, 0);
+  assert.match(mainResult.stdout, /main workspace should select this session/u);
+  assert.doesNotMatch(mainResult.stdout, /sidechain cwd should not select this session/u);
+  assert.equal(sidechainResult.code, 1);
+  assert.match(sidechainResult.stderr, /No QoderCLI sessions match the current directory/u);
+});
+
+test("cli keeps QoderCLI sidechain task selectors separate when agentId is reused", async () => {
+  const { sessionPath } = await writeQoderSessionWithSharedAgentSidechainTasks();
+  const listResult = await spawnCli(["q2x", "--session", sessionPath, "--list-subagents"]);
+  const includeResult = await spawnCli(["q2x", "--session", sessionPath, "--stdout", "--include-subagent", "task-beta"]);
+
+  assert.equal(listResult.code, 0);
+  assert.match(listResult.stdout, /task-alpha/u);
+  assert.match(listResult.stdout, /task-beta/u);
+  assert.doesNotMatch(listResult.stdout, /Selector: worker-shared/u);
+  assert.equal(includeResult.code, 0);
+  assert.match(includeResult.stdout, /\[QoderCLI Sidechain: task-beta\]/u);
+  assert.match(includeResult.stdout, /beta task context/u);
+  assert.doesNotMatch(includeResult.stdout, /alpha task context/u);
 });
 
 test("cli reports unsupported Codex nested transcript listing clearly", async () => {

@@ -3,7 +3,10 @@ import path from "node:path";
 import { cwdFromProjectPath, joinBlocks, knownCwd, readQoderSidecar } from "./shared.js";
 
 export function readSessionCwd(items, sessionPath) {
-  return items.map((item) => knownCwd(item.cwd)).find(Boolean) ?? cwdFromProjectPath(sessionPath);
+  return items
+    .filter((item) => !item.isMeta && item.isSidechain !== true)
+    .map((item) => knownCwd(item.cwd))
+    .find(Boolean) ?? cwdFromProjectPath(sessionPath);
 }
 
 export async function parse(items, sessionPath, agent) {

@@ -90,11 +90,14 @@ async function listClaudeNestedTranscripts(sessionPath) {
 }
 
 function qoderSidechainId(item, fallbackIndex) {
-  if (typeof item.agentId === "string" && item.agentId.trim()) {
-    return item.agentId.trim();
-  }
   if (typeof item.taskId === "string" && item.taskId.trim()) {
     return item.taskId.trim();
+  }
+  if (typeof item.sidechainId === "string" && item.sidechainId.trim()) {
+    return item.sidechainId.trim();
+  }
+  if (typeof item.agentId === "string" && item.agentId.trim()) {
+    return item.agentId.trim();
   }
   if (typeof item.parentUuid === "string" && item.parentUuid.trim()) {
     return `parent-${item.parentUuid.trim()}`;
