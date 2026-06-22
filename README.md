@@ -331,15 +331,19 @@ Agent shorthands:
 You can also run `kage x`, `kage c`, `kage q`, or `kage qw` to list matching sessions for the current directory without exporting.
 When the picker runs interactively, selecting a session prints the native resume command and exits; it does not launch the agent for you.
 
-Claude `subagents/` transcripts stay excluded from bridge exports by default. Inspect or opt into them explicitly:
+Nested transcripts stay excluded from bridge exports by default. Claude subagents and QoderCLI sidechains can be inspected or included explicitly:
 
 ```bash
 kage c2q --list-subagents
 kage c2q --include-subagents
 kage c2q --include-subagent agent-alpha
+
+kage q2x --list-subagents
+kage q2x --include-subagents
+kage q2x --include-subagent worker-alpha
 ```
 
-Included subagent content is wrapped with visible `[Claude Subagent: ...]` boundaries in the exported target context.
+Included nested content is wrapped with visible `[Claude Subagent: ...]` or `[QoderCLI Sidechain: ...]` boundaries in the exported target context. Codex nested transcript support is intentionally disabled until Codex exposes a stable child-run marker.
 
 Use explicit source and target instead of aliases:
 
@@ -431,6 +435,8 @@ Upgrade an existing install:
 ```bash
 kage update
 ```
+
+`kage update` prints the current KAGE version before running the installer and the version detected after the update completes.
 
 Specify a session directly:
 

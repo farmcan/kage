@@ -31,7 +31,12 @@ fi
 
 npm install -g --force "$REPO_TARBALL_URL"
 
-printf '\nInstalled.\n'
+installed_version="$(kage --version 2>/dev/null || true)"
+if [ -n "$installed_version" ]; then
+  printf '\nInstalled %s.\n' "$installed_version"
+else
+  printf '\nInstalled KAGE.\n'
+fi
 printf 'Try:\n'
 printf '  kage c2x\n'
 printf '  kage x2c\n'

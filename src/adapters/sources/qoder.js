@@ -8,10 +8,10 @@ export function readSessionCwd(items, sessionPath) {
 
 export async function parse(items, sessionPath, agent) {
   const sidecar = await readQoderSidecar(sessionPath);
-  const first = items.find((item) => !item.isMeta) ?? items[0] ?? {};
+  const first = items.find((item) => !item.isMeta && item.isSidechain !== true) ?? items.find((item) => !item.isMeta) ?? items[0] ?? {};
   const cwd = knownCwd(sidecar?.working_dir) ?? knownCwd(first.cwd) ?? readSessionCwd(items, sessionPath) ?? process.cwd();
   const messages = items
-    .filter((item) => !item.isMeta)
+    .filter((item) => !item.isMeta && item.isSidechain !== true)
     .map((item) => {
       const text = joinBlocks(item.message?.content);
       if (!text) {

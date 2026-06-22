@@ -14,6 +14,7 @@ The old icon concept assets were removed after the Session Portal icon became th
 ## Maintainer Docs
 
 - [GitHub presence guide](github-presence-guide.md)
+- [Nested transcript support](nested-transcripts.md)
 - [Release and launch checklist](release-launch-checklist.md)
 
 ## Release Notes

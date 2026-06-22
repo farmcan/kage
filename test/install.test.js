@@ -17,6 +17,7 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /npm list -g agent-session-bridge/);
   assert.match(content, /npm uninstall -g agent-session-bridge/);
   assert.match(content, /npm install -g --force/);
+  assert.match(content, /kage --version/);
   assert.match(content, /kage c2x/);
 });
 

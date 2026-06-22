@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { formatAgentName, normalizeAgent } from "./agents.js";
+import { appendNestedTranscriptMessages } from "./nested-transcripts.js";
 import { forkSession, splitSession } from "./session-transforms.js";
-import { appendClaudeSubagentMessages } from "./subagents.js";
 import { parseSession } from "../adapters/sources/index.js";
 import { renderExport } from "../adapters/targets/index.js";
 
@@ -61,7 +61,7 @@ export async function exportSession({
   if (splitRecent) {
     session = splitSession(session, { recentUserTurns: splitRecent });
   }
-  const subagentResult = await appendClaudeSubagentMessages(session, {
+  const subagentResult = await appendNestedTranscriptMessages(session, {
     sessionPath,
     includeSubagents,
     includeSubagent,

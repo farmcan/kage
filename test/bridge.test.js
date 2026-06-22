@@ -219,6 +219,78 @@ async function writeClaudeSessionWithSubagents() {
   return { currentDir, sessionPath, alphaPath, betaPath };
 }
 
+async function writeQoderSessionWithSidechains() {
+  const currentDir = await makeTempDir("qoder-sidechain-workspace");
+  const projectDir = await makeTempDir("qoder-sidechain-project");
+  const sessionPath = path.join(projectDir, "qoder-parent.jsonl");
+  const rows = [
+    {
+      uuid: "main-user",
+      parentUuid: "",
+      isSidechain: false,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-parent",
+      agentId: "main-agent",
+      type: "user",
+      timestamp: "2026-06-22T09:00:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "main Qoder task" }] },
+    },
+    {
+      uuid: "main-assistant",
+      parentUuid: "main-user",
+      isSidechain: false,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-parent",
+      agentId: "main-agent",
+      type: "assistant",
+      timestamp: "2026-06-22T09:00:01.000Z",
+      message: { role: "assistant", content: [{ type: "text", text: "main Qoder answer" }] },
+    },
+    {
+      uuid: "sidechain-alpha-user",
+      parentUuid: "main-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-parent",
+      agentId: "worker-alpha",
+      type: "user",
+      timestamp: "2026-06-22T09:10:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "alpha sidechain context" }] },
+    },
+    {
+      uuid: "sidechain-alpha-assistant",
+      parentUuid: "sidechain-alpha-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-parent",
+      agentId: "worker-alpha",
+      type: "assistant",
+      timestamp: "2026-06-22T09:10:01.000Z",
+      message: { role: "assistant", content: [{ type: "text", text: "alpha sidechain result" }] },
+    },
+    {
+      uuid: "sidechain-beta-user",
+      parentUuid: "main-user",
+      isSidechain: true,
+      isMeta: false,
+      cwd: currentDir,
+      sessionId: "qoder-parent",
+      agentId: "worker-beta",
+      type: "user",
+      timestamp: "2026-06-22T09:20:00.000Z",
+      message: { role: "user", content: [{ type: "text", text: "beta sidechain context" }] },
+    },
+  ];
+
+  await fs.mkdir(projectDir, { recursive: true });
+  await fs.writeFile(sessionPath, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  return { currentDir, sessionPath };
+}
+
 test("joinBlocks handles native transcript content variants", () => {
   assert.equal(joinBlocks("plain string"), "plain string");
   assert.equal(joinBlocks({ text: "single text block" }), "single text block");
@@ -2503,12 +2575,16 @@ test("cli formats the QoderCLI label consistently", async () => {
 });
 
 test("cli supports update command", async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
   const result = await spawnCli(["update"], {
     env: { ...process.env, KAGE_UPDATE_COMMAND: "printf 'Updated KAGE\\n'" },
   });
 
   assert.equal(result.code, 0);
+  assert.match(result.stdout, /KAGE update/u);
+  assert.match(result.stdout, new RegExp(`Current version: ${packageJson.version}`, "u"));
   assert.match(result.stdout, /Updated KAGE/);
+  assert.match(result.stdout, new RegExp(`Version after update: ${packageJson.version}`, "u"));
 });
 
 test("cli doctor emits machine-readable readiness checks", async () => {
@@ -3393,7 +3469,7 @@ test("cli lists Claude subagents for a selected c2q source session", async () =>
   const result = await spawnCli(["c2q", "--session", sessionPath, "--list-subagents"]);
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /Claude subagents for claude-parent/u);
+  assert.match(result.stdout, /Claude subagent transcripts for claude-parent/u);
   assert.match(result.stdout, /agent-alpha/u);
   assert.match(result.stdout, /agent-beta/u);
   assert.match(result.stdout, new RegExp(alphaPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
@@ -3422,6 +3498,59 @@ test("cli can include one selected Claude subagent in c2q exports", async () => 
   assert.doesNotMatch(result.stdout, /alpha exploratory context/u);
   assert.match(result.stdout, /\[Claude Subagent: agent-beta\]/u);
   assert.match(result.stdout, /beta hidden context/u);
+});
+
+test("cli excludes QoderCLI sidechains from q2x by default", async () => {
+  const { sessionPath } = await writeQoderSessionWithSidechains();
+  const result = await spawnCli(["q2x", "--session", sessionPath, "--stdout"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /main Qoder task/u);
+  assert.doesNotMatch(result.stdout, /alpha sidechain context/u);
+  assert.doesNotMatch(result.stdout, /beta sidechain context/u);
+  assert.doesNotMatch(result.stdout, /\[QoderCLI Sidechain:/u);
+});
+
+test("cli lists QoderCLI sidechains for a selected q2x source session", async () => {
+  const { sessionPath } = await writeQoderSessionWithSidechains();
+  const result = await spawnCli(["q2x", "--session", sessionPath, "--list-subagents"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /QoderCLI sidechain transcripts for qoder-parent/u);
+  assert.match(result.stdout, /worker-alpha/u);
+  assert.match(result.stdout, /worker-beta/u);
+  assert.match(result.stdout, /Selector: worker-alpha/u);
+  assert.match(result.stdout, new RegExp(sessionPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+});
+
+test("cli can include all QoderCLI sidechains in q2x exports", async () => {
+  const { sessionPath } = await writeQoderSessionWithSidechains();
+  const result = await spawnCli(["q2x", "--session", sessionPath, "--stdout", "--include-subagents"]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /\[QoderCLI Sidechain: worker-alpha\]/u);
+  assert.match(result.stdout, /alpha sidechain context/u);
+  assert.match(result.stdout, /\[\/QoderCLI Sidechain: worker-alpha\]/u);
+  assert.match(result.stdout, /\[QoderCLI Sidechain: worker-beta\]/u);
+  assert.match(result.stdout, /beta sidechain context/u);
+});
+
+test("cli can include one selected QoderCLI sidechain in q2x exports", async () => {
+  const { sessionPath } = await writeQoderSessionWithSidechains();
+  const result = await spawnCli(["q2x", "--session", sessionPath, "--stdout", "--include-subagent", "worker-beta"]);
+
+  assert.equal(result.code, 0);
+  assert.doesNotMatch(result.stdout, /worker-alpha/u);
+  assert.doesNotMatch(result.stdout, /alpha sidechain context/u);
+  assert.match(result.stdout, /\[QoderCLI Sidechain: worker-beta\]/u);
+  assert.match(result.stdout, /beta sidechain context/u);
+});
+
+test("cli reports unsupported Codex nested transcript listing clearly", async () => {
+  const result = await spawnCli(["x2q", "--session", path.join(__dirname, "..", "fixtures", "sample-codex-session.jsonl"), "--list-subagents"]);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Codex sessions do not currently expose supported nested transcript metadata/u);
 });
 
 test("cli installs cross-agent bridges with target-native UUID session ids", async () => {

@@ -18,7 +18,7 @@ import { getExportCapability, inferDefaultExportFormat, routeAliases } from "./c
 import { searchSessions } from "./core/search.js";
 import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.js";
 import { compactSessionText } from "./core/session-labels.js";
-import { listClaudeSubagents } from "./core/subagents.js";
+import { listNestedTranscripts } from "./core/nested-transcripts.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
 import { startServeCommand } from "./serve/index.js";
 
@@ -77,9 +77,9 @@ Options:
   --split-recent <n>          Keep only the latest N turns
   --fork <prompt>             Inject fork prompt for exported payloads
   --fork-file <path>          Read fork prompt from file
-  --list-subagents            List Claude subagent transcripts for the selected source session
-  --include-subagents         Include all Claude subagent transcripts in the export
-  --include-subagent <id|path> Include one Claude subagent transcript in the export
+  --list-subagents            List nested transcripts for the selected source session
+  --include-subagents         Include all nested transcripts in the export
+  --include-subagent <id|path> Include one nested transcript in the export
   --preview                   Show planned export without writing files
   --run                       Execute resume commands after export
   --older-than <duration>     Filter items older than this value
@@ -536,6 +536,8 @@ export async function runUpdateCommand({
   stdout = process.stdout,
   stderr = process.stderr,
 } = {}) {
+  const currentVersion = await getCliVersion();
+  stdout.write(`KAGE update\nCurrent version: ${currentVersion}\n\n`);
   const shell = process.env.SHELL || "sh";
   await new Promise((resolve, reject) => {
     const child = spawn(shell, ["-lc", command], {
@@ -558,6 +560,8 @@ export async function runUpdateCommand({
       reject(new Error(`Update failed with exit code ${code}`));
     });
   });
+  const updatedVersion = await getCliVersion();
+  stdout.write(`\nUpdate complete.\nVersion after update: ${updatedVersion}\n`);
 }
 
 export async function runResumeCommand({
@@ -1624,15 +1628,16 @@ function formatSubagentsResult(result, asJson) {
     return `${JSON.stringify(result, null, 2)}\n`;
   }
 
-  const lines = [`Claude subagents for ${result.sessionId}:`];
+  const lines = [`${result.displayName} ${result.kindLabel.toLowerCase()} transcripts for ${result.sessionId}:`];
   lines.push(`Session: ${result.sessionPath}`);
-  lines.push(`Directory: ${result.subagentDir}`);
+  lines.push(`Location: ${result.location}`);
   if (result.subagents.length === 0) {
-    lines.push("No Claude subagent transcripts found.");
+    lines.push(`No ${result.kindLabel.toLowerCase()} transcripts found.`);
   }
   for (const subagent of result.subagents) {
     lines.push("");
     lines.push(`- ${subagent.id}`);
+    lines.push(`  Selector: ${subagent.selector ?? subagent.id}`);
     lines.push(`  Path: ${subagent.path}`);
     lines.push(`  Messages: ${subagent.messageCount}`);
     lines.push(`  Updated: ${subagent.updatedAt ?? "unknown time"}`);
@@ -1836,20 +1841,21 @@ async function main() {
   args.forkPrompt = await resolveForkPrompt(args);
   const sessionPath = await resolveSessionPath(args);
   if (args.listSubagents) {
-    if (formatAgentName(args.agent) !== "claude") {
-      throw new Error("--list-subagents is only supported for Claude source sessions");
-    }
-    const { parentSession, subagentDir, subagents } = await listClaudeSubagents(sessionPath);
+    const nestedResult = await listNestedTranscripts(sessionPath, { agent: args.agent });
     process.stdout.write(
       formatSubagentsResult(
         {
           mode: "subagents",
-          sourceAgent: "claude",
-          sessionId: parentSession.sessionId,
+          sourceAgent: nestedResult.sourceAgent,
+          displayName: nestedResult.displayName,
+          kindLabel: nestedResult.kindLabel,
+          sessionId: nestedResult.parentSession.sessionId,
           sessionPath,
-          subagentDir,
-          subagents: subagents.map((subagent) => ({
+          location: nestedResult.location,
+          subagents: nestedResult.nestedTranscripts.map((subagent) => ({
             id: subagent.id,
+            kind: subagent.kind,
+            selector: subagent.selector,
             path: subagent.path,
             sessionId: subagent.sessionId,
             messageCount: subagent.messageCount,
