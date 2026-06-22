@@ -127,7 +127,7 @@ struct SettingsView: View {
 
       Section("Doctor") {
         if let doctor = poller.doctorResult {
-          Text("KAGE \(doctor.kageVersion)")
+          Text("KAGE \(doctor.displayVersion)")
           ForEach(doctor.agents) { agent in
             VStack(alignment: .leading, spacing: 4) {
               HStack {

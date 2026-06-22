@@ -20,6 +20,7 @@ import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.j
 import { compactSessionText } from "./core/session-labels.js";
 import { listNestedTranscripts } from "./core/nested-transcripts.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
+import { formatBuildLabel, formatCliVersion, getCliVersionInfo } from "./core/version.js";
 import { startServeCommand } from "./serve/index.js";
 
 const shorthandAgents = ["c", "x", "q", "qw"];
@@ -536,8 +537,13 @@ export async function runUpdateCommand({
   stdout = process.stdout,
   stderr = process.stderr,
 } = {}) {
-  const currentVersion = await getCliVersion();
-  stdout.write(`KAGE update\nCurrent version: ${currentVersion}\n\n`);
+  const currentVersion = await getCliVersionInfo();
+  stdout.write(`KAGE update\nCurrent version: ${currentVersion.version}\n`);
+  const currentBuild = formatBuildLabel(currentVersion.build);
+  if (currentBuild) {
+    stdout.write(`Current build: ${currentBuild}\n`);
+  }
+  stdout.write("\n");
   const shell = process.env.SHELL || "sh";
   await new Promise((resolve, reject) => {
     const child = spawn(shell, ["-lc", command], {
@@ -560,8 +566,12 @@ export async function runUpdateCommand({
       reject(new Error(`Update failed with exit code ${code}`));
     });
   });
-  const updatedVersion = await getCliVersion();
-  stdout.write(`\nUpdate complete.\nVersion after update: ${updatedVersion}\n`);
+  const updatedVersion = await getCliVersionInfo();
+  stdout.write(`\nUpdate complete.\nVersion after update: ${updatedVersion.version}\n`);
+  const updatedBuild = formatBuildLabel(updatedVersion.build);
+  if (updatedBuild) {
+    stdout.write(`Build after update: ${updatedBuild}\n`);
+  }
 }
 
 export async function runResumeCommand({
@@ -634,9 +644,7 @@ async function runCliCommand(args, { capture = false } = {}) {
 }
 
 async function getCliVersion() {
-  const packagePath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
-  const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
-  return packageJson.version;
+  return (await getCliVersionInfo()).version;
 }
 
 function commandForAgent(agent) {
@@ -993,7 +1001,7 @@ function formatCleanResult(result, asJson) {
 }
 
 async function buildDoctorResult(args = {}) {
-  const version = await getCliVersion();
+  const versionInfo = await getCliVersionInfo();
   const agents = await Promise.all(
     supportedAgents.map(async (agent) => {
       const command = commandForAgent(agent);
@@ -1024,7 +1032,8 @@ async function buildDoctorResult(args = {}) {
         (!agent.sessionRootRequired || (agent.sessionRoot.exists && agent.sessionRoot.readable)),
     ),
     cwd: process.cwd(),
-    kageVersion: version,
+    kageVersion: versionInfo.version,
+    kageBuild: versionInfo.build,
     agents,
   };
 }
@@ -1034,7 +1043,12 @@ function formatDoctorResult(result, asJson) {
     return `${JSON.stringify(result, null, 2)}\n`;
   }
 
-  const lines = [`KAGE doctor: ${result.ok ? "ready" : "attention needed"}`, `Version: ${result.kageVersion}`, `CWD: ${result.cwd}`];
+  const lines = [`KAGE doctor: ${result.ok ? "ready" : "attention needed"}`, `Version: ${result.kageVersion}`];
+  const buildLabel = formatBuildLabel(result.kageBuild);
+  if (buildLabel) {
+    lines.push(`Build: ${buildLabel}`);
+  }
+  lines.push(`CWD: ${result.cwd}`);
   for (const agent of result.agents) {
     const commandStatus =
       agent.command == null
@@ -1741,7 +1755,7 @@ async function main() {
     throw new Error(args.error);
   }
   if (args.version) {
-    process.stdout.write(`kage ${await getCliVersion()}\n`);
+    process.stdout.write(`${formatCliVersion(await getCliVersionInfo())}\n`);
     return;
   }
   if (args.help) {

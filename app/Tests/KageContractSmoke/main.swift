@@ -10,6 +10,12 @@ do {
       "ok": true,
       "cwd": "/tmp/project",
       "kageVersion": "0.1.0",
+      "kageBuild": {
+        "revision": "abc123def456",
+        "source": "app-bundle",
+        "installedAt": "2026-06-22T12:00:00Z",
+        "tarballUrl": null
+      },
       "agents": [
         {
           "agent": "codex",
@@ -50,6 +56,7 @@ do {
     """
   )
   try require(doctor.ok, "doctor ok should decode")
+  try require(doctor.displayVersion == "0.1.0 (app-bundle abc123def456)", "doctor build label should decode")
   try require(doctor.agents[0].sessionRoot.isHealthy, "doctor session root should decode as healthy")
   try require(doctor.agents[1].command == nil, "optional source command should decode as nil")
   try require(doctor.agents[1].isReady, "optional QoderWork source should not make doctor unhealthy")

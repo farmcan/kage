@@ -523,7 +523,7 @@ struct DesktopDashboardView: View {
         HStack(spacing: 6) {
           Image(systemName: doctor.ok ? "checkmark.circle" : "exclamationmark.triangle")
             .foregroundStyle(doctor.ok ? .green : .orange)
-          Text("KAGE \(doctor.kageVersion)")
+          Text("KAGE \(doctor.displayVersion)")
           Spacer()
         }
         .font(.caption)

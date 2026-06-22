@@ -2595,7 +2595,7 @@ test("cli supports --version", async () => {
   const result = await spawnCli(["--version"]);
 
   assert.equal(result.code, 0);
-  assert.equal(result.stdout.trim(), `kage ${packageJson.version}`);
+  assert.match(result.stdout.trim(), new RegExp(`^kage ${packageJson.version}(?: \\([^)]+ [0-9a-f]{7,40}\\))?$`, "u"));
 });
 
 test("package.json exposes KAGE bin", async () => {
@@ -2669,11 +2669,14 @@ test("cli supports update command", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /KAGE update/u);
   assert.match(result.stdout, new RegExp(`Current version: ${packageJson.version}`, "u"));
+  assert.match(result.stdout, /Current build: /u);
   assert.match(result.stdout, /Updated KAGE/);
   assert.match(result.stdout, new RegExp(`Version after update: ${packageJson.version}`, "u"));
+  assert.match(result.stdout, /Build after update: /u);
 });
 
 test("cli doctor emits machine-readable readiness checks", async () => {
+  const packageJson = JSON.parse(await fs.readFile(path.join(__dirname, "..", "package.json"), "utf8"));
   const fakeHome = await makeTempDir("doctor-home");
   const binDir = await makeTempDir("doctor-bin");
   await fs.mkdir(path.join(fakeHome, ".claude", "projects"), { recursive: true });
@@ -2692,6 +2695,8 @@ test("cli doctor emits machine-readable readiness checks", async () => {
   assert.equal(result.code, 0);
   assert.equal(payload.mode, "doctor");
   assert.equal(payload.ok, true);
+  assert.equal(payload.kageVersion, packageJson.version);
+  assert.match(payload.kageBuild.revision, /^[0-9a-f]{7,40}$/u);
   assert.equal(payload.agents.length, 4);
   assert.equal(payload.agents.find((agent) => agent.agent === "claude").version, "claude 2.1.98");
   assert.equal(payload.agents.find((agent) => agent.agent === "claude").resumeCommand, "cd <cwd> && claude --resume <session-id>");

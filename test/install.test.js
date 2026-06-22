@@ -17,6 +17,8 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /npm list -g agent-session-bridge/);
   assert.match(content, /npm uninstall -g agent-session-bridge/);
   assert.match(content, /npm install -g --force/);
+  assert.match(content, /build-info\.json/);
+  assert.match(content, /api\.github\.com\/repos\/farmcan\/kage\/git\/ref\/heads\/main/);
   assert.match(content, /kage --version/);
   assert.match(content, /kage c2x/);
 });
@@ -29,6 +31,8 @@ test("menu bar bundle script ships the KAGE CLI resources", async () => {
   assert.match(content, /kage-cli/);
   assert.match(content, /cp -R "\$REPO_ROOT\/src"/);
   assert.match(content, /node_modules\/qrcode-terminal/);
+  assert.match(content, /build-info\.json/);
+  assert.match(content, /git -C "\$REPO_ROOT" rev-parse --short=12 HEAD/);
   assert.match(content, /exec \/usr\/bin\/env node "\$SCRIPT_DIR\/kage-cli\/src\/cli\.js"/);
   assert.match(content, /chmod \+x "\$CLI_LAUNCHER"/);
 });

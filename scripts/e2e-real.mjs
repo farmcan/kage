@@ -250,14 +250,17 @@ try {
   requireCondition(appIconName === "AppIcon", `Expected CFBundleIconFile AppIcon, got ${appIconName}.`);
   requireCondition(await exists(appIconPath), `Packaged app icon not found: ${appIconPath}.`);
   requireCondition(await exists(menuBarIconPath), `Packaged menu bar icon not found: ${menuBarIconPath}.`);
-  requireCondition(cliVersion === `kage ${version}`, `Expected CLI version kage ${version}, got ${cliVersion}.`);
-  summary.push(`verified app icon, menu bar icon, and bundled CLI version ${version}`);
+  requireCondition(cliVersion.startsWith(`kage ${version}`), `Expected CLI version kage ${version}, got ${cliVersion}.`);
+  requireCondition(/\(app-bundle [0-9a-f]{7,40}\)$/u.test(cliVersion), `Expected bundled CLI build label, got ${cliVersion}.`);
+  summary.push(`verified app icon, menu bar icon, and bundled CLI version ${cliVersion}`);
 
   const fixtures = await createFixtures();
   summary.push(`created real session roots under ${tmpHome}`);
 
   const doctor = runJson(kageBin, ["doctor", "--json"], { cwd: projectDir, env: e2eEnv() });
   requireCondition(doctor.kageVersion === version, `doctor should report KAGE ${version}.`);
+  requireCondition(doctor.kageBuild?.source === "app-bundle", `doctor should report app-bundle source, got ${JSON.stringify(doctor.kageBuild)}.`);
+  requireCondition(/^[0-9a-f]{7,40}$/u.test(doctor.kageBuild?.revision ?? ""), `doctor should report build revision, got ${JSON.stringify(doctor.kageBuild)}.`);
   for (const agentName of ["claude", "codex", "qodercli"]) {
     const agent = doctor.agents.find((candidate) => candidate.agent === agentName);
     requireCondition(agent, `doctor should include ${agentName}.`);

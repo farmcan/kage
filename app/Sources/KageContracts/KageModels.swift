@@ -143,7 +143,32 @@ public struct DoctorResult: Decodable, Sendable {
   public let ok: Bool
   public let cwd: String
   public let kageVersion: String
+  public let kageBuild: KageBuild?
   public let agents: [DoctorAgent]
+
+  public var displayVersion: String {
+    guard let buildLabel = kageBuild?.displayLabel, !buildLabel.isEmpty else {
+      return kageVersion
+    }
+    return "\(kageVersion) (\(buildLabel))"
+  }
+}
+
+public struct KageBuild: Decodable, Sendable {
+  public let revision: String?
+  public let source: String?
+  public let installedAt: String?
+  public let tarballUrl: String?
+
+  public var displayLabel: String? {
+    guard let revision, !revision.isEmpty else {
+      return nil
+    }
+    if let source, !source.isEmpty {
+      return "\(source) \(revision)"
+    }
+    return revision
+  }
 }
 
 public struct DoctorAgent: Decodable, Identifiable, Sendable {

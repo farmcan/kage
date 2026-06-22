@@ -16,6 +16,8 @@ RESOURCE_SOURCE_DIR="$SCRIPT_DIR/Resources"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PACKAGE_VERSION="$(sed -n 's/.*"version": "\(.*\)".*/\1/p' "$REPO_ROOT/package.json" | head -n 1)"
 VERSION="${KAGE_APP_VERSION:-$PACKAGE_VERSION}"
+BUILD_REVISION="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || true)"
+BUILD_TIME="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 cd "$SCRIPT_DIR"
 swift build -c release
@@ -30,6 +32,14 @@ cp -R "$REPO_ROOT/src" "$CLI_BUNDLE_DIR/src"
 cp "$REPO_ROOT/package.json" "$CLI_BUNDLE_DIR/package.json"
 cp "$REPO_ROOT/README.md" "$CLI_BUNDLE_DIR/README.md"
 cp "$REPO_ROOT/LICENSE" "$CLI_BUNDLE_DIR/LICENSE"
+cat > "$CLI_BUNDLE_DIR/build-info.json" <<JSON
+{
+  "source": "app-bundle",
+  "revision": "$BUILD_REVISION",
+  "installedAt": "$BUILD_TIME",
+  "tarballUrl": null
+}
+JSON
 if [[ -d "$REPO_ROOT/node_modules/qrcode-terminal" ]]; then
   mkdir -p "$CLI_BUNDLE_DIR/node_modules"
   cp -R "$REPO_ROOT/node_modules/qrcode-terminal" "$CLI_BUNDLE_DIR/node_modules/qrcode-terminal"
