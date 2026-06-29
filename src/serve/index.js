@@ -504,6 +504,49 @@ function createTask(body, options, targetKey) {
   };
 }
 
+function queueTargetTask(task, body, options, kind) {
+  const queue = options.sendQueues.get(task.targetKey) ?? [];
+  queue.push({ task, body, kind });
+  options.sendQueues.set(task.targetKey, queue);
+  const now = new Date().toISOString();
+  task.updatedAt = now;
+  task.logs = [...task.logs, "Waiting for the current task on this target to finish."];
+}
+
+function startTargetTask(task, body, options, kind) {
+  options.sendInflight.set(task.targetKey, { startedAt: Date.now(), taskId: task.id });
+  setTimeout(() => {
+    if (kind === "send") {
+      void runSendTask(task, body, options);
+      return;
+    }
+    void runDispatchTask(task, body, options);
+  }, 0);
+}
+
+function scheduleTargetTask(task, body, options, kind) {
+  if (options.sendInflight.has(task.targetKey)) {
+    queueTargetTask(task, body, options, kind);
+    return;
+  }
+  startTargetTask(task, body, options, kind);
+}
+
+function finishTargetTask(task, options) {
+  const queue = options.sendQueues.get(task.targetKey);
+  const next = queue?.shift();
+  if (queue && queue.length === 0) {
+    options.sendQueues.delete(task.targetKey);
+  }
+  if (!next) {
+    options.sendInflight.delete(task.targetKey);
+    return;
+  }
+  next.task.updatedAt = new Date().toISOString();
+  next.task.logs = [...next.task.logs, "Previous task finished; starting now."];
+  startTargetTask(next.task, next.body, options, next.kind);
+}
+
 async function runDispatchTask(task, body, options) {
   task.status = "running";
   task.progress = 35;
@@ -545,7 +588,7 @@ async function runDispatchTask(task, body, options) {
     task.error = error.message;
     task.logs = [...task.logs, error.message];
   } finally {
-    options.sendInflight.delete(task.targetKey);
+    finishTargetTask(task, options);
   }
 }
 
@@ -589,7 +632,7 @@ async function runSendTask(task, body, options) {
     task.error = error.message;
     task.logs = [...task.logs, error.message];
   } finally {
-    options.sendInflight.delete(task.targetKey);
+    finishTargetTask(task, options);
   }
 }
 
@@ -815,25 +858,13 @@ async function handleTaskAction(request, response, options, { taskId, action }) 
     }
     const body = { agent: task.agent, cwd: task.cwd, message: task.message };
     const targetKey = sendTargetKey(body, options.cwd);
-    if (options.sendInflight.has(targetKey)) {
-      jsonResponse(response, 409, {
-        mode: "dispatch",
-        status: "busy",
-        error: "A task is already running for this target. Wait for it to finish before retrying.",
-        targetKey,
-      });
-      return;
-    }
     const nextTask = createTask(body, options, targetKey);
     nextTask.logs = [`Retrying ${task.id}.`];
     options.tasks.set(nextTask.id, nextTask);
-    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: nextTask.id });
     task.logs = [...(task.logs || []), `Retry dispatched as ${nextTask.id}.`];
     task.updatedAt = new Date().toISOString();
     trimTaskHistory(options.tasks);
-    setTimeout(() => {
-      void runDispatchTask(nextTask, body, options);
-    }, 0);
+    scheduleTargetTask(nextTask, body, options, "dispatch");
     jsonResponse(response, 202, { mode: "dispatch", task: publicTask(nextTask) });
     return;
   }
@@ -870,23 +901,11 @@ async function handleDispatch(request, response, options) {
     return;
   }
   const targetKey = sendTargetKey(body, options.cwd);
-  if (options.sendInflight.has(targetKey)) {
-    jsonResponse(response, 409, {
-      mode: "dispatch",
-      status: "busy",
-      error: "A task is already running for this target. Wait for it to finish before dispatching another prompt.",
-      targetKey,
-    });
-    return;
-  }
   try {
     const task = createTask(body, options, targetKey);
     options.tasks.set(task.id, task);
-    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: task.id });
     trimTaskHistory(options.tasks);
-    setTimeout(() => {
-      void runDispatchTask(task, body, options);
-    }, 0);
+    scheduleTargetTask(task, body, options, "dispatch");
     jsonResponse(response, 202, { mode: "dispatch", task: publicTask(task) });
   } catch (error) {
     jsonResponse(response, 500, { mode: "dispatch", status: "failed", error: error.message, targetKey });
@@ -924,23 +943,11 @@ async function handleSend(request, response, options) {
     return;
   }
   const targetKey = sendTargetKey(body, options.cwd);
-  if (options.sendInflight.has(targetKey)) {
-    jsonResponse(response, 409, {
-      mode: "send",
-      status: "busy",
-      error: "A send is already running for this target. Wait for it to finish before sending another prompt.",
-      targetKey,
-    });
-    return;
-  }
   try {
     const task = createTask({ ...body, agent: normalizedAgent, message: normalizedMessage }, options, targetKey);
     options.tasks.set(task.id, task);
-    options.sendInflight.set(targetKey, { startedAt: Date.now(), taskId: task.id });
     trimTaskHistory(options.tasks);
-    setTimeout(() => {
-      void runSendTask(task, body, options);
-    }, 0);
+    scheduleTargetTask(task, body, options, "send");
     jsonResponse(response, 202, { mode: "send", targetKey, task: publicTask(task) });
   } catch (error) {
     jsonResponse(response, 500, {
@@ -950,7 +957,6 @@ async function handleSend(request, response, options) {
       targetKey,
       ...(error.result ? { result: error.result } : {}),
     });
-    options.sendInflight.delete(targetKey);
   }
 }
 
@@ -1075,6 +1081,7 @@ export function createKageServeServer(options = {}) {
     allowSend: options.allowSend !== false,
     sendRunner: options.sendRunner ?? runAgentSend,
     sendInflight: new Map(),
+    sendQueues: new Map(),
     tasks: new Map(),
     pollIntervalMs: options.pollIntervalMs ?? 2000,
   };

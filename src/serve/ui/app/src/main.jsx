@@ -648,11 +648,27 @@ async function loadTranscriptSearch({ query, workspace, agent }) {
   }
 }
 
+function revealTaskOnBoard(taskId) {
+  if (!taskId) return;
+  const state = useStore.getState();
+  state.setViewMode("board");
+  state.setSelectedTaskId(taskId);
+}
+
 async function loadTasks({ silent = false } = {}) {
   try {
     const data = await api("/api/tasks");
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-    useStore.getState().setTasks(tasks);
+    const state = useStore.getState();
+    const previousById = new Map((state.tasks || []).map((task) => [task.id, task]));
+    const reviewTaskToReveal = tasks.find((task) => {
+      const previousStatus = previousById.get(task.id)?.status;
+      return task.status === "needs_review" && previousStatus !== "needs_review";
+    });
+    state.setTasks(tasks);
+    if (reviewTaskToReveal) {
+      revealTaskOnBoard(reviewTaskToReveal.id);
+    }
     return tasks;
   } catch (error) {
     if (!silent) {
@@ -3209,6 +3225,7 @@ function TaskDispatchBar({ workspace }) {
       logs: ["Queued locally."],
     };
     useStore.getState().upsertTask(optimisticTask);
+    useStore.getState().setSelectedTaskId(optimisticTask.id);
     setDraft("");
     try {
       const data = await api("/api/dispatch", {
@@ -3219,6 +3236,7 @@ function TaskDispatchBar({ workspace }) {
       if (data.task) {
         useStore.getState().removeTask(optimisticTask.id);
         useStore.getState().upsertTask(data.task);
+        useStore.getState().setSelectedTaskId(data.task.id);
       }
       useStore.getState().showToast("Task dispatched");
       void loadTasks({ silent: true });
@@ -3291,8 +3309,15 @@ function uniqueTaskLines(lines, limit = 8) {
   return values;
 }
 
+function stripAnsiControlCodes(value) {
+  return String(value || "")
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/gu, "")
+    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/gu, "")
+    .replace(/\r(?!\n)/gu, "\n");
+}
+
 function compactTaskText(value, { stripNoise = false, maxChars = 12000 } = {}) {
-  const raw = String(value || "").trim();
+  const raw = stripAnsiControlCodes(value).trim();
   if (!raw) return "";
   const lines = raw.split(/\r?\n/u);
   let hiddenNoise = 0;
@@ -3312,6 +3337,68 @@ function compactTaskText(value, { stripNoise = false, maxChars = 12000 } = {}) {
     text = `${text.slice(0, maxChars).trimEnd()}\n\n[truncated ${text.length - maxChars} characters]`;
   }
   return text;
+}
+
+function trimTaskUsageFooter(value) {
+  return String(value || "")
+    .replace(/\n+\s*(?:tokens used|token usage|usage summary)\b[\s\S]*$/iu, "")
+    .trim();
+}
+
+function stripTaskCliEnvelope(value) {
+  const lines = stripAnsiControlCodes(value).split(/\r?\n/u);
+  const visible = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      visible.push(line);
+      continue;
+    }
+    if (/^-{6,}$/u.test(trimmed)) continue;
+    if (/^OpenAI Codex v[\d.]+/iu.test(trimmed)) continue;
+    if (/^(workdir|model|provider|approval|sandbox|reasoning effort|reasoning summaries|session id):\s+/iu.test(trimmed)) continue;
+    visible.push(line);
+  }
+  return trimTaskUsageFooter(visible.join("\n"));
+}
+
+function extractMarkedFinalOutput(value) {
+  const lines = String(value || "").split(/\r?\n/u);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const marker = lines[index].trim().toLowerCase();
+    if (marker === "assistant" || marker === "codex" || marker === "final answer" || marker === "final") {
+      const candidate = trimTaskUsageFooter(lines.slice(index + 1).join("\n"));
+      if (candidate && candidate.length < String(value || "").trim().length) {
+        return candidate;
+      }
+    }
+  }
+  return "";
+}
+
+function presentableTaskOutput(value, options = {}) {
+  const cleaned = stripTaskCliEnvelope(value);
+  const finalOutput = extractMarkedFinalOutput(cleaned);
+  return compactTaskText(finalOutput || cleaned, { stripNoise: true, ...options });
+}
+
+function taskTextLooksMarkdown(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return [
+    /^\s{0,3}(?:```|~~~)/mu,
+    /^\s{0,3}#{1,6}\s+\S/mu,
+    /^\s{0,3}>\s+\S/mu,
+    /^\s{0,3}(?:[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+)\S/mu,
+    /^\s{0,3}\|?.+\|.+\n\s{0,3}\|?\s*:?-{3,}:?\s*\|/mu,
+    /^!\[[^\]]*]\([^)]+\)/mu,
+    /\[[^\]\n]+]\([^)]+\)/u,
+    /`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~/u,
+  ].some((pattern) => pattern.test(text));
+}
+
+function shouldRenderTaskSectionAsMarkdown(section) {
+  return section.format === "markdown" || (section.format === "auto" && taskTextLooksMarkdown(section.text));
 }
 
 function taskFailureText(task) {
@@ -3334,20 +3421,32 @@ function taskFailureText(task) {
 }
 
 function taskResultSections(task) {
-  const output = compactTaskText(task.stdout, { maxChars: 16000 });
+  const output = presentableTaskOutput(task.stdout, { maxChars: 16000 });
+  const rawOutput = compactTaskText(task.stdout, { maxChars: 16000 });
   const failure = task.status === "failed" ? taskFailureText(task) : "";
   const diagnostics = compactTaskText(task.stderr, { stripNoise: true, maxChars: 16000 });
   const activity = compactTaskText((task.logs || []).join("\n"), { stripNoise: true, maxChars: 8000 });
   const sections = [];
 
   if (output) {
-    sections.push({ key: "output", title: "Output", text: output, tone: "output" });
+    sections.push({ key: "output", title: "Final Output", text: output, tone: "output", format: "markdown" });
   } else if (failure) {
-    sections.push({ key: "failure", title: "Failure", text: failure, tone: "error" });
+    sections.push({ key: "failure", title: "Failure", text: failure, tone: "error", format: "auto" });
   } else {
-    sections.push({ key: "waiting", title: "Activity", text: activity || "Waiting for activity.", tone: "muted" });
+    sections.push({ key: "waiting", title: "Activity", text: activity || "Waiting for activity.", tone: "muted", format: "auto" });
   }
 
+  if (rawOutput && rawOutput !== output) {
+    sections.push({
+      key: "raw-output",
+      title: "Raw Output",
+      meta: `${taskTextLineCount(rawOutput)} lines`,
+      text: rawOutput,
+      tone: "activity",
+      collapsible: true,
+      defaultOpen: false,
+    });
+  }
   if (diagnostics) {
     sections.push({
       key: "diagnostics",
@@ -3366,11 +3465,23 @@ function taskResultSections(task) {
       meta: `${taskTextLineCount(activity)} lines`,
       text: activity,
       tone: "activity",
+      format: "auto",
       collapsible: true,
       defaultOpen: false,
     });
   }
   return sections;
+}
+
+function TaskResultSectionText({ section }) {
+  if (shouldRenderTaskSectionAsMarkdown(section)) {
+    return (
+      <div className="task-result-markdown">
+        <MarkdownText content={section.text} />
+      </div>
+    );
+  }
+  return <pre>{section.text}</pre>;
 }
 
 function TaskResultPanel({ task }) {
@@ -3393,7 +3504,7 @@ function TaskResultPanel({ task }) {
               {section.meta && <small>{section.meta}</small>}
               <ChevronDown size={14} />
             </summary>
-            <pre>{section.text}</pre>
+            <TaskResultSectionText section={section} />
           </details>
         ) : (
           <section key={section.key} className={cls("task-result-section", section.tone)}>
@@ -3401,7 +3512,7 @@ function TaskResultPanel({ task }) {
               <span>{section.title}</span>
               {section.meta && <small>{section.meta}</small>}
             </div>
-            <pre>{section.text}</pre>
+            <TaskResultSectionText section={section} />
           </section>
         )
       ))}
@@ -3995,6 +4106,7 @@ function Composer({ session, compact = false, allowReply = true }) {
       return;
     }
     if (task.status === "needs_review") {
+      revealTaskOnBoard(task.id);
       useStore.getState().showToast("Task needs review");
     }
     if (!compact && submittedMode === "new" && previousPaths && task.agent && task.cwd) {
@@ -4044,6 +4156,7 @@ function Composer({ session, compact = false, allowReply = true }) {
         clearLocalSendErrors();
         if (result.task) {
           useStore.getState().upsertTask(result.task);
+          useStore.getState().setSelectedTaskId(result.task.id);
           useStore.getState().showToast(submittedMode === "reply" ? "Reply queued" : "New session queued");
           void watchQueuedSendTask(result.task.id, { pendingId, message, submittedMode, previousPaths });
           if (!compact && submittedMode === "new" && result.task.agent && result.task.cwd && previousPaths) {

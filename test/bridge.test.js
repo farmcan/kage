@@ -2316,21 +2316,32 @@ test("serve send API is enabled by default", async () => {
   }
 });
 
-test("serve send API rejects concurrent sends to the same target", async () => {
-  let releaseSend;
+test("serve send API queues concurrent sends to the same target", async () => {
+  const releases = [];
+  const startedMessages = [];
   let firstSendStartedResolve;
   const firstSendStarted = new Promise((resolve) => {
     firstSendStartedResolve = resolve;
+  });
+  let secondSendStartedResolve;
+  const secondSendStarted = new Promise((resolve) => {
+    secondSendStartedResolve = resolve;
   });
 
   const server = createKageServeServer({
     cwd: __dirname,
     sendRunner: async (payload) => {
-      firstSendStartedResolve(payload);
+      startedMessages.push(payload.message);
+      if (payload.message === "first") {
+        firstSendStartedResolve(payload);
+      }
+      if (payload.message === "second") {
+        secondSendStartedResolve(payload);
+      }
       await new Promise((release) => {
-        releaseSend = release;
+        releases.push(release);
       });
-      return { ok: true, target: "session", command: "fake", cwd: payload.cwd, status: "completed" };
+      return { ok: true, target: "session", command: "fake", cwd: payload.cwd, status: "completed", stdout: payload.message };
     },
   });
   await new Promise((resolve, reject) => {
@@ -2356,29 +2367,57 @@ test("serve send API rejects concurrent sends to the same target", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agent: "claude", sessionId: "same-session", cwd: __dirname, message: "second" }),
     });
-    assert.equal(secondResponse.status, 409);
-    assert.match((await secondResponse.json()).error, /already running/);
+    assert.equal(secondResponse.status, 202);
+    const secondBody = await secondResponse.json();
+    assert.equal(secondBody.task.status, "queued");
+    assert.ok(secondBody.task.logs.some((line) => /current task/i.test(line)));
+    assert.deepEqual(startedMessages, ["first"]);
 
-    releaseSend();
+    releases.shift()();
     const firstResponse = await firstResponsePromise;
     assert.equal(firstResponse.status, 202);
+
+    const secondPayload = await secondSendStarted;
+    assert.equal(secondPayload.message, "second");
+    releases.shift()();
+
+    let completedTask;
+    for (let index = 0; index < 20; index += 1) {
+      const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+      completedTask = tasksBody.tasks.find((task) => task.id === secondBody.task.id);
+      if (completedTask?.status === "completed") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(completedTask.status, "completed");
+    assert.equal(completedTask.stdout, "second");
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });
 
 test("serve dispatch API tracks in-memory task lifecycle", async () => {
-  let releaseSend;
-  let sendStartedResolve;
-  const sendStarted = new Promise((resolve) => {
-    sendStartedResolve = resolve;
+  const releases = new Map();
+  const startedMessages = [];
+  let firstSendStartedResolve;
+  const firstSendStarted = new Promise((resolve) => {
+    firstSendStartedResolve = resolve;
+  });
+  let secondSendStartedResolve;
+  const secondSendStarted = new Promise((resolve) => {
+    secondSendStartedResolve = resolve;
   });
   const server = createKageServeServer({
     cwd: __dirname,
     sendRunner: async (payload) => {
-      sendStartedResolve(payload);
+      startedMessages.push(payload.message);
+      if (payload.message === "Build the board") {
+        firstSendStartedResolve(payload);
+      }
+      if (payload.message === "Build it again") {
+        secondSendStartedResolve(payload);
+      }
       await new Promise((release) => {
-        releaseSend = release;
+        releases.set(payload.message, release);
       });
       return {
         ok: true,
@@ -2386,7 +2425,7 @@ test("serve dispatch API tracks in-memory task lifecycle", async () => {
         command: "fake",
         cwd: payload.cwd,
         status: "completed",
-        stdout: "task done",
+        stdout: `${payload.message} done`,
         stderr: "",
         durationMs: 42,
       };
@@ -2413,21 +2452,25 @@ test("serve dispatch API tracks in-memory task lifecycle", async () => {
     assert.equal(dispatchBody.task.status, "queued");
     assert.equal(dispatchBody.task.title, "Build the board");
 
-    const payload = await sendStarted;
+    const payload = await firstSendStarted;
     assert.equal(payload.message, "Build the board");
 
-    const duplicateResponse = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
+    const queuedResponse = await fetch(`http://127.0.0.1:${port}/api/dispatch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agent: "codex", cwd: __dirname, message: "Build it again" }),
     });
-    assert.equal(duplicateResponse.status, 409);
+    assert.equal(queuedResponse.status, 202);
+    const queuedBody = await queuedResponse.json();
+    assert.equal(queuedBody.task.status, "queued");
+    assert.deepEqual(startedMessages, ["Build the board"]);
 
     const runningTasks = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
     assert.equal(runningTasks.mode, "tasks");
-    assert.equal(runningTasks.tasks[0].status, "running");
+    assert.equal(runningTasks.tasks.find((task) => task.id === dispatchBody.task.id).status, "running");
+    assert.equal(runningTasks.tasks.find((task) => task.id === queuedBody.task.id).status, "queued");
 
-    releaseSend();
+    releases.get("Build the board")();
     let reviewTask;
     for (let index = 0; index < 20; index += 1) {
       const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
@@ -2437,8 +2480,21 @@ test("serve dispatch API tracks in-memory task lifecycle", async () => {
     }
     assert.equal(reviewTask.status, "needs_review");
     assert.equal(reviewTask.progress, 90);
-    assert.equal(reviewTask.stdout, "task done");
+    assert.equal(reviewTask.stdout, "Build the board done");
     assert.ok(reviewTask.logs.some((line) => /review|returned output/i.test(line)));
+
+    const secondPayload = await secondSendStarted;
+    assert.equal(secondPayload.message, "Build it again");
+    releases.get("Build it again")();
+    let secondReviewTask;
+    for (let index = 0; index < 20; index += 1) {
+      const tasksBody = await (await fetch(`http://127.0.0.1:${port}/api/tasks`)).json();
+      secondReviewTask = tasksBody.tasks.find((task) => task.id === queuedBody.task.id);
+      if (secondReviewTask?.status === "needs_review") break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(secondReviewTask.status, "needs_review");
+    assert.equal(secondReviewTask.stdout, "Build it again done");
 
     const completeResponse = await fetch(`http://127.0.0.1:${port}/api/tasks/${encodeURIComponent(dispatchBody.task.id)}/complete`, {
       method: "POST",

@@ -2820,6 +2820,22 @@ body:has(.dispatch-panel.mobile-open) .mobile-dispatch-fab {
   font-weight: 800;
 }
 
+.task-result-markdown {
+  --session-color: var(--agent-color);
+  min-width: 0;
+  padding: 11px 12px;
+  color: var(--text);
+}
+
+.task-result-markdown .text-block {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.task-result-markdown .markdown-body pre {
+  max-height: 30vh;
+}
+
 .task-result-section pre {
   max-height: 34vh;
   overflow: auto;

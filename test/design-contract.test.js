@@ -113,10 +113,35 @@ test("serve task board presents readable results before raw diagnostics", async 
   assert.match(serveMain, /function TaskResultPanel\(\{ task \}\)/u);
   assert.match(serveMain, /function taskFailureText\(task\)/u);
   assert.match(serveMain, /repeated Codex setup warning/u);
-  assert.match(serveMain, /<details key=\{section\.key\} className=\{cls\("task-result-section", section\.tone\)\}/u);
+  assert.match(serveMain, /function presentableTaskOutput\(value, options = \{\}\)/u);
+  assert.match(serveMain, /function taskTextLooksMarkdown\(value\)/u);
+  assert.match(serveMain, /function shouldRenderTaskSectionAsMarkdown\(section\)/u);
+  assert.match(serveMain, /function TaskResultSectionText\(\{ section \}\)/u);
+  assert.match(serveMain, /title: "Final Output"[\s\S]*format: "markdown"/u);
+  assert.match(serveMain, /title: "Failure"[\s\S]*format: "auto"/u);
+  assert.match(serveMain, /title: "Activity"[\s\S]*format: "auto"/u);
+  assert.match(serveMain, /section\.format === "auto" && taskTextLooksMarkdown\(section\.text\)/u);
+  assert.match(serveMain, /<MarkdownText content=\{section\.text\} \/>/u);
+  assert.match(serveMain, /<details key=\{section\.key\} className=\{cls\("task-result-section", section\.tone\)\}[\s\S]*?<TaskResultSectionText section=\{section\} \/>/u);
   assert.match(serveStyles, /\.task-result-panel/u);
+  assert.match(serveStyles, /\.task-result-markdown/u);
   assert.match(serveStyles, /\.task-result-section\.diagnostics/u);
   assert.match(serveStyles, /\.task-result-section pre/u);
+});
+
+test("serve task board reveals current output when review is needed", async () => {
+  const serveMain = await readRepoFile("src", "serve", "ui", "app", "src", "main.jsx");
+
+  assert.match(serveMain, /function revealTaskOnBoard\(taskId\)/u);
+  assert.match(serveMain, /state\.setViewMode\("board"\)/u);
+  assert.match(serveMain, /state\.setSelectedTaskId\(taskId\)/u);
+  assert.match(serveMain, /const reviewTaskToReveal = tasks\.find/u);
+  assert.match(serveMain, /task\.status === "needs_review" && previousStatus !== "needs_review"/u);
+  assert.match(serveMain, /if \(reviewTaskToReveal\) \{[\s\S]*?revealTaskOnBoard\(reviewTaskToReveal\.id\)/u);
+  assert.match(serveMain, /useStore\.getState\(\)\.setSelectedTaskId\(optimisticTask\.id\)/u);
+  assert.match(serveMain, /useStore\.getState\(\)\.setSelectedTaskId\(data\.task\.id\)/u);
+  assert.match(serveMain, /if \(task\.status === "needs_review"\) \{[\s\S]*?revealTaskOnBoard\(task\.id\)/u);
+  assert.match(serveMain, /if \(result\.task\) \{[\s\S]*?setSelectedTaskId\(result\.task\.id\)/u);
 });
 
 test("serve grouped session cards receive the current clock value", async () => {
