@@ -40,11 +40,14 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
   assert.doesNotMatch(homepage, /assets\/screenshots|hero-screenshot|preview-duo/u);
   assert.doesNotMatch(readme, /## Screenshots|assets\/screenshots/u);
-  assert.match(homepage, /aria-label="KAGE workflow model"/u);
-  assert.match(homepage, /Workflow model[\s\S]*?Directory is the context[\s\S]*?Resume, fork, or bridge/u);
-  assert.match(homepage, /id="map" class="memory-band"/u);
-  assert.match(homepage, /One local layer over scattered agent memory/u);
-  assert.match(homepage, /Local stores[\s\S]*?KAGE index[\s\S]*?Explicit actions[\s\S]*?Next surface/u);
+  assert.match(homepage, /<html lang="zh-CN">/u);
+  assert.match(homepage, /data-locale="zh-CN"[\s\S]*?data-locale="en"/u);
+  assert.match(homepage, /setLocale\(savedLocale && translations\[savedLocale\] \? savedLocale : "zh-CN", false\)/u);
+  assert.match(homepage, /给 Codex<br>一个分身/u);
+  assert.match(homepage, /id="x2x"[\s\S]*?kage x2x[\s\S]*?codex resume 019f…f84/u);
+  assert.match(homepage, /id="c2x"[\s\S]*?kage c2x[\s\S]*?codex resume 019f…b67/u);
+  assert.match(homepage, /Codex 分身[\s\S]*?Claude → Codex/u);
+  assert.match(homepage, /lineage sidecar[\s\S]*?不会在转换后自动启动 Agent/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
@@ -218,9 +221,9 @@ test("docs position kage serve as a mobile agent monitor", async () => {
   assert.match(readme, /Mobile agent monitor/u);
   assert.match(readme, /see what your agents are doing/u);
   assert.match(readme, /Serve the mobile agent monitor over your LAN/u);
-  assert.match(homepage, /Mobile agent monitor/u);
-  assert.match(homepage, /See what local agents are doing from phone or tablet/u);
-  assert.match(homepage, /See what your agents are doing from your phone/u);
+  assert.match(homepage, /Monitor agents from your phone/u);
+  assert.match(homepage, /Watch local agents over a trusted LAN/u);
+  assert.match(homepage, /手机查看 Agent 状态/u);
 });
 
 test("serve surfaces live monitoring as a primary state", async () => {
