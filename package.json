@@ -14,6 +14,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "build:docs": "vite build --config vite.docs.config.mjs",
     "build:serve-ui": "vite build --config vite.serve-ui.config.mjs",
     "check:all": "node scripts/check-all.mjs",
     "test": "node --test",
@@ -44,6 +45,8 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@primer/octicons-react": "^19.29.2",
+    "@primer/react-brand": "^0.57.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",

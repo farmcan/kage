@@ -24,6 +24,8 @@ async function readRepoBytes(...parts) {
 test("agent colors stay in sync across desktop app and public assets", async () => {
   const dashboard = await readRepoFile("app", "Sources", "KageMenuBar", "Views", "DesktopDashboardView.swift");
   const homepage = await readRepoFile("docs", "index.html");
+  const homepageSource = await readRepoFile("site", "src", "main.jsx");
+  const homepageStyles = await readRepoFile("site", "src", "styles.css");
   const readme = await readRepoFile("README.md");
   const logo = await readRepoFile("docs", "assets", "kage-logo.svg");
 
@@ -35,19 +37,25 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(dashboard, new RegExp(`static let qoder = Color\\(hex: ${palette.qoder.swift}\\)`, "u"));
   assert.match(dashboard, new RegExp(`static let claude = Color\\(hex: ${palette.claude.swift}\\)`, "u"));
 
-  assert.match(homepage, new RegExp(`--agent-codex: ${palette.codex.css};`, "u"));
-  assert.match(homepage, new RegExp(`--agent-qoder: ${palette.qoder.css};`, "u"));
-  assert.match(homepage, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
-  assert.doesNotMatch(homepage, /assets\/screenshots|hero-screenshot|preview-duo/u);
+  assert.match(homepageStyles, new RegExp(`--agent-codex: ${palette.codex.css};`, "u"));
+  assert.match(homepageStyles, new RegExp(`--agent-qoder: ${palette.qoder.css};`, "u"));
+  assert.match(homepageStyles, new RegExp(`--agent-claude: ${palette.claude.css};`, "u"));
+  assert.doesNotMatch(homepageSource, /assets\/screenshots|hero-screenshot|preview-duo/u);
   assert.doesNotMatch(readme, /## Screenshots|assets\/screenshots/u);
   assert.match(homepage, /<html lang="zh-CN">/u);
-  assert.match(homepage, /data-locale="zh-CN"[\s\S]*?data-locale="en"/u);
-  assert.match(homepage, /setLocale\(savedLocale && translations\[savedLocale\] \? savedLocale : "zh-CN", false\)/u);
-  assert.match(homepage, /给 Codex<br>一个分身/u);
-  assert.match(homepage, /id="x2x"[\s\S]*?kage x2x[\s\S]*?codex resume 019f…f84/u);
-  assert.match(homepage, /id="c2x"[\s\S]*?kage c2x[\s\S]*?codex resume 019f…b67/u);
-  assert.match(homepage, /Codex 分身[\s\S]*?Claude → Codex/u);
-  assert.match(homepage, /lineage sidecar[\s\S]*?不会在转换后自动启动 Agent/u);
+  assert.match(homepage, /\/kage\/site-assets\/app\.css/u);
+  assert.match(homepage, /\/kage\/site-assets\/app\.js/u);
+  assert.match(homepageSource, /import PrimerBrand from "@primer\/react-brand"/u);
+  assert.match(homepageSource, /Hero,[\s\S]*?Pillar,[\s\S]*?River,[\s\S]*?Section/u);
+  assert.match(homepageSource, /localStorage\.getItem\("kage-locale"\) === "en" \? "en" : "zh-CN"/u);
+  assert.match(homepageSource, /heading: "别让 Agent\\n从零开始。"/u);
+  assert.match(homepageSource, /找回旧工作[\s\S]*?双开 Codex 并行做[\s\S]*?Claude → Codex 接着做[\s\S]*?全程本地/u);
+  assert.match(homepageSource, /id="x2x"[\s\S]*?<ParallelVisual t=\{t\}/u);
+  assert.match(homepageSource, /一个 Codex 在跑，另一个已经开工/u);
+  assert.match(homepageSource, /终端 A · 当前 Codex[\s\S]*?终端 B · Codex 分身/u);
+  assert.match(homepageSource, /id="c2x"[\s\S]*?<BridgeVisual t=\{t\}/u);
+  assert.match(homepageSource, /换 Agent，不用重讲一遍背景/u);
+  assert.match(homepageSource, /你决定何时启动 Codex/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
@@ -216,14 +224,14 @@ test("serve conversation supports focus mode for wide transcript reading", async
 
 test("docs position kage serve as a mobile agent monitor", async () => {
   const readme = await readRepoFile("README.md");
-  const homepage = await readRepoFile("docs", "index.html");
+  const homepageSource = await readRepoFile("site", "src", "main.jsx");
 
   assert.match(readme, /Mobile agent monitor/u);
   assert.match(readme, /see what your agents are doing/u);
   assert.match(readme, /Serve the mobile agent monitor over your LAN/u);
-  assert.match(homepage, /Monitor agents from your phone/u);
-  assert.match(homepage, /Watch local agents over a trusted LAN/u);
-  assert.match(homepage, /手机查看 Agent 状态/u);
+  assert.match(homepageSource, /Monitor agents from your phone/u);
+  assert.match(homepageSource, /Watch local agents over a trusted LAN/u);
+  assert.match(homepageSource, /手机查看 Agent 状态/u);
 });
 
 test("serve surfaces live monitoring as a primary state", async () => {

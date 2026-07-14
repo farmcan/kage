@@ -43,11 +43,11 @@ test("homepage and release notes track the package version", async () => {
   const tag = `v${version}`;
   const dmgName = `KAGE-${version}.dmg`;
   const expectedDownload = `https://github.com/farmcan/kage/releases/download/${tag}/${dmgName}`;
-  const homepage = await fs.readFile(path.join(__dirname, "..", "docs", "index.html"), "utf8");
+  const homepageSource = await fs.readFile(path.join(__dirname, "..", "site", "src", "main.jsx"), "utf8");
   const releaseNotes = await fs.readFile(path.join(__dirname, "..", "docs", "release-notes", `${tag}.md`), "utf8");
 
-  assert.match(homepage, new RegExp(`Latest: ${tag}`));
-  assert.equal(homepage.split(expectedDownload).length - 1, 2);
+  assert.match(homepageSource, new RegExp(`Latest: ${tag}`));
+  assert.equal(homepageSource.split(expectedDownload).length - 1, 1);
   assert.match(releaseNotes, new RegExp(`# KAGE ${tag}`));
   assert.match(releaseNotes, new RegExp(`releases/download/${tag}/${dmgName}`));
 });
