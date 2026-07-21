@@ -48,6 +48,11 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageSource, /import PrimerBrand from "@primer\/react-brand"/u);
   assert.match(homepageSource, /Hero,[\s\S]*?Pillar,[\s\S]*?River,[\s\S]*?Section/u);
   assert.match(homepageSource, /localStorage\.getItem\("kage-locale"\) === "en" \? "en" : "zh-CN"/u);
+  assert.match(homepageSource, /localStorage\.getItem\("kage-theme"\) === "dark" \? "dark" : "light"/u);
+  assert.match(homepageSource, /<ThemeProvider colorMode=\{colorMode\}/u);
+  assert.match(homepageSource, /switchToDark: "切换到黑色主题"[\s\S]*?switchToLight: "切换到白色主题"/u);
+  assert.match(homepageStyles, /:root \{[\s\S]*?color-scheme: light;[\s\S]*?--kage-bg: #ffffff;/u);
+  assert.match(homepageStyles, /:root\[data-theme="dark"\] \{[\s\S]*?color-scheme: dark;[\s\S]*?--kage-bg: #07090d;/u);
   assert.match(homepageSource, /heading: "别让 Agent\\n从零开始。"/u);
   assert.match(homepageSource, /找回旧工作[\s\S]*?双开 Codex 并行做[\s\S]*?Claude → Codex 接着做[\s\S]*?全程本地/u);
   assert.match(homepageSource, /id="x2x"[\s\S]*?<ParallelVisual t=\{t\}/u);

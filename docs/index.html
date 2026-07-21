@@ -7,7 +7,14 @@
       name="description"
       content="KAGE 在本地搜索、分叉和转换 Claude Code、Codex、Qoder 会话。双开 Codex 并行做，跨 Agent 接着做。"
     />
-    <meta name="theme-color" content="#07090d" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("kage-theme") === "dark" ? "dark" : "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
     <meta property="og:title" content="KAGE — 别让 Agent 从零开始" />
     <meta
       property="og:description"

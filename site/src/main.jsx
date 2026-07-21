@@ -10,8 +10,10 @@ import {
   GitBranchIcon,
   HeartIcon,
   MarkGithubIcon,
+  MoonIcon,
   SearchIcon,
   ShieldCheckIcon,
+  SunIcon,
   TerminalIcon,
   XIcon,
 } from "@primer/octicons-react";
@@ -47,6 +49,10 @@ const copy = {
       more: "更多能力",
       support: "支持 KAGE",
       github: "GitHub",
+      darkTheme: "黑色",
+      lightTheme: "白色",
+      switchToDark: "切换到黑色主题",
+      switchToLight: "切换到白色主题",
     },
     hero: {
       eyebrow: "Claude Code · Codex · Qoder 的本地会话层",
@@ -156,6 +162,10 @@ const copy = {
       more: "More",
       support: "Support KAGE",
       github: "GitHub",
+      darkTheme: "Dark",
+      lightTheme: "Light",
+      switchToDark: "Switch to dark theme",
+      switchToLight: "Switch to light theme",
     },
     hero: {
       eyebrow: "The local session layer for Claude Code · Codex · Qoder",
@@ -449,6 +459,7 @@ const benefitColors = ["blue", "green", "coral", "purple"];
 
 function App() {
   const [locale, setLocale] = useState(() => localStorage.getItem("kage-locale") === "en" ? "en" : "zh-CN");
+  const [colorMode, setColorMode] = useState(() => localStorage.getItem("kage-theme") === "dark" ? "dark" : "light");
   const [supportOpen, setSupportOpen] = useState(false);
   const t = copy[locale];
 
@@ -457,8 +468,16 @@ function App() {
     localStorage.setItem("kage-locale", locale);
   }, [locale]);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = colorMode;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", colorMode === "dark" ? "#07090d" : "#ffffff");
+    localStorage.setItem("kage-theme", colorMode);
+  }, [colorMode]);
+
+  const nextThemeLabel = colorMode === "light" ? t.nav.switchToDark : t.nav.switchToLight;
+
   return (
-    <ThemeProvider colorMode="dark" className="kage-theme">
+    <ThemeProvider colorMode={colorMode} className="kage-theme">
       <header className="site-header">
         <a className="brand" href="#top" aria-label="KAGE home">
           <img src="/kage/assets/kage-logo.svg" alt="" />
@@ -475,6 +494,16 @@ function App() {
             <button type="button" className={locale === "zh-CN" ? "active" : ""} onClick={() => setLocale("zh-CN")}>中文</button>
             <button type="button" className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>EN</button>
           </div>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setColorMode((current) => current === "light" ? "dark" : "light")}
+            aria-label={nextThemeLabel}
+            title={nextThemeLabel}
+          >
+            {colorMode === "light" ? <MoonIcon size={16} /> : <SunIcon size={16} />}
+            <span className="theme-label">{colorMode === "light" ? t.nav.darkTheme : t.nav.lightTheme}</span>
+          </button>
           <Button
             size="small"
             variant="secondary"
