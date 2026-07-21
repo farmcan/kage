@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import PrimerBrand from "@primer/react-brand";
 import {
@@ -6,11 +6,14 @@ import {
   ArrowSwitchIcon,
   CheckIcon,
   CopyIcon,
+  DownloadIcon,
   GitBranchIcon,
+  HeartIcon,
   MarkGithubIcon,
   SearchIcon,
   ShieldCheckIcon,
   TerminalIcon,
+  XIcon,
 } from "@primer/octicons-react";
 import "@primer/react-brand/lib/css/main.css";
 import "@primer/react-brand/fonts/fonts.css";
@@ -33,6 +36,7 @@ const {
 
 const INSTALL_COMMAND = "curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash";
 const RELEASE_URL = "https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg";
+const SUPPORT_QR_IMAGE = "/kage/assets/support-alipay-qr.jpg";
 
 const copy = {
   "zh-CN": {
@@ -41,6 +45,7 @@ const copy = {
       x2x: "Codex 分身",
       c2x: "跨 Agent",
       more: "更多能力",
+      support: "支持 KAGE",
       github: "GitHub",
     },
     hero: {
@@ -131,6 +136,16 @@ const copy = {
       download: "下载 macOS App",
       latest: "Latest: v0.1.17",
     },
+    support: {
+      title: "支持 KAGE",
+      badge: "完全自愿 · 不影响任何功能",
+      heading: "请作者喝杯咖啡",
+      description: "KAGE 会继续免费开源。愿意的话，可以支持 Agent 兼容性维护、发布构建和后续开发。",
+      scan: "电脑端直接扫码；手机端保存后在支付宝识别。",
+      save: "保存支付宝收款码",
+      trust: "支持不会解锁额外功能，也不会改变 KAGE 的本地优先承诺。",
+      close: "关闭支持窗口",
+    },
     footer: "KAGE 是开源、本地优先的 Agent 会话工具。",
   },
   en: {
@@ -139,6 +154,7 @@ const copy = {
       x2x: "Codex clone",
       c2x: "Cross-agent",
       more: "More",
+      support: "Support KAGE",
       github: "GitHub",
     },
     hero: {
@@ -228,6 +244,16 @@ const copy = {
       install: "Copy install command",
       download: "Download macOS app",
       latest: "Latest: v0.1.17",
+    },
+    support: {
+      title: "Support KAGE",
+      badge: "Optional · No features are gated",
+      heading: "Buy the maintainer a coffee",
+      description: "KAGE will stay free and open source. Your support helps maintain agent compatibility, release builds, and future development.",
+      scan: "Scan with Alipay on desktop; save the image on mobile and open it in Alipay.",
+      save: "Save Alipay QR code",
+      trust: "Support does not unlock features or change KAGE's local-first promise.",
+      close: "Close support dialog",
     },
     footer: "KAGE is an open-source, local-first agent session tool.",
   },
@@ -359,11 +385,71 @@ function BridgeVisual({ t }) {
   );
 }
 
+function SupportDialog({ onClose, t }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+    dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="support-dialog"
+      aria-labelledby="support-dialog-title"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="support-dialog-shell">
+        <div className="support-dialog-header">
+          <span>{t.support.title}</span>
+          <button type="button" className="support-close" onClick={onClose} aria-label={t.support.close}>
+            <XIcon size={18} />
+          </button>
+        </div>
+        <div className="support-dialog-copy">
+          <span className="support-badge">{t.support.badge}</span>
+          <Heading as="h2" size="3" id="support-dialog-title">{t.support.heading}</Heading>
+          <Text as="p" size="300" variant="muted">{t.support.description}</Text>
+        </div>
+        <div className="support-payment">
+          <div className="support-qr-frame">
+            <img src={SUPPORT_QR_IMAGE} alt={t.support.save} />
+          </div>
+          <Text as="p" size="100" variant="muted" align="center">{t.support.scan}</Text>
+          <Button
+            as="a"
+            href={SUPPORT_QR_IMAGE}
+            download="kage-alipay-qr.jpg"
+            variant="secondary"
+            size="small"
+            leadingVisual={<DownloadIcon />}
+          >
+            {t.support.save}
+          </Button>
+        </div>
+        <div className="support-trust">
+          <ShieldCheckIcon size={17} />
+          <span>{t.support.trust}</span>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
 const benefitIcons = [SearchIcon, GitBranchIcon, ArrowSwitchIcon, ShieldCheckIcon];
 const benefitColors = ["blue", "green", "coral", "purple"];
 
 function App() {
   const [locale, setLocale] = useState(() => localStorage.getItem("kage-locale") === "en" ? "en" : "zh-CN");
+  const [supportOpen, setSupportOpen] = useState(false);
   const t = copy[locale];
 
   useEffect(() => {
@@ -389,7 +475,17 @@ function App() {
             <button type="button" className={locale === "zh-CN" ? "active" : ""} onClick={() => setLocale("zh-CN")}>中文</button>
             <button type="button" className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>EN</button>
           </div>
-          <Button as="a" href="https://github.com/farmcan/kage" size="small" variant="subtle" leadingVisual={<MarkGithubIcon />}>
+          <Button
+            size="small"
+            variant="secondary"
+            leadingVisual={<HeartIcon />}
+            onClick={() => setSupportOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={t.nav.support}
+          >
+            <span className="support-label">{t.nav.support}</span>
+          </Button>
+          <Button as="a" href="https://github.com/farmcan/kage" size="small" variant="subtle" leadingVisual={<MarkGithubIcon />} aria-label={t.nav.github}>
             <span className="github-label">{t.nav.github}</span>
           </Button>
         </div>
@@ -516,11 +612,13 @@ function App() {
         <div className="footer-brand"><img src="/kage/assets/kage-logo.svg" alt="" /><strong>KAGE</strong></div>
         <p>{t.footer}</p>
         <Stack direction="horizontal" gap="normal" className="footer-links">
+          <button type="button" onClick={() => setSupportOpen(true)}>{t.nav.support}</button>
           <a href="https://github.com/farmcan/kage">GitHub</a>
           <a href={RELEASE_URL}>macOS</a>
           <a href="https://github.com/farmcan/kage/blob/main/LICENSE">MIT</a>
         </Stack>
       </footer>
+      {supportOpen && <SupportDialog t={t} onClose={() => setSupportOpen(false)} />}
     </ThemeProvider>
   );
 }

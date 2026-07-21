@@ -56,6 +56,13 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageSource, /id="c2x"[\s\S]*?<BridgeVisual t=\{t\}/u);
   assert.match(homepageSource, /换 Agent，不用重讲一遍背景/u);
   assert.match(homepageSource, /你决定何时启动 Codex/u);
+  assert.match(homepageSource, /const SUPPORT_QR_IMAGE = "\/kage\/assets\/support-alipay-qr\.jpg"/u);
+  assert.match(homepageSource, /完全自愿 · 不影响任何功能[\s\S]*?KAGE 会继续免费开源/u);
+  assert.match(homepageSource, /Optional · No features are gated[\s\S]*?KAGE will stay free and open source/u);
+  assert.match(homepageSource, /aria-haspopup="dialog"[\s\S]*?aria-label=\{t\.nav\.support\}/u);
+  assert.match(homepageSource, /supportOpen && <SupportDialog/u);
+  assert.match(homepageStyles, /\.support-dialog::backdrop/u);
+  assert.match(homepageStyles, /\.support-qr-frame img/u);
 
   assert.match(logo, /Agent dots, left to right: Codex, QoderCLI\/QoderWork, Claude/u);
   assert.match(logo, new RegExp(`<circle cx="164" cy="360" r="24" fill="${palette.codex.css}"/>`, "u"));
