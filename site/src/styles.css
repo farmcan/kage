@@ -686,138 +686,148 @@ code {
   50% { opacity: 0; }
 }
 
-.fork-command {
-  display: inline-flex;
+.fork-options {
+  display: flex;
   align-self: center;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
   margin-top: 34px;
-  padding: 8px 14px;
-  border: 1px solid rgba(71, 209, 140, 0.25);
-  border-radius: 999px;
-  background: rgba(71, 209, 140, 0.08);
+}
+
+.fork-options span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid rgba(71, 209, 140, 0.22);
+  border-radius: 8px;
+  background: rgba(71, 209, 140, 0.07);
   color: var(--kage-green);
   font-size: 11px;
 }
 
+.fork-options small {
+  color: #a6b1bc;
+  font-size: 9px;
+}
+
 .bridge-visual {
-  display: grid;
-  grid-template-columns: 1fr 120px 1fr;
-  align-items: center;
-  padding: 42px 28px;
-}
-
-.agent-node {
-  min-width: 0;
-  padding: 22px 18px;
-  border: 1px solid var(--kage-line-strong);
-  border-radius: 14px;
-  background: rgba(15, 20, 27, 0.94);
-}
-
-.agent-mark {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  margin-bottom: 28px;
-  border-radius: 10px;
-  background: rgba(207, 118, 84, 0.15);
-  color: var(--kage-coral);
-  font-family: "Hubot Sans", sans-serif;
-  font-weight: 800;
-}
-
-.agent-codex .agent-mark {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--kage-blue);
-}
-
-.agent-node div {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  justify-content: center;
+  padding: 38px 28px;
 }
 
-.agent-node strong {
-  font-size: 15px;
-}
-
-.agent-node small {
-  color: var(--kage-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.bridge-track {
+.bridge-visual-head {
   display: flex;
   align-items: center;
-  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
-.bridge-command {
-  margin-bottom: 11px;
+.bridge-visual-head > strong {
   color: #dbe2e9;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-size: 12px;
 }
 
-.bridge-line {
-  position: relative;
-  width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, var(--kage-coral), var(--kage-blue));
-}
-
-.bridge-line::after {
-  position: absolute;
-  top: -3px;
-  right: -1px;
-  width: 7px;
-  height: 7px;
-  border-top: 1px solid var(--kage-blue);
-  border-right: 1px solid var(--kage-blue);
-  content: "";
-  transform: rotate(45deg);
-}
-
-.bridge-line i {
-  position: absolute;
-  top: -3px;
-  left: 45%;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 12px #fff;
-}
-
-.bridge-track small {
+.bridge-visual-head small {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 12px;
   color: var(--kage-green);
   font-size: 9px;
 }
 
-.resume-hint {
-  position: absolute;
-  right: 30px;
-  bottom: 38px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 13px;
-  border: 1px solid rgba(59, 130, 246, 0.27);
-  border-radius: 8px;
-  background: #05070a;
-  color: var(--kage-blue);
-  font-size: 10px;
+.bridge-route-list {
+  display: grid;
+  gap: 10px;
 }
 
-.resume-hint span {
-  color: #637081;
+.bridge-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--kage-line);
+  border-radius: 12px;
+  background: rgba(15, 20, 27, 0.94);
+}
+
+.route-agent {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.route-agent b {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  font-family: "Hubot Sans", sans-serif;
+  font-size: 11px;
+}
+
+.route-agent strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #dbe2e9;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-agent-claude b {
+  background: rgba(207, 118, 84, 0.15);
+  color: var(--kage-coral);
+}
+
+.route-agent-codex b {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--kage-blue);
+}
+
+.route-agent-qoder b {
+  background: rgba(71, 209, 140, 0.13);
+  color: var(--kage-green);
+}
+
+.route-command {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 7px;
+  color: #7f8c99;
+  font-size: 9px;
+}
+
+.route-command::before {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--kage-coral), var(--kage-blue));
+  content: "";
+}
+
+.route-command code {
+  color: #c6d0da;
+  font-size: 9px;
+  text-align: right;
+}
+
+.bridge-more {
+  align-self: center;
+  margin-top: 18px;
+  color: #8794a1;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
 }
 
 .more-section {
@@ -1230,59 +1240,35 @@ code {
     min-height: 116px;
   }
 
-  .fork-command {
+  .fork-options {
     margin-top: 20px;
   }
 
   .bridge-visual {
-    grid-template-columns: 1fr;
-    gap: 36px;
-    padding: 28px 20px 84px;
+    padding: 28px 14px;
   }
 
-  .bridge-track {
-    position: relative;
-    height: 70px;
-    justify-content: center;
+  .bridge-route {
+    grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+    gap: 7px;
+    padding: 10px 8px;
   }
 
-  .bridge-command {
-    position: absolute;
-    top: 25px;
-    right: calc(50% + 12px);
-    margin: 0;
-    white-space: nowrap;
+  .route-agent {
+    gap: 6px;
   }
 
-  .bridge-line {
-    width: 1px;
-    height: 70px;
-    background: linear-gradient(var(--kage-coral), var(--kage-blue));
+  .route-agent b {
+    width: 26px;
+    height: 26px;
   }
 
-  .bridge-line::after {
-    top: auto;
-    right: -3px;
-    bottom: -1px;
-    transform: rotate(135deg);
+  .route-agent strong {
+    font-size: 9px;
   }
 
-  .bridge-line i {
-    top: 45%;
-    left: -3px;
-  }
-
-  .bridge-track small {
-    position: absolute;
-    top: 23px;
-    left: calc(50% + 12px);
-    margin: 0;
-    white-space: nowrap;
-  }
-
-  .resume-hint {
-    right: 20px;
-    bottom: 24px;
+  .route-command code {
+    font-size: 8px;
   }
 
   .monitor-note {

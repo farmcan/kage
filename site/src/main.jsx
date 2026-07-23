@@ -44,8 +44,8 @@ const copy = {
   "zh-CN": {
     nav: {
       why: "为什么用 KAGE",
-      x2x: "Codex 分身",
-      c2x: "跨 Agent",
+      x2x: "Agent 分身",
+      c2x: "跨 Agent 接力",
       more: "更多能力",
       support: "支持 KAGE",
       github: "GitHub",
@@ -55,10 +55,10 @@ const copy = {
       switchToLight: "切换到白色主题",
     },
     hero: {
-      eyebrow: "Claude Code · Codex · Qoder 的本地会话层",
+      eyebrow: "Claude Code · Codex · QoderCLI 的本地会话层",
       heading: "别让 Agent\n从零开始。",
       description: "KAGE 在本地搜索、分叉和转换 AI 编程会话，让上下文跟着任务走。",
-      proof: ["找回旧工作", "双开 Codex 并行做", "Claude → Codex 接着做", "全程本地"],
+      proof: ["找回旧工作", "任意 Agent 开分身", "跨 Agent 带上下文接力", "全程本地"],
       install: "安装 KAGE",
       source: "查看源码",
     },
@@ -69,10 +69,10 @@ const copy = {
       copy: "复制",
       then: "02 · 然后选一条任务线",
       recommended: "推荐",
-      x2xTitle: "Codex 分身",
-      x2xText: "复制当前上下文，开第二个 Codex 并行做。",
-      c2xTitle: "Claude → Codex",
-      c2xText: "把 Claude 的进度变成 Codex 原生会话。",
+      x2xTitle: "Agent 分身",
+      x2xText: "Codex、Claude Code、QoderCLI 都能复制会话；x2x 是最快的 Codex 双开。",
+      c2xTitle: "跨 Agent 接力",
+      c2xText: "Claude Code、Codex、QoderCLI 之间转换，带着上下文继续做。",
       local: "只读写本机 Agent 会话文件，不上传 transcript。",
     },
     benefits: {
@@ -86,11 +86,11 @@ const copy = {
         },
         {
           title: "并行做",
-          text: "复制当前 Codex 会话，第二个终端带着同一份上下文立即开工。",
+          text: "复制 Codex、Claude Code 或 QoderCLI 会话，第二条任务线带着同一份上下文开工。",
         },
         {
           title: "换着做",
-          text: "把一个 Agent 的工作转换成另一个 Agent 可原生恢复的会话。",
+          text: "在 Claude Code、Codex 与 QoderCLI 之间转换，目标 Agent 可原生恢复。",
         },
         {
           title: "留在本地",
@@ -99,30 +99,37 @@ const copy = {
       ],
     },
     x2x: {
-      kicker: "kage x2x · Codex → Codex",
-      heading: "一个 Codex 在跑，另一个已经开工。",
-      text: "复制当前会话上下文，生成新的原生 Codex 会话。打开第二个终端，让两个 Codex 沿不同任务线并行工作。",
-      link: "查看 x2x 用法",
-      same: "同一份上下文",
-      lines: "两条并行任务线",
-      original: "终端 A · 当前 Codex",
-      clone: "终端 B · Codex 分身",
+      kicker: "同 Agent 分身 · x2x / c2c / q2q",
+      heading: "不只 Codex。每个 Agent 都能再开一条工作线。",
+      text: "用 x2x、c2c 或 q2q 复制 Codex、Claude Code、QoderCLI 的当前会话，生成各自原生可继续的分身。",
+      link: "查看全部分身命令",
+      same: "同一个 Agent 的上下文",
+      lines: "复制成另一条任务线",
+      original: "示例 · 当前 Codex",
+      clone: "示例 · Codex 分身",
       running: "运行测试中…",
       working: "实现登录错误态",
       context: "已继承 42 条消息 · 同一项目",
       success: "✓ 分支任务已开始",
+      forks: [
+        { command: "kage x2x", agent: "Codex" },
+        { command: "kage c2c", agent: "Claude Code" },
+        { command: "kage q2q", agent: "QoderCLI" },
+      ],
     },
     c2x: {
-      kicker: "kage c2x · Claude → Codex",
-      heading: "换 Agent，不用重讲一遍背景。",
-      text: "KAGE 读取本地 Claude Code 会话，保留项目、消息和来源关系，写成 Codex 可以原生 resume 的会话。你决定何时启动 Codex。",
-      link: "查看 c2x 用法",
-      source: "Claude Code",
-      sourceState: "设计与排查已完成",
+      kicker: "跨 Agent 接力 · c2x / q2x / x2q",
+      heading: "Claude、Codex、QoderCLI，换着做也不用重讲。",
+      text: "KAGE 在 Claude Code、Codex 与 QoderCLI 之间转换本地会话，保留项目、消息和来源关系，写成目标 Agent 可原生恢复的会话。",
+      link: "查看全部转换命令",
+      visualLabel: "本地会话转换",
       bridge: "本地转换",
-      target: "Codex",
-      targetState: "从原进度继续实现",
-      resume: "codex resume 019f…b67",
+      also: "也支持 x2c · c2q · q2c",
+      routes: [
+        { command: "kage c2x", from: "Claude Code", fromMark: "C", fromTone: "claude", to: "Codex", toMark: "X", toTone: "codex" },
+        { command: "kage q2x", from: "QoderCLI", fromMark: "Q", fromTone: "qoder", to: "Codex", toMark: "X", toTone: "codex" },
+        { command: "kage x2q", from: "Codex", fromMark: "X", fromTone: "codex", to: "QoderCLI", toMark: "Q", toTone: "qoder" },
+      ],
     },
     more: {
       label: "不只会转换",
@@ -158,8 +165,8 @@ const copy = {
   en: {
     nav: {
       why: "Why KAGE",
-      x2x: "Codex clone",
-      c2x: "Cross-agent",
+      x2x: "Agent clones",
+      c2x: "Cross-agent handoff",
       more: "More",
       support: "Support KAGE",
       github: "GitHub",
@@ -169,10 +176,10 @@ const copy = {
       switchToLight: "Switch to light theme",
     },
     hero: {
-      eyebrow: "The local session layer for Claude Code · Codex · Qoder",
+      eyebrow: "The local session layer for Claude Code · Codex · QoderCLI",
       heading: "Never make an agent\nstart from zero.",
       description: "KAGE searches, forks, and bridges AI coding sessions locally, so context follows the work.",
-      proof: ["Recover past work", "Run two Codex sessions in parallel", "Continue Claude work in Codex", "Local only"],
+      proof: ["Recover past work", "Clone any supported agent", "Carry context across agents", "Local only"],
       install: "Install KAGE",
       source: "View source",
     },
@@ -183,10 +190,10 @@ const copy = {
       copy: "Copy",
       then: "02 · Then choose a line of work",
       recommended: "Recommended",
-      x2xTitle: "Codex clone",
-      x2xText: "Copy the current context and start a second Codex in parallel.",
-      c2xTitle: "Claude → Codex",
-      c2xText: "Turn Claude progress into a native Codex session.",
+      x2xTitle: "Agent clone",
+      x2xText: "Fork Codex, Claude Code, or QoderCLI sessions; x2x is the fastest Codex example.",
+      c2xTitle: "Cross-agent handoff",
+      c2xText: "Move context between Claude Code, Codex, and QoderCLI, then keep working.",
       local: "Reads and writes local agent session files. No transcript upload.",
     },
     benefits: {
@@ -200,11 +207,11 @@ const copy = {
         },
         {
           title: "Parallelize it",
-          text: "Fork the current Codex session and start a second terminal with the same context.",
+          text: "Fork a Codex, Claude Code, or QoderCLI session and start another task line with the same context.",
         },
         {
           title: "Move it",
-          text: "Bridge one agent's work into a session another agent can resume natively.",
+          text: "Bridge work between Claude Code, Codex, and QoderCLI into a session the target can resume natively.",
         },
         {
           title: "Keep it local",
@@ -213,30 +220,37 @@ const copy = {
       ],
     },
     x2x: {
-      kicker: "kage x2x · Codex → Codex",
-      heading: "One Codex is still running. The next one is already working.",
-      text: "Copy the current session context into a new native Codex session. Open a second terminal and let both Codex sessions work on different task lines.",
-      link: "See x2x usage",
-      same: "The same context",
-      lines: "Two parallel task lines",
-      original: "Terminal A · Current Codex",
-      clone: "Terminal B · Codex clone",
+      kicker: "Same-agent clones · x2x / c2c / q2q",
+      heading: "Not just Codex. Give every agent another line of work.",
+      text: "Use x2x, c2c, or q2q to fork the current Codex, Claude Code, or QoderCLI session into a native clone that can continue immediately.",
+      link: "See every clone command",
+      same: "One agent's context",
+      lines: "Forked into another task line",
+      original: "Example · Current Codex",
+      clone: "Example · Codex clone",
       running: "Running tests…",
       working: "Implement login error states",
       context: "Inherited 42 messages · same project",
       success: "✓ Branch task started",
+      forks: [
+        { command: "kage x2x", agent: "Codex" },
+        { command: "kage c2c", agent: "Claude Code" },
+        { command: "kage q2q", agent: "QoderCLI" },
+      ],
     },
     c2x: {
-      kicker: "kage c2x · Claude → Codex",
-      heading: "Switch agents without repeating the backstory.",
-      text: "KAGE reads a local Claude Code session, preserves the project, messages, and lineage, then writes a session Codex can resume natively. You decide when to launch it.",
-      link: "See c2x usage",
-      source: "Claude Code",
-      sourceState: "Design and diagnosis complete",
+      kicker: "Cross-agent handoff · c2x / q2x / x2q",
+      heading: "Switch between Claude, Codex, and QoderCLI without repeating the backstory.",
+      text: "KAGE bridges local sessions between Claude Code, Codex, and QoderCLI, preserving the project, messages, and lineage in a session the target agent can resume natively.",
+      link: "See every bridge command",
+      visualLabel: "Local session bridges",
       bridge: "Local bridge",
-      target: "Codex",
-      targetState: "Continue implementation",
-      resume: "codex resume 019f…b67",
+      also: "Also supports x2c · c2q · q2c",
+      routes: [
+        { command: "kage c2x", from: "Claude Code", fromMark: "C", fromTone: "claude", to: "Codex", toMark: "X", toTone: "codex" },
+        { command: "kage q2x", from: "QoderCLI", fromMark: "Q", fromTone: "qoder", to: "Codex", toMark: "X", toTone: "codex" },
+        { command: "kage x2q", from: "Codex", fromMark: "X", fromTone: "codex", to: "QoderCLI", toMark: "Q", toTone: "qoder" },
+      ],
     },
     more: {
       label: "More than bridges",
@@ -392,28 +406,38 @@ function ParallelVisual({ t }) {
           <p className="terminal-success">{t.x2x.success}</p>
         </TerminalWindow>
       </div>
-      <div className="fork-command"><TerminalIcon size={15} /><code>kage x2x</code></div>
+      <div className="fork-options">
+        {t.x2x.forks.map((fork) => (
+          <span key={fork.command}><code>{fork.command}</code><small>{fork.agent}</small></span>
+        ))}
+      </div>
     </div>
   );
 }
 
 function BridgeVisual({ t }) {
   return (
-    <div className="bridge-visual">
-      <div className="agent-node agent-claude">
-        <span className="agent-mark">C</span>
-        <div><strong>{t.c2x.source}</strong><small>{t.c2x.sourceState}</small></div>
-      </div>
-      <div className="bridge-track">
-        <span className="bridge-command">kage c2x</span>
-        <span className="bridge-line"><i /></span>
+    <div className="bridge-visual" aria-label={t.c2x.visualLabel}>
+      <div className="bridge-visual-head">
+        <strong>{t.c2x.visualLabel}</strong>
         <small><ShieldCheckIcon size={13} />{t.c2x.bridge}</small>
       </div>
-      <div className="agent-node agent-codex">
-        <span className="agent-mark">X</span>
-        <div><strong>{t.c2x.target}</strong><small>{t.c2x.targetState}</small></div>
+      <div className="bridge-route-list">
+        {t.c2x.routes.map((route) => (
+          <div className="bridge-route" key={route.command}>
+            <span className={`route-agent route-agent-${route.fromTone}`}>
+              <b>{route.fromMark}</b><strong>{route.from}</strong>
+            </span>
+            <span className="route-command">
+              <code>{route.command}</code><ArrowRightIcon size={15} />
+            </span>
+            <span className={`route-agent route-agent-${route.toTone}`}>
+              <b>{route.toMark}</b><strong>{route.to}</strong>
+            </span>
+          </div>
+        ))}
       </div>
-      <div className="resume-hint"><span>$</span><code>{t.c2x.resume}</code></div>
+      <div className="bridge-more">{t.c2x.also}</div>
     </div>
   );
 }
