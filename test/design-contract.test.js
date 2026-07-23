@@ -58,7 +58,7 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageStyles, /:root \{[\s\S]*?color-scheme: light;[\s\S]*?--kage-bg: #ffffff;/u);
   assert.match(homepageStyles, /:root\[data-theme="dark"\] \{[\s\S]*?color-scheme: dark;[\s\S]*?--kage-bg: #07090d;/u);
   assert.match(homepageSource, /heading: "别让 Agent\\n从零开始。"/u);
-  assert.match(homepageSource, /找回旧工作[\s\S]*?支持的 Agent 都能分身[\s\S]*?跨 Agent 带上下文接力[\s\S]*?全程本地/u);
+  assert.match(homepageSource, /找回旧工作[\s\S]*?Codex \/ Claude \/ QoderCLI 都能分身[\s\S]*?跨 Agent 带上下文接力[\s\S]*?全程本地/u);
   assert.match(homepageSource, /id="x2x"[\s\S]*?<ParallelVisual t=\{t\}/u);
   assert.match(homepageSource, /不只 Codex。每个 Agent 都能再开一条工作线。/u);
   assert.match(homepageSource, /kage x2x[\s\S]*?kage c2c[\s\S]*?kage q2q/u);
@@ -68,6 +68,8 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageSource, /kage c2x[\s\S]*?kage q2x[\s\S]*?kage x2q/u);
   assert.match(homepageSource, /也支持 x2c · c2q · q2c/u);
   assert.match(homepageStyles, /\.route-agent-qoder b/u);
+  assert.match(homepageSource, /HTML 回放（x2v \/ c2v \/ q2v）[\s\S]*?导出清理（kage clean）[\s\S]*?QoderWork 也能作为搜索、回放和接力来源/u);
+  assert.match(homepageSource, /手机查看和调度 Agent[\s\S]*?按需启动新的本地任务/u);
   assert.match(homepageSource, /const SUPPORT_QR_IMAGE = "\/kage\/assets\/support-alipay-qr\.jpg"/u);
   assert.match(homepageSource, /完全自愿 · 不影响任何功能[\s\S]*?KAGE 会继续免费开源/u);
   assert.match(homepageSource, /Optional · No features are gated[\s\S]*?KAGE will stay free and open source/u);
@@ -241,16 +243,16 @@ test("serve conversation supports focus mode for wide transcript reading", async
   assert.match(serveStyles, /\.workspace\.conversation-fullscreen \.conversation-panel/u);
 });
 
-test("docs position kage serve as a mobile agent monitor", async () => {
+test("docs position kage serve as a mobile agent monitor and dispatcher", async () => {
   const readme = await readRepoFile("README.md");
   const homepageSource = await readRepoFile("site", "src", "main.jsx");
 
   assert.match(readme, /Mobile agent monitor/u);
   assert.match(readme, /see what your agents are doing/u);
   assert.match(readme, /Serve the mobile agent monitor over your LAN/u);
-  assert.match(homepageSource, /Monitor agents from your phone/u);
-  assert.match(homepageSource, /Watch local agents over a trusted LAN/u);
-  assert.match(homepageSource, /手机查看 Agent 状态/u);
+  assert.match(homepageSource, /Monitor and dispatch from your phone/u);
+  assert.match(homepageSource, /Watch progress and start new local tasks over a trusted LAN/u);
+  assert.match(homepageSource, /手机查看和调度 Agent/u);
 });
 
 test("serve surfaces live monitoring as a primary state", async () => {
