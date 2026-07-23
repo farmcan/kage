@@ -58,7 +58,7 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageStyles, /:root \{[\s\S]*?color-scheme: light;[\s\S]*?--kage-bg: #ffffff;/u);
   assert.match(homepageStyles, /:root\[data-theme="dark"\] \{[\s\S]*?color-scheme: dark;[\s\S]*?--kage-bg: #07090d;/u);
   assert.match(homepageSource, /heading: "别让 Agent\\n从零开始。"/u);
-  assert.match(homepageSource, /找回旧工作[\s\S]*?任意 Agent 开分身[\s\S]*?跨 Agent 带上下文接力[\s\S]*?全程本地/u);
+  assert.match(homepageSource, /找回旧工作[\s\S]*?支持的 Agent 都能分身[\s\S]*?跨 Agent 带上下文接力[\s\S]*?全程本地/u);
   assert.match(homepageSource, /id="x2x"[\s\S]*?<ParallelVisual t=\{t\}/u);
   assert.match(homepageSource, /不只 Codex。每个 Agent 都能再开一条工作线。/u);
   assert.match(homepageSource, /kage x2x[\s\S]*?kage c2c[\s\S]*?kage q2q/u);

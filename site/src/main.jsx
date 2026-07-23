@@ -58,7 +58,7 @@ const copy = {
       eyebrow: "Claude Code · Codex · QoderCLI 的本地会话层",
       heading: "别让 Agent\n从零开始。",
       description: "KAGE 在本地搜索、分叉和转换 AI 编程会话，让上下文跟着任务走。",
-      proof: ["找回旧工作", "任意 Agent 开分身", "跨 Agent 带上下文接力", "全程本地"],
+      proof: ["找回旧工作", "支持的 Agent 都能分身", "跨 Agent 带上下文接力", "全程本地"],
       install: "安装 KAGE",
       source: "查看源码",
     },
@@ -82,7 +82,7 @@ const copy = {
       items: [
         {
           title: "找得到",
-          text: "一次搜索 Claude Code、Codex、Qoder 的本地历史，不再翻 JSONL。",
+          text: "一次搜索 Claude Code、Codex、QoderCLI 的本地历史，不再翻 JSONL。",
         },
         {
           title: "并行做",
@@ -203,7 +203,7 @@ const copy = {
       items: [
         {
           title: "Find it",
-          text: "Search local Claude Code, Codex, and Qoder history at once. No more digging through JSONL.",
+          text: "Search local Claude Code, Codex, and QoderCLI history at once. No more digging through JSONL.",
         },
         {
           title: "Parallelize it",
