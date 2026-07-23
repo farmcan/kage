@@ -70,6 +70,10 @@ html {
   scroll-behavior: smooth;
 }
 
+#install-kage {
+  scroll-margin-top: 64px;
+}
+
 body {
   min-width: 320px;
   margin: 0;

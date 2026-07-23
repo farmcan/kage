@@ -65,6 +65,7 @@ const copy = {
     start: {
       label: "01 · 先安装",
       copied: "已复制",
+      installCopied: "安装命令已复制",
       copy: "复制",
       then: "02 · 然后选一条任务线",
       recommended: "推荐",
@@ -178,6 +179,7 @@ const copy = {
     start: {
       label: "01 · Install first",
       copied: "Copied",
+      installCopied: "Install command copied",
       copy: "Copy",
       then: "02 · Then choose a line of work",
       recommended: "Recommended",
@@ -269,30 +271,51 @@ const copy = {
   },
 };
 
-function CopyButton({ value, children, className = "" }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
+async function copyTextToClipboard(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    document.body.append(textarea);
     try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = value;
-      document.body.append(textarea);
       textarea.select();
-      document.execCommand("copy");
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
       textarea.remove();
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
     }
   }
+}
+
+function useCopyFeedback() {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  async function copyValue(value) {
+    const didCopy = await copyTextToClipboard(value);
+    if (!didCopy) return;
+    setCopied(true);
+    window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  return [copied, copyValue];
+}
+
+function CopyButton({ value, children, className = "", copiedLabel }) {
+  const [copied, copyValue] = useCopyFeedback();
+
+  const label = copied ? copiedLabel || copy[document.documentElement.lang]?.start.copied || "Copied" : children;
 
   return (
-    <button type="button" className={`copy-button ${className}`} onClick={handleCopy} aria-live="polite">
+    <button type="button" className={`copy-button ${className}`} onClick={() => copyValue(value)} aria-live="polite">
       {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
-      {copied ? copy[document.documentElement.lang]?.start.copied || "Copied" : children}
+      {label}
     </button>
   );
 }
@@ -318,7 +341,7 @@ function LaunchPanel({ t }) {
       </div>
       <div className="command-bar command-bar-install">
         <code>{INSTALL_COMMAND}</code>
-        <CopyButton value={INSTALL_COMMAND}>{t.start.copy}</CopyButton>
+        <CopyButton value={INSTALL_COMMAND} copiedLabel={t.start.installCopied}>{t.start.copy}</CopyButton>
       </div>
       <div className="launch-step launch-step-second">
         <span>{t.start.then}</span>
@@ -461,6 +484,7 @@ function App() {
   const [locale, setLocale] = useState(() => localStorage.getItem("kage-locale") === "en" ? "en" : "zh-CN");
   const [colorMode, setColorMode] = useState(() => localStorage.getItem("kage-theme") === "dark" ? "dark" : "light");
   const [supportOpen, setSupportOpen] = useState(false);
+  const [installCopied, copyInstallCommand] = useCopyFeedback();
   const t = copy[locale];
 
   useEffect(() => {
@@ -528,7 +552,7 @@ function App() {
                 <Hero.Eyebrow>{t.hero.eyebrow}</Hero.Eyebrow>
                 <Hero.Heading>{t.hero.heading.split("\n").map((line, index) => <React.Fragment key={line}>{index > 0 && <br />}{line}</React.Fragment>)}</Hero.Heading>
                 <Hero.Description>{t.hero.description}</Hero.Description>
-                <Hero.PrimaryAction href="#install">{t.hero.install}</Hero.PrimaryAction>
+                <Hero.PrimaryAction href="#install-kage">{t.hero.install}</Hero.PrimaryAction>
                 <Hero.SecondaryAction href="https://github.com/farmcan/kage">{t.hero.source}</Hero.SecondaryAction>
               </Hero>
               <div className="proof-line">
@@ -614,7 +638,7 @@ function App() {
                   <div className="command-row" key={item.command}>
                     <span className="command-index">0{index + 1}</span>
                     <div><code>{item.command}</code><strong>{item.title}</strong><small>{item.text}</small></div>
-                    <CopyButton value={item.command}>{t.start.copy}</CopyButton>
+                    <CopyButton value={item.command} copiedLabel={t.start.copied}>{t.start.copy}</CopyButton>
                   </div>
                 ))}
               </div>
@@ -622,13 +646,18 @@ function App() {
           </Grid>
         </Section>
 
-        <Section className="cta-section" paddingBlockStart="normal" paddingBlockEnd="normal">
+        <Section id="install-kage" className="cta-section" paddingBlockStart="normal" paddingBlockEnd="normal">
           <CTABanner align="start" hasBorder hasShadow={false} className="kage-cta">
             <CTABanner.Heading size="2">{t.cta.heading}</CTABanner.Heading>
             <CTABanner.Description>{t.cta.text}</CTABanner.Description>
             <CTABanner.ButtonGroup>
-              <Button variant="primary" onClick={() => navigator.clipboard.writeText(INSTALL_COMMAND)} leadingVisual={<CopyIcon />}>
-                {t.cta.install}
+              <Button
+                variant="primary"
+                onClick={() => copyInstallCommand(INSTALL_COMMAND)}
+                leadingVisual={installCopied ? <CheckIcon /> : <CopyIcon />}
+                aria-live="polite"
+              >
+                {installCopied ? t.start.installCopied : t.cta.install}
               </Button>
               <Button as="a" href={RELEASE_URL} variant="secondary">{t.cta.download}</Button>
             </CTABanner.ButtonGroup>
