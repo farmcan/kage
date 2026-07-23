@@ -6,14 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const screenshotDir = path.join(repoRoot, "docs", "assets", "screenshots");
 
 const svgFiles = [
   path.join("docs", "assets", "kage-logo.svg"),
-  ...fs
-    .readdirSync(path.join(repoRoot, "docs", "assets", "screenshots"))
-    .filter((fileName) => fileName.endsWith(".svg"))
-    .sort()
-    .map((fileName) => path.join("docs", "assets", "screenshots", fileName)),
+  ...(fs.existsSync(screenshotDir)
+    ? fs
+        .readdirSync(screenshotDir)
+        .filter((fileName) => fileName.endsWith(".svg"))
+        .sort()
+        .map((fileName) => path.join("docs", "assets", "screenshots", fileName))
+    : []),
 ];
 
 const steps = [
