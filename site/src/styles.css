@@ -1165,8 +1165,8 @@ code {
   }
 
   .brand span,
-  .github-label,
-  .support-label,
+  .install-label,
+  .star-label,
   .theme-label {
     display: none;
   }

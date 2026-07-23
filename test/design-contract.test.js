@@ -52,9 +52,12 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageSource, /<ThemeProvider colorMode=\{colorMode\}/u);
   assert.match(homepageSource, /switchToDark: "切换到黑色主题"[\s\S]*?switchToLight: "切换到白色主题"/u);
   assert.match(homepageSource, /installCopied: "安装命令已复制"[\s\S]*?installCopied: "Install command copied"/u);
+  assert.match(homepageSource, /install: "安装 KAGE"[\s\S]*?star: "Star on GitHub"[\s\S]*?install: "Install KAGE"[\s\S]*?star: "Star on GitHub"/u);
   assert.match(homepageSource, /<Hero\.PrimaryAction href="#install-kage">/u);
+  assert.match(homepageSource, /<Hero\.SecondaryAction href="https:\/\/github\.com\/farmcan\/kage">\{t\.hero\.star\}<\/Hero\.SecondaryAction>/u);
   assert.match(homepageSource, /<Section id="install-kage" className="cta-section"/u);
   assert.match(homepageSource, /onClick=\{\(\) => copyInstallCommand\(INSTALL_COMMAND\)\}[\s\S]*?installCopied \? t\.start\.installCopied : t\.cta\.install/u);
+  assert.match(homepageSource, /href="#install-kage"[\s\S]*?aria-label=\{t\.nav\.install\}[\s\S]*?href="https:\/\/github\.com\/farmcan\/kage"[\s\S]*?aria-label=\{t\.nav\.star\}/u);
   assert.match(homepageStyles, /:root \{[\s\S]*?color-scheme: light;[\s\S]*?--kage-bg: #ffffff;/u);
   assert.match(homepageStyles, /:root\[data-theme="dark"\] \{[\s\S]*?color-scheme: dark;[\s\S]*?--kage-bg: #07090d;/u);
   assert.match(homepageSource, /heading: "别让 Agent\\n从零开始。"/u);
@@ -73,7 +76,8 @@ test("agent colors stay in sync across desktop app and public assets", async () 
   assert.match(homepageSource, /const SUPPORT_QR_IMAGE = "\/kage\/assets\/support-alipay-qr\.jpg"/u);
   assert.match(homepageSource, /完全自愿 · 不影响任何功能[\s\S]*?KAGE 会继续免费开源/u);
   assert.match(homepageSource, /Optional · No features are gated[\s\S]*?KAGE will stay free and open source/u);
-  assert.match(homepageSource, /aria-haspopup="dialog"[\s\S]*?aria-label=\{t\.nav\.support\}/u);
+  assert.match(homepageSource, /<footer className="site-footer">[\s\S]*?aria-haspopup="dialog"[\s\S]*?aria-label=\{t\.nav\.support\}/u);
+  assert.doesNotMatch(homepageSource, /<header className="site-header">[\s\S]*?aria-label=\{t\.nav\.support\}[\s\S]*?<\/header>/u);
   assert.match(homepageSource, /supportOpen && <SupportDialog/u);
   assert.match(homepageStyles, /\.support-dialog::backdrop/u);
   assert.match(homepageStyles, /\.support-qr-frame img/u);

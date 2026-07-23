@@ -8,11 +8,10 @@ import {
   CopyIcon,
   DownloadIcon,
   GitBranchIcon,
-  HeartIcon,
-  MarkGithubIcon,
   MoonIcon,
   SearchIcon,
   ShieldCheckIcon,
+  StarIcon,
   SunIcon,
   TerminalIcon,
   XIcon,
@@ -47,8 +46,9 @@ const copy = {
       x2x: "Agent 分身",
       c2x: "跨 Agent 接力",
       more: "更多能力",
+      install: "安装 KAGE",
+      star: "Star on GitHub",
       support: "支持 KAGE",
-      github: "GitHub",
       darkTheme: "黑色",
       lightTheme: "白色",
       switchToDark: "切换到黑色主题",
@@ -60,7 +60,7 @@ const copy = {
       description: "KAGE 在本地搜索、分叉和转换 AI 编程会话，让上下文跟着任务走。",
       proof: ["找回旧工作", "Codex / Claude / QoderCLI 都能分身", "跨 Agent 带上下文接力", "全程本地"],
       install: "安装 KAGE",
-      source: "查看源码",
+      star: "Star on GitHub",
     },
     start: {
       label: "01 · 先安装",
@@ -147,7 +147,7 @@ const copy = {
       heading: "先装上。下一次不用从零开始。",
       text: "第一条命令安装 KAGE，然后运行 kage x2x 或 kage c2x。",
       install: "复制安装命令",
-      download: "下载 macOS App",
+      star: "Star on GitHub",
       latest: "Latest: v0.1.17",
     },
     support: {
@@ -168,8 +168,9 @@ const copy = {
       x2x: "Agent clones",
       c2x: "Cross-agent handoff",
       more: "More",
+      install: "Install KAGE",
+      star: "Star on GitHub",
       support: "Support KAGE",
-      github: "GitHub",
       darkTheme: "Dark",
       lightTheme: "Light",
       switchToDark: "Switch to dark theme",
@@ -181,7 +182,7 @@ const copy = {
       description: "KAGE searches, forks, and bridges AI coding sessions locally, so context follows the work.",
       proof: ["Recover past work", "Clone Codex, Claude & QoderCLI", "Carry context across agents", "Local only"],
       install: "Install KAGE",
-      source: "View source",
+      star: "Star on GitHub",
     },
     start: {
       label: "01 · Install first",
@@ -268,7 +269,7 @@ const copy = {
       heading: "Install it now. Never start from zero again.",
       text: "Install KAGE with the first command, then run kage x2x or kage c2x.",
       install: "Copy install command",
-      download: "Download macOS app",
+      star: "Star on GitHub",
       latest: "Latest: v0.1.17",
     },
     support: {
@@ -553,17 +554,26 @@ function App() {
             <span className="theme-label">{colorMode === "light" ? t.nav.darkTheme : t.nav.lightTheme}</span>
           </button>
           <Button
+            as="a"
+            href="#install-kage"
             size="small"
             variant="secondary"
-            leadingVisual={<HeartIcon />}
-            onClick={() => setSupportOpen(true)}
-            aria-haspopup="dialog"
-            aria-label={t.nav.support}
+            leadingVisual={<DownloadIcon />}
+            aria-label={t.nav.install}
           >
-            <span className="support-label">{t.nav.support}</span>
+            <span className="install-label">{t.nav.install}</span>
           </Button>
-          <Button as="a" href="https://github.com/farmcan/kage" size="small" variant="subtle" leadingVisual={<MarkGithubIcon />} aria-label={t.nav.github}>
-            <span className="github-label">{t.nav.github}</span>
+          <Button
+            as="a"
+            href="https://github.com/farmcan/kage"
+            target="_blank"
+            rel="noreferrer"
+            size="small"
+            variant="primary"
+            leadingVisual={<StarIcon />}
+            aria-label={t.nav.star}
+          >
+            <span className="star-label">{t.nav.star}</span>
           </Button>
         </div>
       </header>
@@ -577,7 +587,7 @@ function App() {
                 <Hero.Heading>{t.hero.heading.split("\n").map((line, index) => <React.Fragment key={line}>{index > 0 && <br />}{line}</React.Fragment>)}</Hero.Heading>
                 <Hero.Description>{t.hero.description}</Hero.Description>
                 <Hero.PrimaryAction href="#install-kage">{t.hero.install}</Hero.PrimaryAction>
-                <Hero.SecondaryAction href="https://github.com/farmcan/kage">{t.hero.source}</Hero.SecondaryAction>
+                <Hero.SecondaryAction href="https://github.com/farmcan/kage">{t.hero.star}</Hero.SecondaryAction>
               </Hero>
               <div className="proof-line">
                 {t.hero.proof.map((item) => <span key={item}><CheckIcon size={14} />{item}</span>)}
@@ -683,7 +693,16 @@ function App() {
               >
                 {installCopied ? t.start.installCopied : t.cta.install}
               </Button>
-              <Button as="a" href={RELEASE_URL} variant="secondary">{t.cta.download}</Button>
+              <Button
+                as="a"
+                href="https://github.com/farmcan/kage"
+                target="_blank"
+                rel="noreferrer"
+                variant="secondary"
+                leadingVisual={<StarIcon />}
+              >
+                {t.cta.star}
+              </Button>
             </CTABanner.ButtonGroup>
             <span className="release-label">{t.cta.latest}</span>
           </CTABanner>
@@ -694,7 +713,14 @@ function App() {
         <div className="footer-brand"><img src="/kage/assets/kage-logo.svg" alt="" /><strong>KAGE</strong></div>
         <p>{t.footer}</p>
         <Stack direction="horizontal" gap="normal" className="footer-links">
-          <button type="button" onClick={() => setSupportOpen(true)}>{t.nav.support}</button>
+          <button
+            type="button"
+            onClick={() => setSupportOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={t.nav.support}
+          >
+            {t.nav.support}
+          </button>
           <a href="https://github.com/farmcan/kage">GitHub</a>
           <a href={RELEASE_URL}>macOS</a>
           <a href="https://github.com/farmcan/kage/blob/main/LICENSE">MIT</a>
