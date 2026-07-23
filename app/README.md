@@ -16,7 +16,7 @@ The app is intentionally a thin UI shell. It does not parse Claude Code, Codex, 
 Download the latest unsigned DMG:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
+https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg
 ```
 
 If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -54,7 +54,7 @@ Package a local DMG:
 
 ```bash
 (cd app && ./package.sh)
-open app/.build/release/KAGE-0.1.17.dmg
+open app/.build/release/KAGE-0.2.0.dmg
 ```
 
 `package.sh` creates an unsigned DMG by default. Set `KAGE_CODESIGN_IDENTITY` to sign the `.app` and `.dmg`, and set `KAGE_NOTARY_PROFILE` to submit the DMG through `xcrun notarytool`.

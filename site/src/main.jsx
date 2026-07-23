@@ -36,7 +36,7 @@ const {
 } = PrimerBrand;
 
 const INSTALL_COMMAND = "curl -fsSL https://raw.githubusercontent.com/farmcan/kage/main/install.sh | bash";
-const RELEASE_URL = "https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg";
+const RELEASE_URL = "https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg";
 const SUPPORT_QR_IMAGE = "/kage/assets/support-alipay-qr.jpg";
 
 const copy = {
@@ -148,7 +148,7 @@ const copy = {
       text: "第一条命令安装 KAGE，然后运行 kage x2x 或 kage c2x。",
       install: "复制安装命令",
       star: "Star on GitHub",
-      latest: "Latest: v0.1.17",
+      latest: "Latest: v0.2.0",
     },
     support: {
       title: "支持 KAGE",
@@ -270,7 +270,7 @@ const copy = {
       text: "Install KAGE with the first command, then run kage x2x or kage c2x.",
       install: "Copy install command",
       star: "Star on GitHub",
-      latest: "Latest: v0.1.17",
+      latest: "Latest: v0.2.0",
     },
     support: {
       title: "Support KAGE",

@@ -2,8 +2,22 @@
 
 ## Unreleased / 未发布
 
-- Cross-agent bridge exports now use target-native UUID session ids for Codex, Claude Code, and QoderCLI, with Codex also writing `thread_source: "user"` metadata so native resume pickers can see imported sessions more reliably.
-- 跨 agent bridge 导出现在会为 Codex、Claude Code、QoderCLI 使用目标端原生 UUID session id；Codex 同时写入 `thread_source: "user"` metadata，让原生 resume picker 更可靠地识别导入 session。
+## v0.2.0 / 2026-07-23
+
+- Continue a Claude Code session in Codex without repeating the context: `kage c2x` creates a target-native Codex session and prints the exact `codex resume` command.
+- 无需重新交代上下文即可在 Codex 里继续 Claude Code session：`kage c2x` 会创建目标端原生 Codex session，并打印准确的 `codex resume` 命令。
+- Cross-agent bridges now use target-native UUID session ids and preserve source lineage across Codex, Claude Code, and QoderCLI.
+- 跨 agent bridge 现在使用目标端原生 UUID session id，并在 Codex、Claude Code、QoderCLI 之间保留来源关系。
+- Nested Claude subagents and QoderCLI sidechains can be listed or included explicitly while staying excluded by default.
+- Claude subagent 与 QoderCLI sidechain 可以显式列出或包含，同时默认仍保持排除。
+- `kage serve` adds a password-capable local mobile monitor, transcript reader, task board, and opt-in dispatch surface.
+- `kage serve` 增加支持密码的本地手机监控、transcript 阅读、任务看板与按需调度界面。
+- The macOS app adds faster cached session loading, clearer process activity, embedded continuation flows, and explicit bridge result actions.
+- macOS App 增加更快的 session cache、清晰的进程状态、内嵌继续工作流程，以及明确的 bridge 结果操作。
+- The public homepage now leads with Install KAGE and Star on GitHub, with product messaging centered on agent clones and cross-agent handoff.
+- 公共主页现在优先展示 Install KAGE 与 Star on GitHub，并以 Agent 分身和跨 Agent 接力为核心叙事。
+
+## Earlier Changes / 早期变更
 
 - KAGE v0.1.16 fixes agent brand colors across the desktop app, app icon, GitHub screenshots, and homepage previews: Codex is blue, Qoder is green, and Claude remains orange.
 - KAGE v0.1.16 修正桌面端、App 图标、GitHub screenshots 和主页预览里的 agent 品牌色：Codex 为蓝色、Qoder 为绿色、Claude 保持橙色。

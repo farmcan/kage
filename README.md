@@ -18,7 +18,7 @@ KAGE is the local memory layer for the AI coding tools you already run. Find the
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.1.17](https://github.com/farmcan/kage/releases/tag/v0.1.17)
+Latest release: [KAGE v0.2.0](https://github.com/farmcan/kage/releases/tag/v0.2.0)
 
 ## Why Star KAGE
 
@@ -65,7 +65,7 @@ kage search "auth"
 Optionally download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
+https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg
 ```
 
 The desktop app is currently unsigned in CI.
@@ -103,7 +103,7 @@ From the desktop app or serve UI, use `New Session` / `Dispatch` to start a fres
 ## Skip It For Now If
 
 - You only use one coding agent and never revisit old sessions.
-- You need a signed and notarized macOS installer today. The current DMG is unsigned while [#34](https://github.com/farmcan/kage/issues/34) is open.
+- You need a signed and notarized macOS installer today. The current public DMG remains unsigned.
 - You expect hosted cloud sync, team sharing, or a public remote relay today. Those are future directions, not shipped product.
 
 Build and open the macOS desktop app from a local checkout:
@@ -195,10 +195,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.1.17 DMG from GitHub Releases:
+Download the v0.2.0 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.1.17/KAGE-0.1.17.dmg
+https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -624,7 +624,7 @@ The export pipeline can trim or branch a conversation before writing it:
 - [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
-- [Latest release notes](docs/release-notes/v0.1.17.md)
+- [Latest release notes](docs/release-notes/v0.2.0.md)
 - [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope
