@@ -1,6 +1,6 @@
 import { detectAgent, getDefaultRoot, normalizeAgent } from "./agents.js";
 import { sameOrSubpath, samePath, walk } from "./files.js";
-import { parseSession, readSessionCwd } from "../adapters/sources/index.js";
+import { parseSession, readSessionInfo } from "../adapters/sources/index.js";
 import path from "node:path";
 
 function fileLooksLikeSessionId(filePath, sessionId) {
@@ -18,6 +18,10 @@ async function matchesCwd(sessionCwd, cwd, { includeSubdirs = false } = {}) {
   return includeSubdirs ? sameOrSubpath(sessionCwd, cwd) : samePath(sessionCwd, cwd);
 }
 
+function isDiscoverableSession(session, { includeNonResumable = false } = {}) {
+  return includeNonResumable || session.resumable !== false;
+}
+
 export async function findLatestSession(rootDir = getDefaultRoot("codex"), options = {}) {
   const files = await walk(rootDir);
   if (files.length === 0) {
@@ -28,18 +32,26 @@ export async function findLatestSession(rootDir = getDefaultRoot("codex"), optio
   const cwd = options.cwd ?? null;
   const agent = normalizeAgent(options.agent) ?? detectAgent(rootDir) ?? detectAgent(sortedFiles[0]);
 
-  if (!cwd || !agent) {
+  if (!agent) {
     return sortedFiles.at(-1);
   }
 
+  let latestDiscoverable = null;
   for (const filePath of [...sortedFiles].reverse()) {
-    const sessionCwd = await readSessionCwd(filePath, agent);
-    if (await matchesCwd(sessionCwd, cwd, options)) {
+    const session = await readSessionInfo(filePath, agent);
+    if (!isDiscoverableSession(session, options)) {
+      continue;
+    }
+    latestDiscoverable ??= filePath;
+    if (!cwd || (await matchesCwd(session.cwd, cwd, options))) {
       return filePath;
     }
   }
 
-  return sortedFiles.at(-1);
+  if (latestDiscoverable) {
+    return latestDiscoverable;
+  }
+  throw new Error(`No resumable session files found in ${rootDir}`);
 }
 
 export async function findMatchingSessions(rootDir = getDefaultRoot("codex"), options = {}) {
@@ -53,14 +65,17 @@ export async function findMatchingSessions(rootDir = getDefaultRoot("codex"), op
   const cwd = options.cwd ?? null;
   const agent = normalizeAgent(options.agent) ?? detectAgent(rootDir) ?? detectAgent(orderedFiles[0]);
 
-  if (!cwd || !agent) {
+  if (!agent) {
     return options.limit ? orderedFiles.slice(0, options.limit) : orderedFiles;
   }
 
   const matches = [];
   for (const filePath of orderedFiles) {
-    const sessionCwd = await readSessionCwd(filePath, agent);
-    if (await matchesCwd(sessionCwd, cwd, options)) {
+    const session = await readSessionInfo(filePath, agent);
+    if (!isDiscoverableSession(session, options)) {
+      continue;
+    }
+    if (!cwd || (await matchesCwd(session.cwd, cwd, options))) {
       matches.push(filePath);
       if (options.limit && matches.length >= options.limit) {
         break;

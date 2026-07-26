@@ -565,6 +565,32 @@ test("parseSession reads Codex sessions", async () => {
   assert.equal(session.sessionId, "sample-session");
   assert.equal(session.cwd, "/tmp/demo");
   assert.equal(session.messages.length, 2);
+  assert.equal(session.resumable, true);
+  assert.equal(session.sessionKind, "root");
+  assert.equal(session.parentSessionId, null);
+});
+
+test("parseSession classifies Codex subagent rollouts and retains the parent thread", async () => {
+  const session = await parseSession({
+    sessionPath: path.join(__dirname, "..", "fixtures", "sample-codex-subagent-session.jsonl"),
+    agent: "codex",
+  });
+
+  assert.equal(session.sessionId, "sample-child-thread");
+  assert.equal(session.resumable, false);
+  assert.equal(session.sessionKind, "subagent");
+  assert.equal(session.parentSessionId, "sample-parent-thread");
+
+  const tempDir = await makeTempDir("codex-subagent-source-marker");
+  const sessionPath = path.join(tempDir, "rollout-source-marker.jsonl");
+  await fs.writeFile(
+    sessionPath,
+    '{"type":"session_meta","payload":{"id":"source-child","session_id":"source-parent","cwd":"/tmp/demo","source":{"subagent":{"thread_spawn":{"parent_thread_id":"source-parent"}}}}}\n',
+    "utf8",
+  );
+  const sourceMarkedSession = await parseSession({ sessionPath, agent: "codex" });
+  assert.equal(sourceMarkedSession.resumable, false);
+  assert.equal(sourceMarkedSession.parentSessionId, "source-parent");
 });
 
 test("parseSession filters Codex developer, system, and bootstrap messages", async () => {
@@ -962,6 +988,37 @@ test("findLatestSession prefers Codex cwd matches", async () => {
 
   const latest = await findLatestSession(sessionsRoot, { cwd: currentDir, agent: "codex" });
   assert.equal(path.basename(latest), "bbb.jsonl");
+});
+
+test("Codex discovery skips subagent rollouts unless inspection is requested", async () => {
+  const currentDir = await makeTempDir("codex-subagent-discovery-workspace");
+  const sessionsRoot = await makeTempDir("codex-subagent-discovery-sessions");
+  const targetDir = path.join(sessionsRoot, "2026", "07", "26");
+  const rootPath = path.join(targetDir, "aaa-root.jsonl");
+  const childPath = path.join(targetDir, "zzz-child.jsonl");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    rootPath,
+    `{"timestamp":"2026-07-26T05:00:00.000Z","type":"session_meta","payload":{"id":"root-thread","cwd":"${currentDir}","thread_source":"user"}}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    childPath,
+    `{"timestamp":"2026-07-26T06:00:00.000Z","type":"session_meta","payload":{"id":"child-thread","session_id":"root-thread","parent_thread_id":"root-thread","cwd":"${currentDir}","thread_source":"subagent","source":{"subagent":{"thread_spawn":{"parent_thread_id":"root-thread"}}}}}\n`,
+    "utf8",
+  );
+
+  const latest = await findLatestSession(sessionsRoot, { cwd: currentDir, agent: "codex" });
+  const matches = await findMatchingSessions(sessionsRoot, { cwd: currentDir, agent: "codex" });
+  const inspectionMatches = await findMatchingSessions(sessionsRoot, {
+    cwd: currentDir,
+    agent: "codex",
+    includeNonResumable: true,
+  });
+
+  assert.equal(latest, rootPath);
+  assert.deepEqual(matches, [rootPath]);
+  assert.deepEqual(inspectionMatches, [rootPath, childPath]);
 });
 
 test("findMatchingSessions returns Claude cwd matches", async () => {
@@ -2975,10 +3032,13 @@ test("cli sessions persists and reuses session metadata cache", async () => {
 
   const firstCache = JSON.parse(await fs.readFile(cachePath, "utf8"));
   const cacheEntry = firstCache.entries[`codex:${sessionFile}`];
-  assert.equal(firstCache.version, 2);
+  assert.equal(firstCache.version, 3);
   assert.equal(cacheEntry.summary.sessionId, "codex-cache");
   assert.equal(cacheEntry.summary.turnCount, 2);
   assert.deepEqual(cacheEntry.summary.recentUserMessages, ["cache follow up", "cache me"]);
+  assert.equal(cacheEntry.summary.resumable, true);
+  assert.equal(cacheEntry.summary.sessionKind, "root");
+  assert.equal(cacheEntry.summary.parentSessionId, null);
 
   const secondResult = await spawnCli(["sessions", "--agent", "codex", "--json"], {
     cwd: currentDir,
@@ -2989,6 +3049,60 @@ test("cli sessions persists and reuses session metadata cache", async () => {
   assert.equal(secondResult.code, 0);
   assert.deepEqual(secondPayload.sessions, firstPayload.sessions);
   assert.equal(secondCache.entries[`codex:${sessionFile}`].cachedAt, cacheEntry.cachedAt);
+});
+
+test("session cache versioning invalidates stale Codex resumability metadata", async () => {
+  const fakeHome = await makeTempDir("stale-subagent-cache-home");
+  const currentDir = await makeTempDir("stale-subagent-cache-workspace");
+  const cacheDir = await makeTempDir("stale-subagent-cache-store");
+  const cachePath = path.join(cacheDir, "session-metadata.json");
+  const codexProject = path.join(fakeHome, ".codex", "sessions", "2026", "07", "26");
+  const sessionFile = path.join(codexProject, "rollout-child-thread.jsonl");
+  await fs.mkdir(codexProject, { recursive: true });
+  await fs.writeFile(
+    sessionFile,
+    `{"timestamp":"2026-07-26T06:00:00.000Z","type":"session_meta","payload":{"id":"child-thread","parent_thread_id":"parent-thread","cwd":"${currentDir}","thread_source":"subagent"}}\n`,
+    "utf8",
+  );
+  const stats = await fs.stat(sessionFile);
+  await fs.writeFile(
+    cachePath,
+    `${JSON.stringify({
+      version: 2,
+      entries: {
+        [`codex:${sessionFile}`]: {
+          size: stats.size,
+          mtimeMs: stats.mtimeMs,
+          cachedAt: "2026-07-26T06:01:00.000Z",
+          summary: {
+            agent: "codex",
+            sessionPath: sessionFile,
+            sessionId: "child-thread",
+            cwd: currentDir,
+            updatedAt: "2026-07-26T06:00:00.000Z",
+            title: "stale cache title",
+            shortTitle: "stale cache title",
+            turnCount: 0,
+            recentUserMessages: [],
+          },
+        },
+      },
+    })}\n`,
+    "utf8",
+  );
+
+  const result = await spawnCli(["sessions", "--agent", "codex", "--json"], {
+    cwd: currentDir,
+    env: { ...process.env, HOME: fakeHome, KAGE_SESSION_CACHE_PATH: cachePath },
+  });
+  const payload = JSON.parse(result.stdout);
+  const refreshedCache = JSON.parse(await fs.readFile(cachePath, "utf8"));
+
+  assert.equal(result.code, 0);
+  assert.equal(payload.sessions[0].resumable, false);
+  assert.equal(payload.sessions[0].parentSessionId, "parent-thread");
+  assert.equal(refreshedCache.version, 3);
+  assert.equal(refreshedCache.entries[`codex:${sessionFile}`].summary.resumable, false);
 });
 
 test("cli search finds sessions by query, agent, project, and date filters", async () => {
@@ -3329,6 +3443,71 @@ test("cli single-agent picker prints resume command without launching Codex", as
   assert.match(combinedOutput, /# not launched/u);
   assert.doesNotMatch(combinedOutput, /FAKE_CODEX_LAUNCHED/u);
   await assert.rejects(fs.access(sentinelPath), /ENOENT/u);
+});
+
+test("cli excludes Codex subagents from resume pickers and rejects explicit resume actions", async () => {
+  const currentDir = await makeTempDir("codex-subagent-picker-workspace");
+  const sessionsRoot = await makeTempDir("codex-subagent-picker-sessions");
+  const targetDir = path.join(sessionsRoot, "2026", "07", "26");
+  const childPath = path.join(targetDir, "rollout-z-child-thread.jsonl");
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(
+    path.join(targetDir, "rollout-a-root-thread.jsonl"),
+    [
+      `{"timestamp":"2026-07-26T05:00:00.000Z","type":"session_meta","payload":{"id":"root-thread","cwd":"${currentDir}","thread_source":"user"}}`,
+      '{"timestamp":"2026-07-26T05:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"root request"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    childPath,
+    [
+      `{"timestamp":"2026-07-26T06:00:00.000Z","type":"session_meta","payload":{"id":"child-thread","session_id":"root-thread","parent_thread_id":"root-thread","cwd":"${currentDir}","thread_source":"subagent","source":{"subagent":{"thread_spawn":{"parent_thread_id":"root-thread"}}}}}`,
+      '{"timestamp":"2026-07-26T06:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"child request"}]}}',
+    ].join("\n") + "\n",
+    "utf8",
+  );
+
+  const listResult = await spawnCli(["x", "--root", sessionsRoot], { cwd: currentDir });
+  assert.equal(listResult.code, 0);
+  assert.match(listResult.stdout, /root-thread/u);
+  assert.doesNotMatch(listResult.stdout, /child-thread/u);
+
+  const explicitResult = await spawnCli(["x", "--root", sessionsRoot, "--session", childPath], {
+    cwd: currentDir,
+  });
+  assert.equal(explicitResult.code, 1);
+  assert.match(
+    explicitResult.stderr,
+    /Codex subagent thread child-thread cannot be resumed directly\. Resume parent thread root-thread instead\./u,
+  );
+
+  const actionsResult = await spawnCli(["actions", "--agent", "codex", "--root", sessionsRoot, "--json"], {
+    cwd: currentDir,
+  });
+  const actionsPayload = JSON.parse(actionsResult.stdout);
+  const rootResumeAction = actionsPayload.actions.find((action) => action.id === "resume:codex:root-thread");
+  assert.equal(actionsResult.code, 0);
+  assert.equal(rootResumeAction?.isLatest, true);
+  assert.ok(!actionsPayload.actions.find((action) => action.id === "resume:codex:child-thread"));
+
+  const runActionResult = await spawnCli(
+    ["run-action", "resume:codex:child-thread", "--agent", "codex", "--root", sessionsRoot, "--json"],
+    { cwd: currentDir },
+  );
+  assert.equal(runActionResult.code, 1);
+  assert.match(runActionResult.stderr, /Resume parent thread root-thread instead/u);
+
+  const desktopResult = await spawnCli(["desktop-state", "--agent", "codex", "--root", sessionsRoot], {
+    cwd: currentDir,
+  });
+  const desktopPayload = JSON.parse(desktopResult.stdout);
+  const childSession = desktopPayload.sessions.find((session) => session.sessionId === "child-thread");
+  assert.equal(desktopResult.code, 0);
+  assert.equal(childSession?.resumable, false);
+  assert.equal(childSession?.sessionKind, "subagent");
+  assert.equal(childSession?.parentSessionId, "root-thread");
+  assert.ok(!desktopPayload.actions.find((action) => action.id === "resume:codex:child-thread"));
 });
 
 test("cli supports shorthand positional source and target agents", async () => {

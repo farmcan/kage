@@ -5,7 +5,7 @@ import path from "node:path";
 import { parseSession } from "../adapters/sources/index.js";
 import { getRealUserMessages, getRecentUserMessages, getSessionTitle, getShortSessionTitle } from "./session-labels.js";
 
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 function defaultCacheDir() {
   if (process.env.KAGE_CACHE_DIR) {
@@ -21,7 +21,7 @@ function defaultCacheDir() {
 }
 
 export function defaultSessionCachePath() {
-  return process.env.KAGE_SESSION_CACHE_PATH ?? path.join(defaultCacheDir(), "session-metadata-v2.json");
+  return process.env.KAGE_SESSION_CACHE_PATH ?? path.join(defaultCacheDir(), "session-metadata-v3.json");
 }
 
 function cacheKey(agent, sessionPath) {
@@ -39,6 +39,9 @@ function summarizeSession(session) {
     shortTitle: getShortSessionTitle(session),
     turnCount: getRealUserMessages(session).length,
     recentUserMessages: getRecentUserMessages(session),
+    resumable: session.resumable !== false,
+    sessionKind: session.sessionKind ?? "root",
+    parentSessionId: session.parentSessionId ?? null,
   };
 }
 

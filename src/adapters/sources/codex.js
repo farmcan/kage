@@ -7,7 +7,32 @@ function isCodexBootstrapMessage(role, text) {
 }
 
 export function readSessionCwd(items) {
-  return knownCwd(items.find((item) => item.type === "session_meta")?.payload?.cwd);
+  return readSessionInfo(items).cwd;
+}
+
+function readThreadClassification(meta) {
+  const subagentSource = meta.source?.subagent;
+  const isSubagent = meta.thread_source === "subagent" || Boolean(subagentSource);
+  const parentSessionId = isSubagent
+    ? (meta.parent_thread_id ??
+      subagentSource?.thread_spawn?.parent_thread_id ??
+      meta.session_id ??
+      null)
+    : null;
+
+  return {
+    sessionKind: isSubagent ? "subagent" : "root",
+    resumable: !isSubagent,
+    parentSessionId,
+  };
+}
+
+export function readSessionInfo(items) {
+  const meta = items.find((item) => item.type === "session_meta")?.payload ?? {};
+  return {
+    cwd: knownCwd(meta.cwd),
+    ...readThreadClassification(meta),
+  };
 }
 
 export function parse(items, sessionPath, agent) {
@@ -47,6 +72,7 @@ export function parse(items, sessionPath, agent) {
     cwd,
     title: null,
     updatedAt: meta.timestamp ?? metaItem.timestamp ?? null,
+    ...readThreadClassification(meta),
     rawItems: items,
     messages,
   };

@@ -1258,6 +1258,27 @@ async function matchesCurrentCwd(sessionCwd, cwd, { includeSubdirs = false } = {
   return includeSubdirs ? sameOrSubpath(sessionCwd, cwd) : samePath(sessionCwd, cwd);
 }
 
+async function readSessionCandidate(sessionPath, resolvedAgent, cache) {
+  const summary = await readSessionSummary(sessionPath, resolvedAgent, cache);
+  const summaryPath = summary.sessionPath ?? sessionPath;
+  return {
+    agent: resolvedAgent,
+    agentLabel: formatSessionLabel(resolvedAgent),
+    sessionPath: summaryPath,
+    sessionId: summary.sessionId,
+    cwd: summary.cwd,
+    updatedAt: summary.updatedAt,
+    title: summary.title,
+    shortTitle: summary.shortTitle,
+    turnCount: summary.turnCount ?? 0,
+    recentUserMessages: summary.recentUserMessages ?? [],
+    resumable: summary.resumable !== false,
+    sessionKind: summary.sessionKind ?? "root",
+    parentSessionId: summary.parentSessionId ?? null,
+    lineage: await readLineageMetadata(summaryPath),
+  };
+}
+
 async function buildSessionCandidates(args, options = {}) {
   const rootDir = args.root ?? getDefaultRoot(args.agent ?? "codex");
   const resolvedAgent = formatAgentName(args.agent ?? "codex");
@@ -1276,28 +1297,18 @@ async function buildSessionCandidates(args, options = {}) {
 
     const orderedFiles = files.sort().reverse();
     for (const sessionPath of orderedFiles) {
-      const summary = await readSessionSummary(sessionPath, resolvedAgent, cache);
-      if (!(await matchesCurrentCwd(summary.cwd, cwd, { includeSubdirs: args.includeSubdirs }))) {
+      const candidate = await readSessionCandidate(sessionPath, resolvedAgent, cache);
+      if (options.resumableOnly && !candidate.resumable) {
         continue;
       }
-      if (!isWithinDateRange(summary.updatedAt, sinceDate, untilDate)) {
+      if (!(await matchesCurrentCwd(candidate.cwd, cwd, { includeSubdirs: args.includeSubdirs }))) {
+        continue;
+      }
+      if (!isWithinDateRange(candidate.updatedAt, sinceDate, untilDate)) {
         continue;
       }
 
-      const summaryPath = summary.sessionPath ?? sessionPath;
-      candidates.push({
-        agent: resolvedAgent,
-        agentLabel: formatSessionLabel(resolvedAgent),
-        sessionPath: summaryPath,
-        sessionId: summary.sessionId,
-        cwd: summary.cwd,
-        updatedAt: summary.updatedAt,
-        title: summary.title,
-        shortTitle: summary.shortTitle,
-        turnCount: summary.turnCount ?? 0,
-        recentUserMessages: summary.recentUserMessages ?? [],
-        lineage: await readLineageMetadata(summaryPath),
-      });
+      candidates.push(candidate);
 
       if (args.limit && candidates.length >= args.limit) {
         break;
@@ -1312,6 +1323,21 @@ async function buildSessionCandidates(args, options = {}) {
   return candidates.sort((left, right) => Date.parse(right.updatedAt ?? 0) - Date.parse(left.updatedAt ?? 0));
 }
 
+async function buildExplicitSessionCandidate(args, resolvedAgent) {
+  const rootDir = args.root ?? getDefaultRoot(resolvedAgent);
+  const sessionPath = args.session ??
+    (await findSessionById(rootDir, {
+      sessionId: args.sessionId,
+      agent: resolvedAgent,
+    }));
+  const cache = await SessionMetadataCache.load();
+  try {
+    return await readSessionCandidate(sessionPath, resolvedAgent, cache);
+  } finally {
+    await saveSessionCache(cache);
+  }
+}
+
 function toSessionPayload(candidate) {
   return {
     agent: candidate.agent,
@@ -1324,6 +1350,9 @@ function toSessionPayload(candidate) {
     path: candidate.sessionPath,
     turnCount: candidate.turnCount ?? 0,
     recentUserMessages: candidate.recentUserMessages,
+    resumable: candidate.resumable !== false,
+    sessionKind: candidate.sessionKind ?? "root",
+    parentSessionId: candidate.parentSessionId ?? null,
     lineage: candidate.lineage ?? null,
   };
 }
@@ -1486,6 +1515,9 @@ function routeAliasBetweenAgents(sourceAgent, targetAgent) {
 }
 
 function buildResumeCommandForSession(session) {
+  if (session.resumable === false) {
+    return null;
+  }
   if (session.agent === "claude") {
     return buildClaudeResumeCommand(session.sessionId, session.cwd);
   }
@@ -1496,6 +1528,22 @@ function buildResumeCommandForSession(session) {
     return buildQoderResumeCommand(session.sessionId, session.cwd);
   }
   return null;
+}
+
+function nonResumableSessionError(session) {
+  if (session.agent === "codex" && session.sessionKind === "subagent") {
+    const parentHint = session.parentSessionId
+      ? ` Resume parent thread ${session.parentSessionId} instead.`
+      : " Resume its parent thread instead.";
+    return new Error(`Codex subagent thread ${session.sessionId} cannot be resumed directly.${parentHint}`);
+  }
+  return new Error(`${formatSessionLabel(session.agent)} session ${session.sessionId} cannot be resumed directly.`);
+}
+
+function assertSessionResumable(session) {
+  if (session.resumable === false) {
+    throw nonResumableSessionError(session);
+  }
 }
 
 function formatResumeCommandHint(session, resumeCommand) {
@@ -1512,22 +1560,24 @@ function buildActionList(inventory) {
   const actions = [];
 
   for (const group of inventory.agents) {
+    const latestResumablePath = group.sessions.find((session) => session.resumable !== false)?.path;
     for (const [index, session] of group.sessions.entries()) {
       const isLatest = index === 0;
+      const isLatestResumable = session.path === latestResumablePath;
       const sessionTitle = session.shortTitle ?? formatSessionTitle(session.title, 60);
       const resumeCommand = buildResumeCommandForSession(session);
       if (resumeCommand) {
         actions.push({
           id: `resume:${session.agent}:${session.sessionId}`,
           type: "resume",
-          label: isLatest
+          label: isLatestResumable
             ? `Resume latest ${formatSessionLabel(session.agent)} session`
             : `Resume ${formatSessionLabel(session.agent)} session: ${sessionTitle}`,
           agent: session.agent,
           sessionId: session.sessionId,
           sessionPath: session.path,
           command: resumeCommand,
-          isLatest,
+          isLatest: isLatestResumable,
         });
       }
 
@@ -1675,6 +1725,26 @@ async function runAction(args) {
   const result = await buildActionsResult(args);
   const action = result.actions.find((candidate) => candidate.id === args.runActionId);
   if (!action) {
+    const resumeMatch = args.runActionId.match(/^resume:([^:]+):(.+)$/u);
+    if (resumeMatch) {
+      const [, agent, sessionId] = resumeMatch;
+      try {
+        const candidate = await buildExplicitSessionCandidate(
+          {
+            ...args,
+            agent,
+            session: null,
+            sessionId,
+          },
+          formatAgentName(agent),
+        );
+        assertSessionResumable(candidate);
+      } catch (error) {
+        if (error?.message?.includes("cannot be resumed directly")) {
+          throw error;
+        }
+      }
+    }
     throw new Error(`Unknown action id: ${args.runActionId}`);
   }
 
@@ -1739,7 +1809,7 @@ async function resolveSessionPath(args) {
     });
   }
 
-  const candidates = await buildSessionCandidates(args);
+  const candidates = await buildSessionCandidates(args, { resumableOnly: true });
   if (candidates.length > 0) {
     return chooseSessionPath(formatSessionLabel(args.agent ?? "codex"), candidates);
   }
@@ -1825,7 +1895,20 @@ async function main() {
   }
   if (args.listAgent) {
     const resolvedAgent = formatAgentName(args.listAgent);
-    const candidates = await buildSessionCandidates({ ...args, agent: resolvedAgent });
+    if (args.session || args.sessionId) {
+      const selected = await buildExplicitSessionCandidate({ ...args, agent: resolvedAgent }, resolvedAgent);
+      assertSessionResumable(selected);
+      const resumeCommand = buildResumeCommandForSession(selected);
+      if (!resumeCommand) {
+        throw new Error(`${formatSessionLabel(resolvedAgent)} sessions cannot be resumed from this command.`);
+      }
+      process.stdout.write(formatResumeCommandHint(selected, resumeCommand));
+      return;
+    }
+    const candidates = await buildSessionCandidates(
+      { ...args, agent: resolvedAgent },
+      { resumableOnly: true },
+    );
     if (candidates.length === 0) {
       throw new Error(`No ${formatSessionLabel(resolvedAgent)} sessions match the current directory`);
     }
