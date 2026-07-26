@@ -1,0 +1,4 @@
+{"timestamp":"2026-07-26T05:30:00.000Z","type":"session_meta","payload":{"id":"sample-child-thread","session_id":"sample-parent-thread","parent_thread_id":"sample-parent-thread","cwd":"/tmp/demo","originator":"codex_cli_rs","cli_version":"0.144.6","thread_source":"subagent","source":{"subagent":{"thread_spawn":{"parent_thread_id":"sample-parent-thread","depth":1,"agent_path":"/root/reproduce_issue"}}}}}
+{"timestamp":"2026-07-26T05:30:01.000Z","type":"turn_context","payload":{"cwd":"/tmp/demo","multi_agent_version":"v2"}}
+{"timestamp":"2026-07-26T05:30:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Reproduce the Codex child-thread resume failure."}]}}
+{"timestamp":"2026-07-26T05:30:03.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The child rollout is readable but cannot accept direct app-server input."}]}}

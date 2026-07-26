@@ -77,6 +77,9 @@ do {
           "updatedAt": "2026-05-25T06:56:02.409Z",
           "cwd": "/tmp/project",
           "path": "/Users/test/.claude/projects/-tmp-project/session-1.jsonl",
+          "resumable": true,
+          "sessionKind": "root",
+          "parentSessionId": null,
           "recentUserMessages": ["Fix login"]
         }
       ],
@@ -95,6 +98,9 @@ do {
               "updatedAt": "2026-05-25T06:56:02.409Z",
               "cwd": "/tmp/project",
               "path": "/Users/test/.claude/projects/-tmp-project/session-1.jsonl",
+              "resumable": true,
+              "sessionKind": "root",
+              "parentSessionId": null,
               "recentUserMessages": ["Fix login"]
             }
           ]
@@ -106,6 +112,8 @@ do {
   )
   try require(sessions.sessions[0].id == "claude:session-1", "session id should compose from agent and id")
   try require(sessions.sessions[0].displayTitle == "Fix login", "short session title should drive display title")
+  try require(sessions.sessions[0].canResume, "root sessions should decode as resumable")
+  try require(sessions.sessions[0].sessionKind == "root", "session kind should decode")
   try require(sessions.agents[0].sessions[0].recentUserMessages == ["Fix login"], "recent user messages should decode")
 
   let actions = try decode(
@@ -263,6 +271,9 @@ do {
           "updatedAt": "2026-05-25T06:56:02.409Z",
           "cwd": "/tmp/project",
           "path": "/Users/test/.codex/sessions/session-1.jsonl",
+          "resumable": false,
+          "sessionKind": "subagent",
+          "parentSessionId": "parent-session",
           "recentUserMessages": ["Fix login"],
           "match": {
             "field": "message:user:1",
@@ -282,6 +293,8 @@ do {
     """
   )
   try require(search.results[0].agentSession.id == "codex:session-1", "search result should convert to session")
+  try require(!search.results[0].agentSession.canResume, "Codex subagent search results should remain non-resumable")
+  try require(search.results[0].agentSession.parentSessionId == "parent-session", "subagent parent id should decode")
   try require(search.results[0].match?.text == "Fix login button state", "search match should decode")
 
   let recentSearchArgs = KageCLIArguments.search(

@@ -343,7 +343,7 @@ kage q2x --include-subagents
 kage q2x --include-subagent worker-alpha
 ```
 
-Included nested content is wrapped with visible `[Claude Subagent: ...]` or `[QoderCLI Sidechain: ...]` boundaries in the exported target context. Codex nested transcript support is intentionally disabled until Codex exposes a stable child-run marker.
+Included nested content is wrapped with visible `[Claude Subagent: ...]` or `[QoderCLI Sidechain: ...]` boundaries in the exported target context. Current Codex child rollouts expose stable `session_meta` markers, so KAGE classifies them as inspection-only sessions, keeps them out of native resume pickers, and points explicit resume attempts back to the parent thread. Opt-in import of Codex child content into bridge exports is not exposed yet.
 
 Use explicit source and target instead of aliases:
 

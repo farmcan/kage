@@ -186,6 +186,9 @@ async function searchAgent(agent, rootDir, filters) {
         path: sessionPath,
         turnCount: getRealUserMessages(session).length,
         recentUserMessages: getRecentUserMessages(session),
+        resumable: session.resumable !== false,
+        sessionKind: session.sessionKind ?? "root",
+        parentSessionId: session.parentSessionId ?? null,
         match: findMatchContext(session, title, filters.query),
       });
     } catch {

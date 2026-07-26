@@ -33,3 +33,16 @@ export async function readSessionCwd(sessionPath, agent) {
   const items = await readJsonl(sessionPath);
   return adapter.readSessionCwd(items, sessionPath, resolvedAgent);
 }
+
+export async function readSessionInfo(sessionPath, agent) {
+  const resolvedAgent = normalizeAgent(agent) ?? detectAgent(sessionPath);
+  const adapter = getSourceAdapter(resolvedAgent);
+  const items = await readJsonl(sessionPath);
+  return {
+    cwd: adapter.readSessionCwd(items, sessionPath, resolvedAgent),
+    resumable: true,
+    sessionKind: "root",
+    parentSessionId: null,
+    ...(adapter.readSessionInfo?.(items, sessionPath, resolvedAgent) ?? {}),
+  };
+}

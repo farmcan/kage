@@ -1042,6 +1042,9 @@ struct DesktopDashboardView: View {
   }
 
   private func primaryResumeAction(for session: AgentSession, in actionLookup: [String: [KageAction]]? = nil) -> KageAction? {
+    guard session.canResume else {
+      return nil
+    }
     let state = renderingState
     if actionLookup == nil, let action = state.primaryResumeActions[session.path] {
       return action

@@ -8,7 +8,7 @@ KAGE keeps bridge exports linear by default. Child-task, sidechain, delegated-ag
 | --- | --- | --- |
 | Claude Code | Parent transcript plus `<session-id>/subagents/*.jsonl` child transcripts. | Supported as Claude subagents. |
 | QoderCLI / QoderWork | Sidechain rows can appear inside the same JSONL with `isSidechain: true`; `agentId` is used as the stable selector when present. | Supported as Qoder sidechains. |
-| Codex | Current KAGE fixtures and parser shape show `session_meta`, `response_item`, and `event_msg` rows without child transcript or sidechain metadata. | Unsupported until a stable nested transcript marker is found. |
+| Codex | MultiAgent V2 child rollouts are ordinary session JSONL files whose `session_meta` uses `thread_source: "subagent"` and/or `source.subagent`, with a parent thread id when available. | Detected as inspection-only child sessions and excluded from native resume selection; opt-in child-content import is not exposed yet. |
 
 ## Commands
 
@@ -24,7 +24,7 @@ kage q2x --include-subagents
 kage q2x --include-subagent worker-alpha
 ```
 
-Unsupported agents fail clearly. For example, `kage x2q --list-subagents` reports that Codex does not currently expose supported nested transcript metadata.
+Codex child rollouts can be searched or exported when selected explicitly, but they cannot accept direct user input in current Codex MultiAgent V2. `kage x` excludes them from resume choices, and an explicit native-resume attempt names the parent thread when the rollout records one. The `--list-subagents` / `--include-subagent` bridge controls still apply only to Claude and Qoder nested-content import.
 
 ## Export Boundaries
 

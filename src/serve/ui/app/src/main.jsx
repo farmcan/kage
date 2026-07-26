@@ -141,6 +141,9 @@ function canReplyToSession(session) {
   if (!session || !sendAgents.includes(session.agent) || !String(session.sessionId || "").trim()) {
     return false;
   }
+  if (session.resumable === false) {
+    return false;
+  }
   if (session.agent === "qodercli" && session.sessionId === "later" && Number(session.messageCount || 0) === 0) {
     return false;
   }
@@ -150,6 +153,12 @@ function canReplyToSession(session) {
 function replyUnavailableReason(session) {
   if (!session) return "Select a resumable session to reply.";
   if (!sendAgents.includes(session.agent)) return `${agentMeta[session.agent]?.label || session.agent || "This agent"} is read-only here.`;
+  if (session.resumable === false && session.sessionKind === "subagent") {
+    return session.parentSessionId
+      ? `This Codex subagent is read-only here. Resume parent thread ${session.parentSessionId} instead.`
+      : "This Codex subagent is read-only here. Resume its parent thread instead.";
+  }
+  if (session.resumable === false) return "This session cannot be resumed directly.";
   if (!String(session.sessionId || "").trim()) return "This transcript has no resumable session id; New will start from cwd.";
   if (session.agent === "qodercli" && session.sessionId === "later" && Number(session.messageCount || 0) === 0) return "This transcript uses a placeholder session id; New will start from cwd.";
   return "";
@@ -837,6 +846,7 @@ function buildSessionSearchText(session) {
     session.shortTitle,
     session.cwd,
     session.path,
+    session.parentSessionId,
     session.lineage?.parentTitle,
     session.lineage?.parentSessionId,
     ...(session.recentUserMessages || []),
@@ -894,7 +904,7 @@ function shellQuote(value) {
 }
 
 function resumeCommand(session) {
-  if (!session) return "";
+  if (!session || session.resumable === false) return "";
   const cd = session.cwd ? `cd ${shellQuote(session.cwd)} && ` : "";
   if (session.agent === "claude") return `${cd}claude --resume ${shellQuote(session.sessionId)}`;
   if (session.agent === "codex") return `${cd}codex resume ${shellQuote(session.sessionId)}`;
@@ -4419,7 +4429,11 @@ function DispatchBoard({ sessions, selectedPath, mode, targetAgent, onNewTarget,
                   const actionMap = actionByPath.get(session.path) || [];
                   const getActionByType = (type) => actionMap.find((action) => action.type === type);
                   const quickActions = [
-                    { type: "resume", action: getActionByType("resume") || { command: resumeCommand(session), type: "resume" } },
+                    {
+                      type: "resume",
+                      action: getActionByType("resume") ||
+                        (canReplyToSession(session) ? { command: resumeCommand(session), type: "resume" } : null),
+                    },
                     { type: "fork", action: getActionByType("fork") },
                     { type: "bridge", action: getActionByType("bridge") },
                   ].filter(({ action }) => Boolean(action?.command || Array.isArray(action?.cliArgs) || action?.type === "resume"));

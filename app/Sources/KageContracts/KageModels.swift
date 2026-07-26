@@ -67,6 +67,9 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
   public let path: String
   public let turnCount: Int?
   public let recentUserMessages: [String]
+  public let resumable: Bool?
+  public let sessionKind: String?
+  public let parentSessionId: String?
   public let lineage: SessionLineage?
 
   public init(
@@ -80,6 +83,9 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     path: String,
     turnCount: Int? = nil,
     recentUserMessages: [String],
+    resumable: Bool? = nil,
+    sessionKind: String? = nil,
+    parentSessionId: String? = nil,
     lineage: SessionLineage? = nil
   ) {
     self.agent = agent
@@ -92,6 +98,9 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
     self.path = path
     self.turnCount = turnCount
     self.recentUserMessages = recentUserMessages
+    self.resumable = resumable
+    self.sessionKind = sessionKind
+    self.parentSessionId = parentSessionId
     self.lineage = lineage
   }
 
@@ -101,6 +110,10 @@ public struct AgentSession: Decodable, Identifiable, Hashable, Sendable {
 
   public var id: String {
     "\(agent):\(sessionId)"
+  }
+
+  public var canResume: Bool {
+    resumable ?? true
   }
 }
 
@@ -322,6 +335,9 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
   public let cwd: String
   public let path: String
   public let recentUserMessages: [String]
+  public let resumable: Bool?
+  public let sessionKind: String?
+  public let parentSessionId: String?
   public let match: SearchMatch?
 
   public init(
@@ -334,6 +350,9 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
     cwd: String,
     path: String,
     recentUserMessages: [String],
+    resumable: Bool? = nil,
+    sessionKind: String? = nil,
+    parentSessionId: String? = nil,
     match: SearchMatch?
   ) {
     self.agent = agent
@@ -345,6 +364,9 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
     self.cwd = cwd
     self.path = path
     self.recentUserMessages = recentUserMessages
+    self.resumable = resumable
+    self.sessionKind = sessionKind
+    self.parentSessionId = parentSessionId
     self.match = match
   }
 
@@ -366,7 +388,10 @@ public struct SearchSessionResult: Decodable, Identifiable, Hashable, Sendable {
       updatedAt: updatedAt,
       cwd: cwd,
       path: path,
-      recentUserMessages: recentUserMessages
+      recentUserMessages: recentUserMessages,
+      resumable: resumable,
+      sessionKind: sessionKind,
+      parentSessionId: parentSessionId
     )
   }
 }
