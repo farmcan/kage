@@ -2708,7 +2708,13 @@ test("cli supports --version", async () => {
   const result = await spawnCli(["--version"]);
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout.trim(), new RegExp(`^kage ${packageJson.version}(?: \\([^)]+ [0-9a-f]{7,40}\\))?$`, "u"));
+  assert.match(
+    result.stdout.trim(),
+    new RegExp(
+      `^kage ${packageJson.version}(?: \\([^)]+ [0-9a-f]{7,40}\\))?\\nReleased: ${packageJson.releasedAt}$`,
+      "u",
+    ),
+  );
 });
 
 test("package.json exposes KAGE bin", async () => {
@@ -2782,9 +2788,11 @@ test("cli supports update command", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /KAGE update/u);
   assert.match(result.stdout, new RegExp(`Current version: ${packageJson.version}`, "u"));
+  assert.match(result.stdout, new RegExp(`Current release time: ${packageJson.releasedAt}`, "u"));
   assert.match(result.stdout, /Current build: /u);
   assert.match(result.stdout, /Updated KAGE/);
   assert.match(result.stdout, new RegExp(`Version after update: ${packageJson.version}`, "u"));
+  assert.match(result.stdout, new RegExp(`Release time after update: ${packageJson.releasedAt}`, "u"));
   assert.match(result.stdout, /Build after update: /u);
 });
 

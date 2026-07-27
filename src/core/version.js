@@ -38,6 +38,7 @@ export async function getCliVersionInfo() {
 
   return {
     version: packageJson?.version ?? "0.0.0",
+    releasedAt: packageJson?.releasedAt ?? null,
     build: revision
       ? {
           revision,
@@ -56,7 +57,17 @@ export function formatBuildLabel(build) {
   return `${build.source ?? "build"} ${build.revision}`;
 }
 
+export function formatReleaseTime(releasedAt) {
+  if (!releasedAt) {
+    return null;
+  }
+  const timestamp = Date.parse(releasedAt);
+  return Number.isNaN(timestamp) ? releasedAt : new Date(timestamp).toISOString().replace(".000Z", "Z");
+}
+
 export function formatCliVersion(info) {
   const buildLabel = formatBuildLabel(info.build);
-  return buildLabel ? `kage ${info.version} (${buildLabel})` : `kage ${info.version}`;
+  const versionLabel = buildLabel ? `kage ${info.version} (${buildLabel})` : `kage ${info.version}`;
+  const releaseTime = formatReleaseTime(info.releasedAt);
+  return releaseTime ? `${versionLabel}\nReleased: ${releaseTime}` : versionLabel;
 }

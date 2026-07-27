@@ -18,7 +18,7 @@ KAGE is the local memory layer for the AI coding tools you already run. Find the
 
 Homepage: <https://farmcan.github.io/kage/>
 
-Latest release: [KAGE v0.2.0](https://github.com/farmcan/kage/releases/tag/v0.2.0)
+Latest release: [KAGE v0.2.1](https://github.com/farmcan/kage/releases/tag/v0.2.1)
 
 ## Why Star KAGE
 
@@ -65,7 +65,7 @@ kage search "auth"
 Optionally download the macOS desktop app:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg
+https://github.com/farmcan/kage/releases/download/v0.2.1/KAGE-0.2.1.dmg
 ```
 
 The desktop app is currently unsigned in CI.
@@ -195,10 +195,10 @@ kage claude qodercli --fork "另外开一个分支，去做 session split" --out
 
 ### macOS Desktop App
 
-Download the v0.2.0 DMG from GitHub Releases:
+Download the v0.2.1 DMG from GitHub Releases:
 
 ```text
-https://github.com/farmcan/kage/releases/download/v0.2.0/KAGE-0.2.0.dmg
+https://github.com/farmcan/kage/releases/download/v0.2.1/KAGE-0.2.1.dmg
 ```
 
 The DMG is unsigned for now. If macOS blocks the first launch, right-click `KAGE.app`, choose `Open`, then confirm.
@@ -216,7 +216,7 @@ kage c2x
 kage update
 ```
 
-To upgrade a previous install from this script, run the same install command again. The installer removes the old `agent-session-bridge` global package if it is present, then reinstalls KAGE from the latest `main` tarball.
+To upgrade a previous install from this script, run the same install command again. The installer removes the old `agent-session-bridge` global package if it is present, downloads KAGE directly from GitHub's codeload endpoint, then reinstalls the latest `main` tarball.
 
 ### Local Development
 
@@ -436,7 +436,7 @@ Upgrade an existing install:
 kage update
 ```
 
-`kage update` prints the current KAGE version before running the installer and the version detected after the update completes.
+`kage update` prints the current version and embedded release time before running the installer, then prints the detected version and release time after the update completes. `kage --version` shows the same package release time without making a network request.
 
 Specify a session directly:
 
@@ -624,7 +624,7 @@ The export pipeline can trim or branch a conversation before writing it:
 - [Docs index](docs/README.md)
 - [GitHub presence guide](docs/github-presence-guide.md)
 - [Release and launch checklist](docs/release-launch-checklist.md)
-- [Latest release notes](docs/release-notes/v0.2.0.md)
+- [Latest release notes](docs/release-notes/v0.2.1.md)
 - [May 2026 planning archive](docs/archive/2026-05/)
 
 ## Current Scope

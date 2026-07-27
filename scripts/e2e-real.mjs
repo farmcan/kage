@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const packageJson = JSON.parse(await fs.readFile(path.join(repoRoot, "package.json"), "utf8"));
 const version = packageJson.version;
+const releasedAt = packageJson.releasedAt;
 const appName = "KAGE.app";
 const defaultDmgPath = path.join(repoRoot, "app", ".build", "release", `KAGE-${version}.dmg`);
 const dmgPath = path.resolve(process.argv[2] ?? process.env.KAGE_E2E_DMG ?? defaultDmgPath);
@@ -246,13 +247,18 @@ try {
   const appVersion = run("defaults", ["read", path.join(appPath, "Contents", "Info"), "CFBundleShortVersionString"]).trim();
   const appIconName = run("defaults", ["read", path.join(appPath, "Contents", "Info"), "CFBundleIconFile"]).trim();
   const cliVersion = run(kageBin, ["--version"]).trim();
+  const [cliVersionLabel, cliReleaseLabel] = cliVersion.split("\n");
   requireCondition(appVersion === version, `Expected app version ${version}, got ${appVersion}.`);
   requireCondition(appIconName === "AppIcon", `Expected CFBundleIconFile AppIcon, got ${appIconName}.`);
   requireCondition(await exists(appIconPath), `Packaged app icon not found: ${appIconPath}.`);
   requireCondition(await exists(menuBarIconPath), `Packaged menu bar icon not found: ${menuBarIconPath}.`);
-  requireCondition(cliVersion.startsWith(`kage ${version}`), `Expected CLI version kage ${version}, got ${cliVersion}.`);
-  requireCondition(/\(app-bundle [0-9a-f]{7,40}\)$/u.test(cliVersion), `Expected bundled CLI build label, got ${cliVersion}.`);
-  summary.push(`verified app icon, menu bar icon, and bundled CLI version ${cliVersion}`);
+  requireCondition(cliVersionLabel.startsWith(`kage ${version}`), `Expected CLI version kage ${version}, got ${cliVersionLabel}.`);
+  requireCondition(
+    /\(app-bundle [0-9a-f]{7,40}\)$/u.test(cliVersionLabel),
+    `Expected bundled CLI build label, got ${cliVersionLabel}.`,
+  );
+  requireCondition(cliReleaseLabel === `Released: ${releasedAt}`, `Expected release time ${releasedAt}, got ${cliReleaseLabel}.`);
+  summary.push(`verified app icon, menu bar icon, bundled CLI version ${cliVersionLabel}, and release time ${releasedAt}`);
 
   const fixtures = await createFixtures();
   summary.push(`created real session roots under ${tmpHome}`);

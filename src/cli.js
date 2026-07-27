@@ -20,7 +20,7 @@ import { SessionMetadataCache, readSessionSummary } from "./core/session-cache.j
 import { compactSessionText } from "./core/session-labels.js";
 import { listNestedTranscripts } from "./core/nested-transcripts.js";
 import { buildClaudeResumeCommand, buildCodexResumeCommand, buildQoderResumeCommand } from "./core/resume-commands.js";
-import { formatBuildLabel, formatCliVersion, getCliVersionInfo } from "./core/version.js";
+import { formatBuildLabel, formatCliVersion, formatReleaseTime, getCliVersionInfo } from "./core/version.js";
 import { startServeCommand } from "./serve/index.js";
 
 const shorthandAgents = ["c", "x", "q", "qw"];
@@ -539,6 +539,10 @@ export async function runUpdateCommand({
 } = {}) {
   const currentVersion = await getCliVersionInfo();
   stdout.write(`KAGE update\nCurrent version: ${currentVersion.version}\n`);
+  const currentReleaseTime = formatReleaseTime(currentVersion.releasedAt);
+  if (currentReleaseTime) {
+    stdout.write(`Current release time: ${currentReleaseTime}\n`);
+  }
   const currentBuild = formatBuildLabel(currentVersion.build);
   if (currentBuild) {
     stdout.write(`Current build: ${currentBuild}\n`);
@@ -568,6 +572,10 @@ export async function runUpdateCommand({
   });
   const updatedVersion = await getCliVersionInfo();
   stdout.write(`\nUpdate complete.\nVersion after update: ${updatedVersion.version}\n`);
+  const updatedReleaseTime = formatReleaseTime(updatedVersion.releasedAt);
+  if (updatedReleaseTime) {
+    stdout.write(`Release time after update: ${updatedReleaseTime}\n`);
+  }
   const updatedBuild = formatBuildLabel(updatedVersion.build);
   if (updatedBuild) {
     stdout.write(`Build after update: ${updatedBuild}\n`);

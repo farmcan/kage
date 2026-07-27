@@ -13,10 +13,11 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /^#!\/usr\/bin\/env bash/m);
   assert.match(content, /node/i);
   assert.match(content, /npm/i);
-  assert.match(content, /https:\/\/github\.com\/farmcan\/kage\/archive\/refs\/heads\/main\.tar\.gz/);
+  assert.match(content, /https:\/\/codeload\.github\.com\/farmcan\/kage\/tar\.gz\/refs\/heads\/main/);
+  assert.match(content, /curl --retry 3 --retry-delay 1 -fsSL/);
   assert.match(content, /npm list -g agent-session-bridge/);
   assert.match(content, /npm uninstall -g agent-session-bridge/);
-  assert.match(content, /npm install -g --force/);
+  assert.match(content, /npm install -g "\$archive_path"/);
   assert.match(content, /build-info\.json/);
   assert.match(content, /api\.github\.com\/repos\/farmcan\/kage\/git\/ref\/heads\/main/);
   assert.match(content, /kage --version/);
@@ -46,6 +47,8 @@ test("homepage and release notes track the package version", async () => {
   const homepageSource = await fs.readFile(path.join(__dirname, "..", "site", "src", "main.jsx"), "utf8");
   const releaseNotes = await fs.readFile(path.join(__dirname, "..", "docs", "release-notes", `${tag}.md`), "utf8");
 
+  assert.match(packageJson.releasedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u);
+  assert.equal(new Date(packageJson.releasedAt).toISOString().replace(".000Z", "Z"), packageJson.releasedAt);
   assert.match(homepageSource, new RegExp(`Latest: ${tag}`));
   assert.equal(homepageSource.split(expectedDownload).length - 1, 1);
   assert.match(releaseNotes, new RegExp(`# KAGE ${tag}`));

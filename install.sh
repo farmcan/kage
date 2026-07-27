@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO_TARBALL_URL="https://github.com/farmcan/kage/archive/refs/heads/main.tar.gz"
+REPO_TARBALL_URL="https://codeload.github.com/farmcan/kage/tar.gz/refs/heads/main"
 REPO_REF_URL="https://api.github.com/repos/farmcan/kage/git/ref/heads/main"
 
 fail() {
@@ -26,12 +26,18 @@ fi
 
 printf 'Installing KAGE from %s\n' "$REPO_TARBALL_URL"
 install_revision="$(curl -fsSL "$REPO_REF_URL" | sed -n 's/.*"sha": "\([0-9a-f]\{7,40\}\)".*/\1/p' | head -n 1 || true)"
+archive_dir="$(mktemp -d "${TMPDIR:-/tmp}/kage-main.XXXXXX")"
+archive_path="$archive_dir/kage-main.tar.gz"
+trap 'rm -rf "$archive_dir"' EXIT
+curl --retry 3 --retry-delay 1 -fsSL "$REPO_TARBALL_URL" -o "$archive_path" ||
+  fail "unable to download KAGE. Check your network connection and try again."
+
 if npm list -g agent-session-bridge >/dev/null 2>&1; then
   printf 'Removing old agent-session-bridge package...\n'
   npm uninstall -g agent-session-bridge >/dev/null
 fi
 
-npm install -g --force "$REPO_TARBALL_URL"
+npm install -g "$archive_path"
 
 package_dir="$(npm root -g)/kage"
 if [ -d "$package_dir" ]; then
@@ -48,7 +54,7 @@ fi
 
 installed_version="$(kage --version 2>/dev/null || true)"
 if [ -n "$installed_version" ]; then
-  printf '\nInstalled %s.\n' "$installed_version"
+  printf '\nInstalled KAGE:\n%s\n' "$installed_version"
 else
   printf '\nInstalled KAGE.\n'
 fi

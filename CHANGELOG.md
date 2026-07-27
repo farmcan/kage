@@ -2,6 +2,13 @@
 
 ## Unreleased / 未发布
 
+## v0.2.1 / 2026-07-27
+
+- `kage --version` now shows the package's embedded release time, and `kage update` shows release times before and after updating.
+- `kage --version` 现在会显示包内嵌的发布时间，`kage update` 也会展示更新前后的发布时间。
+- The installer now downloads directly from GitHub's codeload endpoint with explicit retry and failure handling, avoiding the archive redirect path that could return HTTP 403.
+- 安装器现在直接从 GitHub codeload 端点下载，并提供明确的重试与失败处理，避开可能返回 HTTP 403 的 archive 重定向链路。
+
 ## v0.2.0 / 2026-07-23
 
 - Continue a Claude Code session in Codex without repeating the context: `kage c2x` creates a target-native Codex session and prints the exact `codex resume` command.
