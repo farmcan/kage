@@ -6,8 +6,8 @@
 
 - `kage --version` now shows the package's embedded release time, and `kage update` shows release times before and after updating.
 - `kage --version` 现在会显示包内嵌的发布时间，`kage update` 也会展示更新前后的发布时间。
-- The installer now downloads directly from GitHub's codeload endpoint with explicit retry and failure handling, avoiding the archive redirect path that could return HTTP 403.
-- 安装器现在直接从 GitHub codeload 端点下载，并提供明确的重试与失败处理，避开可能返回 HTTP 403 的 archive 重定向链路。
+- The installer now downloads directly from GitHub's codeload endpoint with explicit retry and failure handling, while optional revision lookup no longer prints misleading GitHub API rate-limit errors.
+- 安装器现在直接从 GitHub codeload 端点下载，并提供明确的重试与失败处理；可选的 revision 查询也不再输出具有误导性的 GitHub API 限流错误。
 
 ## v0.2.0 / 2026-07-23
 

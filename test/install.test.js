@@ -20,6 +20,7 @@ test("install.sh exists and documents the GitHub installer flow", async () => {
   assert.match(content, /npm install -g "\$archive_path"/);
   assert.match(content, /build-info\.json/);
   assert.match(content, /api\.github\.com\/repos\/farmcan\/kage\/git\/ref\/heads\/main/);
+  assert.match(content, /curl -fsSL "\$REPO_REF_URL" 2>\/dev\/null/);
   assert.match(content, /kage --version/);
   assert.match(content, /kage c2x/);
 });

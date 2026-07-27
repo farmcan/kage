@@ -25,7 +25,7 @@ if [ "$node_major" -lt 20 ]; then
 fi
 
 printf 'Installing KAGE from %s\n' "$REPO_TARBALL_URL"
-install_revision="$(curl -fsSL "$REPO_REF_URL" | sed -n 's/.*"sha": "\([0-9a-f]\{7,40\}\)".*/\1/p' | head -n 1 || true)"
+install_revision="$(curl -fsSL "$REPO_REF_URL" 2>/dev/null | sed -n 's/.*"sha": "\([0-9a-f]\{7,40\}\)".*/\1/p' | head -n 1 || true)"
 archive_dir="$(mktemp -d "${TMPDIR:-/tmp}/kage-main.XXXXXX")"
 archive_path="$archive_dir/kage-main.tar.gz"
 trap 'rm -rf "$archive_dir"' EXIT
