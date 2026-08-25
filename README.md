@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="docs/assets/kage-logo.svg" width="104" alt="KAGE session portal icon">
 </p>
@@ -219,6 +221,8 @@ kage update
 To upgrade a previous install from this script, run the same install command again. The installer removes the old `agent-session-bridge` global package if it is present, downloads KAGE directly from GitHub's codeload endpoint, then reinstalls the latest `main` tarball.
 
 ### Local Development
+
+Requires Node.js 20 or newer.
 
 ```bash
 npm install
